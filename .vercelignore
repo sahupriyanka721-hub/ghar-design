@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+apps/web/dist
+apps/web/build
+dist
+build
+.git
+.github
+.vscode
+.cache
+.turbo
+.vercel
+.vercel_old
+*.log
+coverage
+tmp
+temp

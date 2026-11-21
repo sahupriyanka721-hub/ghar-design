@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/brand-emblem-web.png" />
+    <link rel="apple-touch-icon" href="/brand-emblem-web.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BuildGhar - Architecture, Civil Construction & Luxury Interior Design</title>
+    <meta name="description" content="India's leading platform for architectural 2D/3D house plans, vetted civil construction contractors, and milestone escrow management." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#f4f8fd] text-slate-900 font-sans antialiased selection:bg-gold-500 selection:text-white">
+    <div id="root">
+      <!-- 
+        =============================================================
+        BUILDGHAR LUXURY BRAND PRE-LOADER (100% Matched to Master Logo)
+        Renders instantly on page load with zero delay before React mounts
+        ============================================================= 
+      -->
+      <div id="bg-preloader" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#edf4fc 0%,#f7faff 50%,#edf4fc 100%);font-family:'Plus Jakarta Sans',-apple-system,sans-serif;z-index:99999;user-select:none;">
+        <style>
+          @keyframes bgPulse {
+            0%, 100% { transform: scale(1) translateY(0); filter: drop-shadow(0 6px 16px rgba(245,158,11,0.3)); }
+            50% { transform: scale(1.06) translateY(-4px); filter: drop-shadow(0 12px 28px rgba(245,158,11,0.55)); }
+          }
+          @keyframes bgGlow {
+            0%, 100% { transform: scale(1); opacity: 0.35; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+          }
+          @keyframes bgProgress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+          }
+          .bg-emblem-anim { animation: bgPulse 2s ease-in-out infinite; }
+          .bg-glow-anim { animation: bgGlow 2.2s ease-in-out infinite; }
+          .bg-bar-anim { animation: bgProgress 1.4s ease-in-out infinite; }
+        </style>
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+          <div class="bg-glow-anim" style="position:absolute;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(245,158,11,0.35) 0%,rgba(59,130,246,0.15) 60%,transparent 70%);pointer-events:none;"></div>
+          <img src="/brand-emblem-web.png" alt="BuildGhar Logo" class="bg-emblem-anim" style="width:72px;height:86px;object-fit:contain;position:relative;z-index:2;" />
+        </div>
+        <div style="margin-top:16px;display:flex;align-items:center;font-family:'Outfit',sans-serif;font-weight:900;font-size:26px;line-height:1;letter-spacing:-0.02em;">
+          <span style="color:#102646;">Build</span>
+          <span style="background:linear-gradient(90deg,#f59e0b,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-left:4px;">Ghar</span>
+        </div>
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.25em;color:#b45309;margin-top:5px;">
+          Homes & Construction
+        </div>
+        <div style="margin-top:20px;width:180px;height:4px;background:#e1ecf7;border-radius:99px;overflow:hidden;position:relative;border:1px solid #c6daf0;">
+          <div class="bg-bar-anim" style="width:50%;height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24,#f59e0b);border-radius:99px;box-shadow:0 0 10px rgba(245,158,11,0.8);"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

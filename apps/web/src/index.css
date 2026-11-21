@@ -1,0 +1,307 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-[#f4f8fd] text-slate-800 antialiased font-sans selection:bg-sky-200 selection:text-navy-950;
+    background-image:
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 45%),
+      radial-gradient(at 50% 40%, rgba(224, 238, 255, 0.4) 0px, transparent 65%),
+      radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-navy-950 tracking-tight leading-tight;
+  }
+}
+
+@layer components {
+  /* World-Class Modern Buttons (Stripe / Airbnb / Apple Tier) */
+  .btn-primary {
+    @apply relative overflow-hidden inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-bold text-white bg-navy-950 hover:bg-navy-900 border border-amber-500/30 hover:border-amber-400 active:scale-[0.98] hover:scale-[1.01] transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-amber-500/10 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-gold {
+    @apply relative overflow-hidden inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-black text-navy-950 bg-gradient-to-r from-amber-400 via-gold-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] hover:scale-[1.01] transition-all duration-200 shadow-md shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/35 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-300/80;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-bold text-navy-950 bg-white/95 backdrop-blur-sm border border-slate-200 hover:bg-amber-50/50 hover:border-amber-400/60 active:scale-[0.98] hover:scale-[1.01] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Signature Light Blues Primary Action Button */
+  .btn-blue {
+    @apply relative overflow-hidden inline-flex items-center justify-center px-6 py-3.5 rounded-2xl text-sm font-extrabold text-white bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 hover:from-sky-500 hover:to-blue-600 active:scale-[0.98] hover:scale-[1.01] transition-all duration-200 shadow-lg shadow-sky-600/25 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-light-blue {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-extrabold text-navy-950 bg-white hover:bg-blue-50/80 border-2 border-blue-200 hover:border-blue-400 active:scale-[0.98] hover:scale-[1.01] transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Executive Cards with Smooth Borders and Clean Lighting (Halka Bluish with Shining) */
+  .card {
+    @apply bg-white/90 backdrop-blur-xl rounded-2xl border border-blue-100/80 shadow-[0_4px_24px_rgba(20,50,90,0.04)] transition-all duration-200;
+  }
+
+  .card-3d-hover {
+    @apply bg-white/90 backdrop-blur-xl rounded-2xl border border-blue-100/80 shadow-[0_4px_24px_rgba(20,50,90,0.04)] transition-all duration-300 hover:shadow-[0_16px_40px_rgba(20,60,120,0.09)] hover:border-amber-400/60 hover:-translate-y-1;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all shadow-sm;
+  }
+
+  .label-text {
+    @apply block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider font-sans;
+  }
+}
+
+/* ---------------- 2D & 3D ANIMATION ENGINES ---------------- */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px) rotateX(0deg) rotateY(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotateX(2deg) rotateY(-1deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes pulse-gold-halo {
+  0%, 100% {
+    box-shadow: 0 0 15px -2px rgba(245, 158, 11, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 35px 4px rgba(245, 158, 11, 0.5);
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Button Luminous Gleam Sweep on Hover (Shining Effect) */
+.btn-gold::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -80%;
+  width: 30%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  transition: all 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.btn-gold:hover::after {
+  left: 140%;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -80%;
+  width: 30%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  transition: all 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.btn-primary:hover::after {
+  left: 140%;
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-flow {
+  background-size: 200% 200%;
+  animation: gradient-flow 4s ease infinite;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.animate-float-3d {
+  animation: float-gentle 6s ease-in-out infinite;
+}
+
+.animate-float-chip {
+  animation: float-reverse 4s ease-in-out infinite;
+}
+
+.animate-pulse-halo {
+  animation: pulse-gold-halo 3s ease-in-out infinite;
+}
+
+.animate-dash-line {
+  stroke-dasharray: 8 6;
+  animation: dash-flow 12s linear infinite;
+}
+
+/* 3D Perspective Contexts */
+.perspective-1200 {
+  perspective: 1200px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* Luxury Typography Gradients */
+.text-gradient-gold {
+  @apply bg-gradient-to-r from-gold-600 via-amber-500 to-gold-500 bg-clip-text text-transparent font-black;
+}
+
+.text-gradient-navy {
+  @apply bg-gradient-to-r from-navy-950 via-navy-900 to-slate-800 bg-clip-text text-transparent;
+}
+
+/* Staggered Hero Fade-In-Up Keyframes (0.4s Apple Motion) */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-75 { animation-delay: 75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-225 { animation-delay: 225ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-375 { animation-delay: 375ms; }
+.delay-450 { animation-delay: 450ms; }
+
+/* Subtle Moving Aurora Gradient (Apple Luxury) */
+@keyframes moveAurora {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.08);
+  }
+}
+
+.animate-aurora {
+  animation: moveAurora 16s ease-in-out infinite;
+}
+
+/* Infinite Auto-Sliding Marquee (Linear.app Style) */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-33.33333%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Admin Fullscreen Modal Reset & Top Coverage */
+
+.admin-fullscreen-modal {
+
+  position: fixed !important;
+
+  inset: 0 !important;
+
+  top: 0 !important;
+
+  left: 0 !important;
+
+  right: 0 !important;
+
+  bottom: 0 !important;
+
+  width: 100vw !important;
+
+  height: 100vh !important;
+
+  z-index: 99999 !important;
+
+  margin: 0 !important;
+
+}
+

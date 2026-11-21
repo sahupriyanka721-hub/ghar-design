@@ -1,0 +1,787 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  PROFESSIONAL
+}
+
+enum ProfessionalCategory {
+  CONSULTANT
+  CIVIL_ENGINEER
+  STRUCTURAL_ENGINEER
+  INTERIOR_DESIGNER
+  CONSTRUCTION_CONTRACTOR
+  SPECIALIST
+}
+
+enum PropertyType {
+  EMPTY_PLOT
+  EXISTING_HOUSE
+  FLAT_APARTMENT
+  COMMERCIAL_PROPERTY
+  VILLA_BUNGALOW
+}
+
+enum MeasurementUnit {
+  FEET
+  METRES
+}
+
+enum RequestStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  SUBMITTED
+  UNDER_REVIEW
+  AWAITING_ASSIGNMENT
+  ASSIGNED
+  QUOTATIONS_IN_PROGRESS
+  UNDER_QUOTATION_REVIEW
+  QUOTATIONS_AVAILABLE
+  QUOTE_SELECTED
+  BOOKING_PENDING
+  BOOKING_CONFIRMED
+  COMPLETED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_ADMIN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PUBLISHED
+  REJECTED
+  SELECTED
+  NOT_SELECTED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum PaymentStatus {
+  PAYMENT_PENDING
+  PAYMENT_SUCCESSFUL
+  PAYMENT_FAILED
+  PAYMENT_VERIFICATION_PENDING
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentPurpose {
+  REQUEST_FEE
+  BOOKING_ADVANCE
+  MILESTONE_PAYMENT
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  email     String?  @unique
+  name      String
+  role      Role     @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customerProfile     CustomerProfile?
+  professionalProfile ProfessionalProfile?
+  projectRequests     ProjectRequest[]     @relation("CustomerRequests")
+  assignedRequests    RequestAssignment[]  @relation("AssignedToProfessional")
+  quotations          Quotation[]          @relation("ProfessionalQuotations")
+  payments            Payment[]
+  bookingsCustomer    Booking[]            @relation("CustomerBookings")
+  bookingsPro         Booking[]            @relation("ProfessionalBookings")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  addresses           CustomerAddress[]
+  materialOrders      MaterialOrder[]
+  supportTickets      SupportTicket[]
+
+  @@index([phone])
+  @@index([role])
+}
+
+model CustomerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  city      String?
+  state     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProfessionalProfile {
+  id                 String               @id @default(uuid())
+  userId             String               @unique
+  firmName           String
+  category           ProfessionalCategory
+  qualifications     String
+  experienceYears    Int                  @default(0)
+  serviceCities      String[]
+  portfolioUrls      String[]
+  isVerified         Boolean              @default(false)
+  availabilityStatus Boolean              @default(true)
+  verificationStatus String               @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  user                  User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationDocuments ProfessionalVerificationDocument[]
+}
+
+model ProfessionalVerificationDocument {
+  id                    String    @id @default(uuid())
+  professionalProfileId String
+  documentType          String
+  documentUrl           String
+  verifiedAt            DateTime?
+  status                String    @default("PENDING") // PENDING, VERIFIED, REJECTED
+  createdAt             DateTime  @default(now())
+
+  profile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+}
+
+model ServiceCategory {
+  id               String           @id @default(uuid())
+  slug             String           @unique
+  name             String
+  description      String
+  iconName         String
+  isActive         Boolean          @default(true)
+  projectRequests  ProjectRequest[]
+  createdAt        DateTime         @default(now())
+}
+
+model ProjectRequest {
+  id                     String          @id @default(uuid())
+  requestCode            String          @unique
+  customerId             String
+  categoryId             String
+  status                 RequestStatus   @default(AWAITING_PAYMENT)
+  propertyType           PropertyType
+  plotWidth              Float
+  plotLength             Float
+  measurementUnit        MeasurementUnit @default(FEET)
+  plotArea               Float
+  builtUpArea            Float?
+  floors                 Int             @default(1)
+  bedrooms               Int             @default(0)
+  bathrooms              Int             @default(0)
+  kitchens               Int             @default(0)
+  currentCondition       String
+  city                   String
+  state                  String
+  locality               String
+  address                String?
+  ownershipConfirmed     Boolean         @default(false)
+  budgetRange            String
+  preferredStartDate     DateTime?
+  expectedCompletionDate DateTime?
+  description            String
+  designStyle            String?
+  siteAccessibilityNotes String?
+  quoteFeePaise          Int             @default(49900)
+  isFeePaid              Boolean         @default(false)
+  selectedQuotationId    String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  customer         User                    @relation("CustomerRequests", fields: [customerId], references: [id], onDelete: Restrict)
+  category         ServiceCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  services         ProjectRequestService[]
+  attachments      ProjectAttachment[]
+  statusHistory    RequestStatusHistory[]
+  assignments      RequestAssignment[]
+  quotations       Quotation[]
+  payments         Payment[]
+  booking          Booking?
+  stages           ProjectStage[]
+  documents        ProjectDocument[]
+  designApprovals  DesignApproval[]
+  messages         ProjectMessage[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([city])
+  @@index([createdAt])
+}
+
+model ProjectRequestService {
+  id          String   @id @default(uuid())
+  requestId   String
+  serviceName String
+
+  request ProjectRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model ProjectAttachment {
+  id          String   @id @default(uuid())
+  requestId   String
+  fileName    String
+  fileUrl     String
+  fileType    String
+  fileSize    Int
+  uploaderId  String
+  createdAt   DateTime @default(now())
+
+  request ProjectRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model RequestStatusHistory {
+  id             String        @id @default(uuid())
+  requestId      String
+  previousStatus RequestStatus
+  newStatus      RequestStatus
+  actorId        String
+  reason         String?
+  createdAt      DateTime      @default(now())
+
+  request ProjectRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model RequestAssignment {
+  id               String           @id @default(uuid())
+  requestId        String
+  professionalId   String
+  status           AssignmentStatus @default(PENDING)
+  responseDeadline DateTime
+  internalNotes    String?
+  declineReason    String?
+  assignedAt       DateTime         @default(now())
+  respondedAt      DateTime?
+
+  request      ProjectRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  professional User           @relation("AssignedToProfessional", fields: [professionalId], references: [id], onDelete: Restrict)
+
+  @@unique([requestId, professionalId])
+  @@index([requestId])
+  @@index([professionalId])
+}
+
+model Quotation {
+  id                    String          @id @default(uuid())
+  quotationCode         String          @unique
+  requestId             String
+  professionalId        String
+  status                QuotationStatus @default(DRAFT)
+  internalReviewStatus  String          @default("PENDING") // PENDING, APPROVED, REJECTED, CHANGES_REQUESTED
+  scopeOfWork           String
+  subtotalPaise         Int
+  discountPaise         Int             @default(0)
+  taxPaise              Int             @default(0)
+  finalAmountPaise      Int
+  revisionsCount        Int             @default(1)
+  drawingFormats        String[]
+  siteVisitChargesPaise Int             @default(0)
+  estimatedDurationDays Int
+  advancePercentage     Int             @default(20)
+  validUntil            DateTime
+  cancellationTerms     String
+  additionalTerms       String?
+  adminFeedback         String?
+  publishedAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  request      ProjectRequest          @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  professional User                    @relation("ProfessionalQuotations", fields: [professionalId], references: [id], onDelete: Restrict)
+  lineItems    QuotationLineItem[]
+  deliverables QuotationDeliverable[]
+  milestones   QuotationMilestone[]
+  revisions    QuotationRevision[]
+  booking      Booking?
+
+  @@index([requestId])
+  @@index([professionalId])
+  @@index([status])
+}
+
+model QuotationRevision {
+  id             String   @id @default(uuid())
+  quotationId    String
+  revisionNumber Int
+  snapshotJson   String
+  createdAt      DateTime @default(now())
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model QuotationLineItem {
+  id             String @id @default(uuid())
+  quotationId    String
+  description    String
+  quantity       Float
+  unit           String
+  unitPricePaise Int
+  totalPaise     Int
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model QuotationDeliverable {
+  id          String  @id @default(uuid())
+  quotationId String
+  title       String
+  isIncluded  Boolean @default(true)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model QuotationMilestone {
+  id          String  @id @default(uuid())
+  quotationId String
+  title       String
+  percentage  Float
+  amountPaise Int
+  description String?
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model Payment {
+  id                String         @id @default(uuid())
+  paymentCode       String         @unique
+  userId            String
+  requestId         String?
+  bookingId         String?
+  purpose           PaymentPurpose
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?        @unique
+  razorpaySignature String?
+  amountPaise       Int
+  currency          String         @default("INR")
+  status            PaymentStatus  @default(PAYMENT_PENDING)
+  failureReason     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  request ProjectRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  booking Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([requestId])
+  @@index([status])
+}
+
+model Booking {
+  id                String        @id @default(uuid())
+  bookingCode       String        @unique
+  requestId         String        @unique
+  quotationId       String        @unique
+  customerId        String
+  professionalId    String
+  status            BookingStatus @default(PENDING)
+  totalAmountPaise  Int
+  advancePaidPaise  Int           @default(0)
+  confirmedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  request      ProjectRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  quotation    Quotation      @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  customer     User           @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  professional User           @relation("ProfessionalBookings", fields: [professionalId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+
+  @@index([customerId])
+  @@index([professionalId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+model PlatformSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model OtpToken {
+  id        String   @id @default(uuid())
+  phone     String
+  otpHash   String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model CustomerAddress {
+  id                String   @id @default(uuid())
+  customerId        String
+  label             String
+  houseNo           String
+  street            String
+  locality          String
+  city              String
+  state             String
+  pinCode           String
+  country           String   @default("India")
+  landmark          String?
+  isDefaultBilling  Boolean  @default(false)
+  isDefaultDelivery Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model ProjectStage {
+  id               String    @id @default(uuid())
+  projectId        String
+  stageNumber      Int
+  stageName        String
+  workflowType     String    @default("CONSTRUCTION")
+  status           String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, BLOCKED
+  assignedPerson   String?
+  startDate        DateTime?
+  dueDate          DateTime?
+  completionDate   DateTime?
+  evidencePhotos   String[]
+  notes            String?
+  requiresApproval Boolean   @default(false)
+  isApproved       Boolean?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  request ProjectRequest @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectDocument {
+  id             String            @id @default(uuid())
+  projectId      String
+  documentCode   String            @unique
+  title          String
+  category       String // AGREEMENT, DRAWING, 3D_DESIGN, BOQ, WORK_ORDER, SPECIFICATION, SITE_REPORT, HANDOVER
+  currentVersion String            @default("v1.0")
+  fileSize       String
+  fileUrl        String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  versions       DocumentVersion[]
+
+  request ProjectRequest @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String
+  version    String
+  fileUrl    String
+  notes      String?
+  uploadedAt DateTime @default(now())
+
+  document ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model DesignApproval {
+  id              String    @id @default(uuid())
+  projectId       String
+  documentId      String
+  documentTitle   String
+  documentVersion String
+  previewUrl      String
+  status          String    @default("PENDING") // PENDING, APPROVED, CHANGES_REQUESTED
+  requestedAt     DateTime  @default(now())
+  decisionDate    DateTime?
+  customerNotes   String?
+
+  request ProjectRequest @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([documentId])
+}
+
+model ProjectMessage {
+  id          String   @id @default(uuid())
+  projectId   String
+  senderId    String
+  senderName  String
+  senderRole  String
+  content     String
+  attachments String[]
+  createdAt   DateTime @default(now())
+
+  request ProjectRequest @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model MaterialProduct {
+  id                String              @id @default(uuid())
+  sku               String              @unique
+  name              String
+  brand             String
+  category          String
+  specifications    String
+  unit              String
+  pricePaise        Int
+  inStock           Boolean             @default(true)
+  stockQuantity     Int                 @default(100)
+  deliveryDays      Int                 @default(3)
+  imageUrl          String
+  bulkQuoteEligible Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  orderItems        MaterialOrderItem[]
+
+  @@index([category])
+  @@index([brand])
+}
+
+model MaterialOrder {
+  id                   String              @id @default(uuid())
+  orderCode            String              @unique
+  customerId           String
+  subtotalPaise        Int
+  taxPaise             Int
+  deliveryFeePaise     Int                 @default(0)
+  totalAmountPaise     Int
+  deliveryAddressJson  String
+  paymentStatus        PaymentStatus       @default(PAYMENT_PENDING)
+  fulfillmentStatus    String              @default("CONFIRMED")
+  orderDate            DateTime            @default(now())
+  expectedDeliveryDate DateTime?
+  trackingNumber       String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  items                MaterialOrderItem[]
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId])
+  @@index([orderCode])
+}
+
+model MaterialOrderItem {
+  id             String @id @default(uuid())
+  orderId        String
+  productId      String
+  name           String
+  sku            String
+  brand          String
+  unit           String
+  quantity       Int
+  unitPricePaise Int
+  totalPaise     Int
+  imageUrl       String
+
+  order   MaterialOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product MaterialProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Invoice {
+  id                     String            @id @default(uuid())
+  invoiceNumber          String            @unique
+  invoiceType            String            @default("TAX_INVOICE") // TAX_INVOICE, PRO_FORMA, RECEIPT
+  issueDate              DateTime          @default(now())
+  dueDate                DateTime
+  relatedProject         String?
+  relatedOrder           String?
+  issuerName             String            @default("GharDesign Private Limited")
+  issuerGstin            String            @default("07AABCG1234F1Z8")
+  customerName           String
+  customerBillingAddress String
+  subtotalPaise          Int
+  discountPaise          Int               @default(0)
+  taxPaise               Int
+  totalAmountPaise       Int
+  paidAmountPaise        Int               @default(0)
+  outstandingPaise       Int               @default(0)
+  status                 String            @default("PENDING") // PAID, PENDING, OVERDUE
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  lineItems              InvoiceLineItem[]
+
+  @@index([invoiceNumber])
+  @@index([status])
+}
+
+model InvoiceLineItem {
+  id             String  @id @default(uuid())
+  invoiceId      String
+  description    String
+  quantity       Float
+  unit           String
+  unitPricePaise Int
+  totalPaise     Int
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model FinalSettlement {
+  id                      String    @id @default(uuid())
+  projectId               String    @unique
+  projectName             String
+  projectCode             String
+  originalContractPaise   Int
+  approvedVariationsPaise Int       @default(0)
+  approvedDiscountsPaise  Int       @default(0)
+  taxesPaise              Int       @default(0)
+  separateMaterialsPaise  Int       @default(0)
+  paymentsReceivedPaise   Int       @default(0)
+  creditNotesPaise        Int       @default(0)
+  retentionPaise          Int       @default(0)
+  netPayablePaise         Int
+  status                  String    @default("AWAITING_CUSTOMER_APPROVAL")
+  disputeNotes            String?
+  createdAt               DateTime  @default(now())
+  closedAt                DateTime?
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model SupportTicket {
+  id               String                 @id @default(uuid())
+  ticketCode       String                 @unique
+  customerId       String
+  category         String // QUOTATION, BILLING, PROJECT_EXECUTION, MATERIALS, GENERAL
+  priority         String                 @default("MEDIUM")
+  subject          String
+  description      String
+  status           String                 @default("OPEN") // OPEN, IN_PROGRESS, WAITING_FOR_CUSTOMER, RESOLVED, CLOSED
+  relatedReference String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  messages         SupportTicketMessage[]
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model SupportTicketMessage {
+  id         String   @id @default(uuid())
+  ticketId   String
+  senderName String
+  senderRole String
+  message    String
+  createdAt  DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model CustomerReview {
+  id                String   @id @default(uuid())
+  bookingId         String
+  projectName       String
+  professionalName  String
+  overallRating     Int
+  qualityRating     Int
+  punctualityRating Int
+  comment           String
+  createdAt         DateTime @default(now())
+
+  @@index([bookingId])
+}
+

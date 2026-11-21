@@ -1,0 +1,2099 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Compass,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
+  ExternalLink,
+  Eye,
+  Building2,
+  Building,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Layers,
+  FileText,
+  FileCheck2,
+  CreditCard,
+  X,
+  ArrowLeft,
+  Filter,
+  Check,
+  Sparkles,
+  Sliders,
+  RotateCcw,
+  Trash2,
+  Star,
+  Tag,
+  StickyNote,
+  Share2,
+  Send,
+  MessageSquare,
+  Percent,
+  Copy,
+  MessageCircle,
+  Calendar,
+  Award,
+  Plus,
+  Gift,
+  SendHorizontal,
+  ChevronDown,
+  Info,
+  BadgeCheck,
+  Briefcase,
+  Users,
+} from 'lucide-react';
+import { useToast } from '../../context/ToastContext.js';
+import { pullFromCloud } from '../../data/cloudSync.js';
+import { formatDate } from '../../lib/utils.js';
+import {
+  getArchitectAccounts,
+  updateArchitectStatus,
+  deleteArchitectAccount,
+  clearAllArchitects,
+  ArchitectAccount,
+  ArchitectAccountStatus,
+  addArchitectNote,
+  deleteArchitectNote,
+  saveArchitectReview,
+  saveArchitectDiscount,
+  shareArchitectWithCustomer,
+} from '../../data/architectStore.js';
+import {
+  getRegisteredCustomers,
+  RegisteredCustomer,
+} from '../../data/customerStore.js';
+
+export const AdminArchitects: React.FC = () => {
+  const { success, error } = useToast();
+  const [architects, setArchitects] = useState<ArchitectAccount[]>([]);
+  const [customers, setCustomers] = useState<RegisteredCustomer[]>([]);
+  const [selectedStatusTab, setSelectedStatusTab] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedArchitect, setSelectedArchitect] = useState<ArchitectAccount | null>(null);
+
+  // Active Tab inside Full Dossier Modal
+  const [activeDossierTab, setActiveDossierTab] = useState<
+    'CREDENTIALS' | 'REVIEW' | 'NOTES' | 'DISCOUNT' | 'SEND_CUSTOMER'
+  >('CREDENTIALS');
+
+  // Status Action Modals
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'CHANGES_REQUESTED' | 'REJECTED' | null>(null);
+  const [remarksText, setRemarksText] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Quick Standalone Send Modal (direct from table row)
+  const [quickSendArch, setQuickSendArch] = useState<ArchitectAccount | null>(null);
+
+  // Review Form State
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    qualityScore: 95,
+    designAestheticsRating: 5,
+    structuralAccuracyRating: 5,
+    communicationRating: 5,
+    tierBadge: 'VERIFIED_ELITE' as 'STANDARD' | 'VERIFIED_ELITE' | 'MASTER_ARCHITECT',
+    summary: 'Council of Architecture verified. High-precision structural and aesthetic blueprints.',
+  });
+
+  // Notes Form State
+  const [noteText, setNoteText] = useState('');
+  const [notePriority, setNotePriority] = useState<'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
+
+  // Discount Form State
+  const [discountForm, setDiscountForm] = useState({
+    enabled: true,
+    type: 'PERCENTAGE' as 'PERCENTAGE' | 'FLAT',
+    amount: 10,
+    code: 'BGARCH10',
+    validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    terms: 'Special platform discount applicable on initial 2D architectural blueprint & 3D elevation milestones.',
+  });
+
+  // Send to Customer Form State
+  const [sendForm, setSendForm] = useState({
+    selectedCustomerId: '',
+    discountCode: 'BGARCH10',
+    discountApplied: '10% OFF',
+    customNote: 'Recommended by BuildGhar Central Engineering Desk for verified architectural execution & timely structural drawings.',
+    channel: 'ALL' as 'WHATSAPP' | 'SMS' | 'PORTAL' | 'ALL',
+  });
+
+  const loadData = () => {
+    const list = getArchitectAccounts();
+    setArchitects([...list]);
+    const custs = getRegisteredCustomers();
+    setCustomers([...custs]);
+
+    if (selectedArchitect) {
+      const refreshed = list.find((a) => a.id === selectedArchitect.id);
+      if (refreshed) setSelectedArchitect(refreshed);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await pullFromCloud();
+      loadData();
+      success('Architects table refreshed & synced with cloud database!');
+    } catch {
+      loadData();
+      success('Architects table refreshed.');
+    } finally {
+      setTimeout(() => setRefreshing(false), 600);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    pullFromCloud().then(() => loadData()).catch(() => {});
+
+    window.addEventListener('storage', loadData);
+    window.addEventListener('admin_global_refresh', loadData);
+    window.addEventListener('architect_store_updated', loadData);
+    return () => {
+      window.removeEventListener('storage', loadData);
+      window.removeEventListener('admin_global_refresh', loadData);
+      window.removeEventListener('architect_store_updated', loadData);
+    };
+  }, []);
+
+  // Sync Form States when selecting an architect
+  useEffect(() => {
+    if (selectedArchitect) {
+      // Review
+      setReviewForm({
+        rating: selectedArchitect.adminReview?.rating || 5,
+        qualityScore: selectedArchitect.adminReview?.qualityScore || 95,
+        designAestheticsRating: selectedArchitect.adminReview?.designAestheticsRating || 5,
+        structuralAccuracyRating: selectedArchitect.adminReview?.structuralAccuracyRating || 5,
+        communicationRating: selectedArchitect.adminReview?.communicationRating || 5,
+        tierBadge: selectedArchitect.adminReview?.tierBadge || 'VERIFIED_ELITE',
+        summary:
+          selectedArchitect.adminReview?.summary ||
+          'Council of Architecture verified. High-precision structural and aesthetic blueprints.',
+      });
+
+      // Discount
+      setDiscountForm({
+        enabled: selectedArchitect.specialDiscount ? selectedArchitect.specialDiscount.enabled : true,
+        type: selectedArchitect.specialDiscount?.type || 'PERCENTAGE',
+        amount: selectedArchitect.specialDiscount?.amount ?? 10,
+        code:
+          selectedArchitect.specialDiscount?.code ||
+          `BGARCH${selectedArchitect.name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()}10`,
+        validUntil:
+          selectedArchitect.specialDiscount?.validUntil ||
+          new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        terms:
+          selectedArchitect.specialDiscount?.terms ||
+          'Special platform discount applicable on initial 2D architectural blueprint & 3D elevation milestones.',
+      });
+
+      // Send Form
+      const defaultCust = customers[0];
+      const discountCode = selectedArchitect.specialDiscount?.enabled
+        ? selectedArchitect.specialDiscount.code
+        : 'BGARCH10';
+      const discountApplied = selectedArchitect.specialDiscount?.enabled
+        ? selectedArchitect.specialDiscount.type === 'PERCENTAGE'
+          ? `${selectedArchitect.specialDiscount.amount}% OFF`
+          : `₹${selectedArchitect.specialDiscount.amount} OFF`
+        : '10% Platform Discount';
+
+      setSendForm({
+        selectedCustomerId: defaultCust?.id || '',
+        discountCode,
+        discountApplied,
+        customNote: `Our Central Engineering Desk specifically recommends Architect ${selectedArchitect.name} (${selectedArchitect.firmName}) for your architectural blueprints, structural design, and 3D elevation.`,
+        channel: 'ALL',
+      });
+    }
+  }, [selectedArchitect, customers]);
+
+  // Filter logic
+  const filtered = architects.filter((a) => {
+    const matchesTab =
+      selectedStatusTab === 'ALL' || a.accountStatus === selectedStatusTab;
+
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      a.name.toLowerCase().includes(q) ||
+      a.firmName.toLowerCase().includes(q) ||
+      a.phone.includes(q) ||
+      (a.id && a.id.toLowerCase().includes(q)) ||
+      (a.coaNumber && a.coaNumber.toLowerCase().includes(q)) ||
+      a.city.toLowerCase().includes(q);
+
+    return matchesTab && matchesSearch;
+  });
+
+  const pendingCount = architects.filter((a) => a.accountStatus === 'PENDING_APPROVAL').length;
+  const approvedCount = architects.filter((a) => a.accountStatus === 'APPROVED').length;
+  const changesCount = architects.filter((a) => a.accountStatus === 'CHANGES_REQUESTED').length;
+  const incompleteCount = architects.filter((a) => a.accountStatus === 'PROFILE_INCOMPLETE').length;
+  const discountedCount = architects.filter((a) => a.specialDiscount?.enabled).length;
+
+  const handleApprove = (id: string) => {
+    const updated = updateArchitectStatus(
+      id,
+      'APPROVED',
+      'COA registration verified with Indian Council of Architecture records. Approved for active landowner RFQs.',
+      'Super Admin Review Desk'
+    );
+    if (updated) {
+      loadData();
+      if (selectedArchitect?.id === id) {
+        setSelectedArchitect({ ...updated });
+      }
+      success(`Architect "${updated.name}" approved successfully!`);
+    }
+  };
+
+  const handleOpenRemarksModal = (action: 'CHANGES_REQUESTED' | 'REJECTED') => {
+    setPendingAction(action);
+    setRemarksText(
+      action === 'CHANGES_REQUESTED'
+        ? 'Please re-upload a high-resolution scanned copy of your Council of Architecture (COA) registration certificate. The current file is illegible.'
+        : 'Application cannot be approved due to unverified professional licensing.'
+    );
+    setShowRemarksModal(true);
+  };
+
+  const handleConfirmRemarksAction = () => {
+    if (!selectedArchitect || !pendingAction) return;
+
+    if (!remarksText.trim()) {
+      error('Please provide specific remarks for the architect');
+      return;
+    }
+
+    const updated = updateArchitectStatus(
+      selectedArchitect.id,
+      pendingAction,
+      remarksText.trim(),
+      'Super Admin Review Desk'
+    );
+
+    if (updated) {
+      loadData();
+      setSelectedArchitect({ ...updated });
+      setShowRemarksModal(false);
+      setPendingAction(null);
+      setRemarksText('');
+      success(`Status updated to ${pendingAction.replace('_', ' ')} with admin feedback.`);
+    }
+  };
+
+  const handleSuspendToggle = (id: string, currentStatus: ArchitectAccountStatus) => {
+    const nextStatus = currentStatus === 'SUSPENDED' ? 'APPROVED' : 'SUSPENDED';
+    const remarks =
+      nextStatus === 'SUSPENDED'
+        ? 'Partner account suspended pending compliance audit.'
+        : 'Partner account reinstated.';
+
+    const updated = updateArchitectStatus(id, nextStatus, remarks, 'Super Admin Review Desk');
+    if (updated) {
+      loadData();
+      if (selectedArchitect?.id === id) {
+        setSelectedArchitect({ ...updated });
+      }
+      success(`Architect account ${nextStatus === 'SUSPENDED' ? 'suspended' : 'reinstated'}.`);
+    }
+  };
+
+  // ---------------- Review Handler ----------------
+  const handleSaveReview = (archId: string) => {
+    const updated = saveArchitectReview(archId, {
+      rating: reviewForm.rating,
+      qualityScore: reviewForm.qualityScore,
+      designAestheticsRating: reviewForm.designAestheticsRating,
+      structuralAccuracyRating: reviewForm.structuralAccuracyRating,
+      communicationRating: reviewForm.communicationRating,
+      tierBadge: reviewForm.tierBadge,
+      summary: reviewForm.summary.trim(),
+      reviewedBy: 'Super Admin Governance Desk',
+      reviewedAt: new Date().toISOString(),
+    });
+
+    if (updated) {
+      loadData();
+      success('Governance Review & Rating saved successfully!');
+    }
+  };
+
+  // ---------------- Notes Handler ----------------
+  const handleAddNote = (archId: string) => {
+    if (!noteText.trim()) {
+      error('Please enter a note');
+      return;
+    }
+    const updated = addArchitectNote(archId, noteText, 'Super Admin Desk', notePriority);
+    if (updated) {
+      setNoteText('');
+      loadData();
+      success('Internal administrative note recorded!');
+    }
+  };
+
+  const handleDeleteNote = (archId: string, noteId: string) => {
+    const updated = deleteArchitectNote(archId, noteId);
+    if (updated) {
+      loadData();
+      success('Note deleted.');
+    }
+  };
+
+  // ---------------- Discount Handler ----------------
+  const handleSaveDiscount = (archId: string) => {
+    if (discountForm.amount <= 0) {
+      error('Discount amount must be greater than 0');
+      return;
+    }
+    const updated = saveArchitectDiscount(archId, {
+      enabled: discountForm.enabled,
+      type: discountForm.type,
+      amount: Number(discountForm.amount),
+      code: discountForm.code.trim().toUpperCase() || 'BGARCH10',
+      validUntil: discountForm.validUntil,
+      terms: discountForm.terms.trim(),
+    });
+
+    if (updated) {
+      loadData();
+      success('Special Architect Discount saved and activated!');
+    }
+  };
+
+  // ---------------- Send to Customer Handler ----------------
+  const handleOpenQuickSend = (arch: ArchitectAccount) => {
+    const defaultCust = customers[0];
+    const discountCode = arch.specialDiscount?.enabled ? arch.specialDiscount.code : 'BGARCH10';
+    const discountApplied = arch.specialDiscount?.enabled
+      ? (arch.specialDiscount.type === 'PERCENTAGE' ? `${arch.specialDiscount.amount}% OFF` : `₹${arch.specialDiscount.amount} OFF`)
+      : '10% Platform Discount';
+
+    setSendForm({
+      selectedCustomerId: defaultCust?.id || '',
+      discountCode,
+      discountApplied,
+      customNote: `Our Central Engineering Desk specifically recommends Architect ${arch.name} (${arch.firmName}) for your architectural blueprints, structural design, and 3D elevation.`,
+      channel: 'ALL',
+    });
+    setQuickSendArch(arch);
+  };
+
+  const handleDispatchToCustomer = (arch: ArchitectAccount) => {
+    const cust = customers.find((c) => c.id === sendForm.selectedCustomerId);
+    if (!cust) {
+      error('Please select a customer to send this architect to');
+      return;
+    }
+
+    try {
+      const res = shareArchitectWithCustomer(arch.id, {
+        customerId: cust.id,
+        customerName: cust.name,
+        customerPhone: cust.phone,
+        discountCode: sendForm.discountCode,
+        discountApplied: sendForm.discountApplied,
+        note: sendForm.customNote,
+        channel: sendForm.channel,
+      });
+
+      loadData();
+      setQuickSendArch(null);
+      success(`Architect profile and ${sendForm.discountApplied} voucher sent to ${cust.name}!`);
+
+      if (sendForm.channel === 'WHATSAPP' || sendForm.channel === 'ALL') {
+        window.open(res.whatsappUrl, '_blank');
+      }
+    } catch (e: any) {
+      error(e.message || 'Failed to dispatch architect');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* ---------------- PAGE HEADER ---------------- */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-100 text-sky-900 text-xs font-black uppercase font-mono mb-2">
+            <Compass className="w-3.5 h-3.5 text-sky-600" />
+            <span>Architect & Engineering Operations</span>
+          </div>
+          <h1 className="text-2xl font-black font-display text-navy-950">
+            Architect Partners Network
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Council of Architecture licensing audit, quality ratings, internal notes, platform discounts, and homeowner recommendation dispatch.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 text-slate-500 ${refreshing ? 'animate-spin text-sky-600' : ''}`} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (window.confirm('Are you sure you want to permanently clear all architect accounts from the database? This will reset the list to 0.')) {
+                clearAllArchitects();
+                loadData();
+                success('All architect records cleared successfully!');
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-bold text-rose-700 transition flex items-center gap-1.5 cursor-pointer"
+            title="Clear all architect records from database"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+            <span>Clear Architects</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- 4 EXECUTIVE KPI SUMMARY STRIP ---------------- */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-3xl border border-blue-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Total Architects</span>
+            <div className="text-2xl font-black font-display text-navy-950 mt-1">{architects.length}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{approvedCount} Approved Partners</div>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+            <Building2 className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-blue-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Pending Governance</span>
+            <div className="text-2xl font-black font-display text-amber-600 mt-1">{pendingCount}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">COA Lic & KYC In Review</div>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <Clock className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-blue-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Active Discounts</span>
+            <div className="text-2xl font-black font-display text-emerald-600 mt-1">{discountedCount}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Homeowner Vouchers Active</div>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Tag className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-blue-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Elite & Masters</span>
+            <div className="text-2xl font-black font-display text-purple-700 mt-1">
+              {architects.filter((a) => a.adminReview?.tierBadge === 'MASTER_ARCHITECT' || a.adminReview?.tierBadge === 'VERIFIED_ELITE').length}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Top-Rated Practitioners</div>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <Award className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- FILTER TABS & SEARCH BAR ---------------- */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+          {[
+            { tab: 'ALL', label: 'All Architects', count: architects.length },
+            { tab: 'PENDING_APPROVAL', label: 'Pending Verification', count: pendingCount, highlight: true },
+            { tab: 'APPROVED', label: 'Approved Partners', count: approvedCount },
+            { tab: 'CHANGES_REQUESTED', label: 'Changes Requested', count: changesCount },
+            { tab: 'PROFILE_INCOMPLETE', label: 'Incomplete Drafts', count: incompleteCount },
+            { tab: 'REJECTED', label: 'Rejected', count: architects.filter((a) => a.accountStatus === 'REJECTED').length },
+            { tab: 'SUSPENDED', label: 'Suspended', count: architects.filter((a) => a.accountStatus === 'SUSPENDED').length },
+          ].map((t) => (
+            <button
+              key={t.tab}
+              onClick={() => setSelectedStatusTab(t.tab)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                selectedStatusTab === t.tab
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <span>{t.label}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                  selectedStatusTab === t.tab
+                    ? 'bg-white/20 text-white'
+                    : t.highlight && t.count > 0
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {t.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Architect Name, Architect ID (e.g. BG/QUO/0001), Practice Name, COA License Number, Mobile, or City..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white shadow-2xs"
+          />
+        </div>
+      </div>
+
+      {/* ---------------- CLEAN EXECUTIVE ARCHITECTS TABLE ---------------- */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                <th className="py-3 px-4">Architect & Practice</th>
+                <th className="py-3 px-4">Quality Review</th>
+                <th className="py-3 px-4">Special Discount</th>
+                <th className="py-3 px-4">Internal Notes</th>
+                <th className="py-3 px-4">Location & Exp</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    No architect records found matching current criteria.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((arch) => {
+                  const isApproved = arch.accountStatus === 'APPROVED';
+                  const isPending = arch.accountStatus === 'PENDING_APPROVAL';
+                  const isChanges = arch.accountStatus === 'CHANGES_REQUESTED';
+                  const isSuspended = arch.accountStatus === 'SUSPENDED';
+                  const hasDiscount = arch.specialDiscount?.enabled;
+                  const review = arch.adminReview;
+                  const notesCount = arch.internalNotes?.length || 0;
+                  const sharesCount = arch.customerShares?.length || 0;
+
+                  return (
+                    <tr
+                      key={arch.id}
+                      className="hover:bg-sky-50/40 transition group cursor-pointer"
+                      onClick={() => {
+                        setSelectedArchitect(arch);
+                        setActiveDossierTab('CREDENTIALS');
+                      }}
+                    >
+                      {/* 1. Architect & Practice Details */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-600 to-navy-900 text-white font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display">
+                            {arch.profilePhoto ? (
+                              <img src={arch.profilePhoto} alt={arch.name} className="w-full h-full object-cover rounded-2xl" />
+                            ) : (
+                              arch.name.slice(0, 2).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-navy-950 group-hover:text-sky-600 transition-colors truncate flex items-center gap-1.5">
+                              <span>{arch.name}</span>
+                              {review?.tierBadge === 'MASTER_ARCHITECT' && (
+                                <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase">
+                                  Master
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">
+                              {arch.firmName}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono text-[10px]">
+                              <span className="px-1.5 py-0.2 rounded bg-sky-50 border border-sky-200 text-sky-800 font-bold">
+                                {arch.id}
+                              </span>
+                              <span className="text-slate-400">COA: {arch.coaNumber || 'Review'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Quality Review & Score */}
+                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        {review ? (
+                          <div
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('REVIEW');
+                            }}
+                            className="cursor-pointer hover:opacity-80 transition inline-block"
+                            title="Click to view full review scorecard"
+                          >
+                            <div className="flex items-center gap-1 text-amber-500 font-bold">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                              <span className="text-slate-900 font-black">{review.rating.toFixed(1)}</span>
+                              <span className="text-[10px] text-slate-400">/ 5</span>
+                            </div>
+                            <div className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                              Score: {review.qualityScore || 95}%
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('REVIEW');
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-amber-50 text-[10px] font-bold text-slate-500 hover:text-amber-800 transition cursor-pointer"
+                          >
+                            + Review
+                          </button>
+                        )}
+                      </td>
+
+                      {/* 3. Special Discount */}
+                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        {hasDiscount ? (
+                          <div
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('DISCOUNT');
+                            }}
+                            className="cursor-pointer hover:opacity-80 transition inline-block"
+                            title="Click to edit special platform discount"
+                          >
+                            <span className="px-2 py-0.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 font-bold text-[10px] inline-flex items-center gap-1 shadow-2xs">
+                              <Tag className="w-2.5 h-2.5 text-amber-600" />
+                              <span>
+                                {arch.specialDiscount?.type === 'PERCENTAGE'
+                                  ? `${arch.specialDiscount.amount}% OFF`
+                                  : `₹${arch.specialDiscount?.amount} OFF`}
+                              </span>
+                            </span>
+                            <div className="font-mono text-[9px] text-slate-400 mt-0.5">
+                              {arch.specialDiscount?.code}
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('DISCOUNT');
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-emerald-50 text-[10px] font-bold text-slate-500 hover:text-emerald-800 transition cursor-pointer"
+                          >
+                            + Discount
+                          </button>
+                        )}
+                      </td>
+
+                      {/* 4. Internal Admin Notes */}
+                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                        {notesCount > 0 ? (
+                          <button
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('NOTES');
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 font-bold text-[10px] inline-flex items-center gap-1 hover:bg-blue-100 transition cursor-pointer"
+                            title="View confidential internal notes"
+                          >
+                            <StickyNote className="w-3 h-3 text-blue-600" />
+                            <span>{notesCount} Notes</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('NOTES');
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-[10px] font-bold text-slate-500 hover:text-blue-800 transition cursor-pointer"
+                          >
+                            + Note
+                          </button>
+                        )}
+                      </td>
+
+                      {/* 5. Location & Exp */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-800">{arch.city || 'India'}</div>
+                        <div className="text-[10px] text-slate-500">{arch.experienceYears} Yrs Exp • Team of {arch.teamSize}</div>
+                      </td>
+
+                      {/* 6. Account Status */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isApproved
+                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                              : isPending
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                              : isChanges
+                              ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                              : isSuspended
+                              ? 'bg-slate-200 text-slate-800'
+                              : 'bg-rose-100 text-rose-900 border border-rose-300'
+                          }`}
+                        >
+                          {arch.accountStatus.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      {/* 7. Clean Action Column */}
+                      <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Send to Customer CTA */}
+                          <button
+                            onClick={() => handleOpenQuickSend(arch)}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                            title="Dispatch recommendation to registered homeowner"
+                          >
+                            <SendHorizontal className="w-3.5 h-3.5" />
+                            <span>Send</span>
+                            {sharesCount > 0 && (
+                              <span className="px-1 py-0.2 rounded-full bg-white/20 text-white text-[9px] font-mono">
+                                {sharesCount}
+                              </span>
+                            )}
+                          </button>
+
+                          {/* Open Full Dossier */}
+                          <button
+                            onClick={() => {
+                              setSelectedArchitect(arch);
+                              setActiveDossierTab('CREDENTIALS');
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                            title="Open full architect dossier"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Dossier</span>
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Permanently delete architect "${arch.name || arch.firmName}"?`)) {
+                                deleteArchitectAccount(arch.id);
+                                loadData();
+                                success(`Architect "${arch.name || arch.firmName}" deleted.`);
+                              }
+                            }}
+                            className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                            title="Delete Architect Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ---------------- FULLSCREEN EXECUTIVE DOSSIER MODAL ---------------- */}
+      <AnimatePresence>
+        {selectedArchitect && (
+          <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150">
+            <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
+
+            {/* Sticky Header Top Navigation Bar */}
+            <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchitect(null)}
+                  className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                  <span className="hidden sm:inline">Back to Architects Table</span>
+                  <span className="sm:hidden">Back</span>
+                </button>
+                <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                      {selectedArchitect.name}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-mono text-xs font-bold border border-amber-400/30">
+                      ID: {selectedArchitect.id}
+                    </span>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                      {selectedArchitect.accountStatus}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono truncate">
+                    {selectedArchitect.firmName} • {selectedArchitect.city} • COA: {selectedArchitect.coaNumber || 'COA Verified'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <button
+                  onClick={() => setActiveDossierTab('SEND_CUSTOMER')}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <SendHorizontal className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Send to Customer</span>
+                </button>
+                <button
+                  onClick={() => setSelectedArchitect(null)}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  <span className="hidden sm:inline">Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dossier Content Area */}
+            <div className="flex-1 max-w-[1500px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              
+              {/* ---------------- 1. HERO EXECUTIVE PROFILE BANNER ---------------- */}
+              <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-[#1e3d6b] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="flex items-center gap-4 relative z-10 min-w-0">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-400/20 text-amber-300 border-2 border-amber-400/40 flex items-center justify-center font-bold text-2xl font-display shadow-lg shrink-0">
+                    {selectedArchitect.profilePhoto ? (
+                      <img src={selectedArchitect.profilePhoto} alt={selectedArchitect.name} className="w-full h-full object-cover rounded-2xl" />
+                    ) : (
+                      selectedArchitect.name.slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h1 className="text-2xl sm:text-3xl font-black font-display text-white">{selectedArchitect.name}</h1>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-sky-500/20 text-sky-300 border-sky-500/40">
+                        COA: {selectedArchitect.coaNumber || 'COA Verified'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 font-mono mt-1.5">
+                      <span className="font-bold text-amber-300">{selectedArchitect.firmName}</span>
+                      <span>•</span>
+                      <span>Architect ID: {selectedArchitect.id}</span>
+                      <span>•</span>
+                      <span>{selectedArchitect.city}, {selectedArchitect.state}</span>
+                      <span>•</span>
+                      <span>Registered: {formatDate(selectedArchitect.registeredAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 relative z-10 shrink-0">
+                  <a
+                    href={`tel:${selectedArchitect.phone}`}
+                    className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Call +91 {selectedArchitect.phone}</span>
+                  </a>
+                  {selectedArchitect.email && (
+                    <a
+                      href={`mailto:${selectedArchitect.email}`}
+                      className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 border border-white/20 transition"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Email</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* ---------------- 2. 4 STRATEGIC MANAGEMENT KPI CARDS ---------------- */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Review Metric */}
+                <div
+                  onClick={() => setActiveDossierTab('REVIEW')}
+                  className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs cursor-pointer hover:border-amber-400 transition"
+                >
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Governance Review</span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                    <span className="text-2xl font-black font-display text-slate-900">
+                      {selectedArchitect.adminReview?.rating ? selectedArchitect.adminReview.rating.toFixed(1) : '5.0'}
+                    </span>
+                    <span className="text-xs text-slate-400">/ 5</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                    {selectedArchitect.adminReview?.tierBadge?.replace('_', ' ') || 'VERIFIED ELITE'} • {selectedArchitect.adminReview?.qualityScore || 95}% Score
+                  </div>
+                </div>
+
+                {/* 2. Special Discount Metric */}
+                <div
+                  onClick={() => setActiveDossierTab('DISCOUNT')}
+                  className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs cursor-pointer hover:border-amber-400 transition"
+                >
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Special Discount</span>
+                  <div className="text-2xl font-black font-display text-amber-600 mt-1">
+                    {selectedArchitect.specialDiscount?.enabled
+                      ? selectedArchitect.specialDiscount.type === 'PERCENTAGE'
+                        ? `${selectedArchitect.specialDiscount.amount}% OFF`
+                        : `₹${selectedArchitect.specialDiscount.amount} OFF`
+                      : 'Inactive'}
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    {selectedArchitect.specialDiscount?.enabled ? `Code: ${selectedArchitect.specialDiscount.code}` : 'Click to activate promo'}
+                  </div>
+                </div>
+
+                {/* 3. Internal Notes Metric */}
+                <div
+                  onClick={() => setActiveDossierTab('NOTES')}
+                  className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs cursor-pointer hover:border-blue-400 transition"
+                >
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Internal Admin Notes</span>
+                  <div className="text-2xl font-black font-display text-blue-700 mt-1">
+                    {selectedArchitect.internalNotes?.length || 0}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Confidential Governance Log</div>
+                </div>
+
+                {/* 4. Customer Recommendations Metric */}
+                <div
+                  onClick={() => setActiveDossierTab('SEND_CUSTOMER')}
+                  className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs cursor-pointer hover:border-emerald-400 transition"
+                >
+                  <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Homeowner Dispatches</span>
+                  <div className="text-2xl font-black font-display text-emerald-700 mt-1">
+                    {selectedArchitect.customerShares?.length || 0}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Recommended via WhatsApp & Portal</div>
+                </div>
+              </div>
+
+              {/* ---------------- 3. TABBED SECTIONS NAVIGATION BAR ---------------- */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xs">
+                {[
+                  { id: 'CREDENTIALS', label: '1. Practice Profile & KYC (6 Steps)', icon: FileCheck2 },
+                  { id: 'REVIEW', label: '2. Quality Review & Governance', icon: Star, badge: selectedArchitect.adminReview?.rating ? `${selectedArchitect.adminReview.rating}★` : null },
+                  { id: 'NOTES', label: '3. Internal Admin Notes', icon: StickyNote, badge: (selectedArchitect.internalNotes?.length || 0) > 0 ? String(selectedArchitect.internalNotes?.length) : null },
+                  { id: 'DISCOUNT', label: '4. Special Platform Discount', icon: Tag, badge: selectedArchitect.specialDiscount?.enabled ? 'Active' : null },
+                  { id: 'SEND_CUSTOMER', label: '5. Send to Customer Desk', icon: SendHorizontal, badge: (selectedArchitect.customerShares?.length || 0) > 0 ? `${selectedArchitect.customerShares?.length} Sent` : null },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeDossierTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveDossierTab(tab.id as any)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                        isActive
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'bg-transparent hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{tab.label}</span>
+                      {tab.badge && (
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                          isActive ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-900'
+                        }`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ---------------- 4. TAB CONTENTS ---------------- */}
+
+              {/* === TAB 1: CREDENTIALS & KYC (6 STEPS) === */}
+              {activeDossierTab === 'CREDENTIALS' && (
+                <div className="space-y-6">
+                  {/* Step 1 & Step 2: Personal & Practice in 2 Columns */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Principal Architect Details */}
+                    <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                      <div className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <User className="w-4 h-4 text-sky-600" />
+                        <span>Principal Architect Profile</span>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Professional Name</span>
+                            <span className="font-bold text-navy-950 text-sm">{selectedArchitect.name}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Designation</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.designation || 'Principal Architect'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Mobile Phone</span>
+                            <span className="font-bold text-slate-800 font-mono">+91 {selectedArchitect.phone}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Email Address</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.email || 'Not Provided'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Experience</span>
+                            <span className="font-bold text-navy-950">{selectedArchitect.experienceYears} Years</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Architect ID</span>
+                            <span className="font-bold text-sky-700 font-mono">{selectedArchitect.id}</span>
+                          </div>
+                        </div>
+                        {selectedArchitect.bio && (
+                          <div className="pt-2 border-t border-slate-200">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Professional Statement</span>
+                            <p className="text-slate-600 leading-relaxed mt-0.5">{selectedArchitect.bio}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Firm & Statutory Details */}
+                    <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                      <div className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <Building2 className="w-4 h-4 text-sky-600" />
+                        <span>Firm & Statutory Credentials</span>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Firm / Practice Name</span>
+                            <span className="font-bold text-navy-950 text-sm">{selectedArchitect.firmName}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Entity Structure</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.businessType}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">COA License No</span>
+                            <span className="font-bold text-sky-700 font-mono">{selectedArchitect.coaNumber || 'Under Review'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">PAN Number</span>
+                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.panNumber || 'Not Specified'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">GSTIN Registration</span>
+                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.gstin || 'Composition / Exempt'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Practice Team</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.teamSize} Staff ({selectedArchitect.architectsCount} Architects)</span>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Registered Office</span>
+                          <span className="text-slate-800 font-medium">
+                            {selectedArchitect.address ? `${selectedArchitect.address}, ` : ''}{selectedArchitect.city}, {selectedArchitect.state} {selectedArchitect.pincode}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: 21 Architectural Services */}
+                  <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                    <div className="font-extrabold text-navy-950 text-sm font-display flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-sky-600" />
+                        <span>Professional Services & Practice Specializations</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold text-xs">
+                        {selectedArchitect.services?.length || 0} Specializations Selected
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {selectedArchitect.services?.map((svc, i) => (
+                        <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-2 text-xs text-slate-800">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="font-medium">{svc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 4: Portfolio Projects */}
+                  <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                    <div className="font-extrabold text-navy-950 text-sm font-display flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-sky-600" />
+                        <span>Showcase Practice Portfolio</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-xs">
+                        {selectedArchitect.portfolioProjects?.length || 0} Projects Executed
+                      </span>
+                    </div>
+                    {selectedArchitect.portfolioProjects && selectedArchitect.portfolioProjects.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {selectedArchitect.portfolioProjects.map((p, idx) => (
+                          <div key={idx} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden text-xs">
+                            {p.imageUrl && (
+                              <img src={p.imageUrl} alt={p.title} className="w-full h-36 object-cover" />
+                            )}
+                            <div className="p-3.5 space-y-1">
+                              <div className="font-black text-navy-950 text-sm">{p.title}</div>
+                              <div className="text-slate-500">{p.category} • {p.location}</div>
+                              <div className="text-[11px] text-slate-400 font-mono">Area: {p.builtUpArea} • Year: {p.completionYear}</div>
+                              {p.description && <p className="text-slate-600 mt-1 line-clamp-2">{p.description}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">No showcase projects uploaded.</p>
+                    )}
+                  </div>
+
+                  {/* Step 5: KYC Verification Documents */}
+                  <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                    <div className="font-extrabold text-navy-950 text-sm font-display flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <FileCheck2 className="w-4 h-4 text-sky-600" />
+                        <span>Statutory KYC Verification Documents</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                        {selectedArchitect.documents?.length || 0} Documents Uploaded
+                      </span>
+                    </div>
+                    {selectedArchitect.documents && selectedArchitect.documents.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectedArchitect.documents.map((doc, idx) => (
+                          <div key={idx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+                            <div>
+                              <div className="font-bold text-navy-950">{doc.title}</div>
+                              <div className="text-[10px] text-slate-500 font-mono">{doc.documentType} • {doc.fileSize || 'PDF Document'}</div>
+                            </div>
+                            {doc.fileUrl && doc.fileUrl !== '#' ? (
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-2xs"
+                              >
+                                <span>Inspect</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">File Pending</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">No statutory KYC documents attached.</p>
+                    )}
+                  </div>
+
+                  {/* Step 6: Bank Account & Cheque Acceptance */}
+                  <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-xs space-y-4">
+                    <div className="font-extrabold text-navy-950 text-sm font-display flex items-center justify-between border-b border-emerald-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-emerald-600" />
+                        <span>Bank Details & Cheque Verification</span>
+                      </div>
+                      {selectedArchitect.bankDetails?.isChequeAccepted && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Cheque Accepted
+                        </span>
+                      )}
+                    </div>
+                    {selectedArchitect.bankDetails?.accountNumber ? (
+                      <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-3 text-xs">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
+                            <span className="font-bold text-navy-950 text-sm">{selectedArchitect.bankDetails.bankName || 'Not specified'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Holder</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.accountHolderName || selectedArchitect.name}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
+                            <span className="font-bold text-slate-800 font-mono">•••• {selectedArchitect.bankDetails.accountNumber.slice(-4)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">IFSC Code</span>
+                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.bankDetails.ifscCode}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Type</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.accountType || 'CURRENT'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Branch Location</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.branch || selectedArchitect.city || 'Main Branch'}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-emerald-200 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Cheque Document</span>
+                            <span className="font-bold text-navy-950">{selectedArchitect.bankDetails.cancelledChequeFileName || 'Attached Cheque'}</span>
+                          </div>
+                          {selectedArchitect.bankDetails.cancelledChequeUrl && selectedArchitect.bankDetails.cancelledChequeUrl !== '#' ? (
+                            <a
+                              href={selectedArchitect.bankDetails.cancelledChequeUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <span>View Cheque</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">No cheque file attached</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">Bank details not provided during registration.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 2: QUALITY REVIEW & GOVERNANCE === */}
+              {activeDossierTab === 'REVIEW' && (
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-md space-y-6">
+                  <div className="border-b border-slate-100 pb-4">
+                    <h3 className="text-lg font-black text-navy-950 flex items-center gap-2">
+                      <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                      <span>Governance Desk Audit & Quality Review</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure official practice ratings, quality audit benchmarks, and verified classification tiers.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Overall Score & Rating */}
+                    <div className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/70 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          Overall Rating:
+                        </label>
+                        <div className="flex items-center gap-1 font-mono text-xl font-black text-amber-600">
+                          <Star className="w-5 h-5 fill-amber-400 text-amber-500" />
+                          <span>{reviewForm.rating.toFixed(1)} / 5.0</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                            className={`p-2.5 rounded-xl border text-sm font-bold transition flex items-center justify-center flex-1 cursor-pointer ${
+                              reviewForm.rating >= star
+                                ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                                : 'bg-white text-slate-400 border-slate-200 hover:bg-amber-50'
+                            }`}
+                          >
+                            <Star className={`w-4 h-4 ${reviewForm.rating >= star ? 'fill-white' : ''}`} />
+                            <span className="ml-1 text-xs">{star}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Tier Badge Selection */}
+                      <div className="pt-2">
+                        <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                          Professional Classification Tier:
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['STANDARD', 'VERIFIED_ELITE', 'MASTER_ARCHITECT'] as const).map((tier) => (
+                            <button
+                              key={tier}
+                              type="button"
+                              onClick={() => setReviewForm({ ...reviewForm, tierBadge: tier })}
+                              className={`p-2.5 rounded-xl border text-[11px] font-black transition cursor-pointer text-center ${
+                                reviewForm.tierBadge === tier
+                                  ? 'bg-navy-950 text-white border-navy-950 shadow-xs'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              {tier.replace('_', ' ')}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Dimension Ratings */}
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700">Quality Execution Score:</span>
+                        <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                          {reviewForm.qualityScore}% Audit Passed
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={reviewForm.qualityScore}
+                        onChange={(e) => setReviewForm({ ...reviewForm, qualityScore: Number(e.target.value) })}
+                        className="w-full accent-emerald-600 cursor-pointer"
+                      />
+
+                      <div className="space-y-3 pt-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600 font-medium">Design & Planning Aesthetics:</span>
+                          <div className="flex items-center gap-1 text-amber-500">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                onClick={() => setReviewForm({ ...reviewForm, designAestheticsRating: s })}
+                                className={`w-4 h-4 cursor-pointer ${
+                                  reviewForm.designAestheticsRating >= s ? 'fill-amber-400 text-amber-500' : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600 font-medium">IS-Code Structural Engineering:</span>
+                          <div className="flex items-center gap-1 text-amber-500">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                onClick={() => setReviewForm({ ...reviewForm, structuralAccuracyRating: s })}
+                                className={`w-4 h-4 cursor-pointer ${
+                                  reviewForm.structuralAccuracyRating >= s ? 'fill-amber-400 text-amber-500' : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600 font-medium">Customer Communication:</span>
+                          <div className="flex items-center gap-1 text-amber-500">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                onClick={() => setReviewForm({ ...reviewForm, communicationRating: s })}
+                                className={`w-4 h-4 cursor-pointer ${
+                                  reviewForm.communicationRating >= s ? 'fill-amber-400 text-amber-500' : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                      Public Quality Endorsement & Audit Remarks:
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={reviewForm.summary}
+                      onChange={(e) => setReviewForm({ ...reviewForm, summary: e.target.value })}
+                      placeholder="Enter quality evaluation remarks visible on the platform profile..."
+                      className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveReview(selectedArchitect.id)}
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Save Governance Review</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 3: INTERNAL ADMIN NOTES === */}
+              {activeDossierTab === 'NOTES' && (
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-md space-y-6">
+                  <div>
+                    <h3 className="text-lg font-black text-navy-950 flex items-center gap-2">
+                      <StickyNote className="w-5 h-5 text-blue-600" />
+                      <span>Internal Operations & Governance Notes</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Confidential audit trail, site meeting notes, and compliance flags visible exclusively to Platform Administrators.
+                    </p>
+                  </div>
+
+                  {/* Add New Note Box */}
+                  <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-navy-950 uppercase tracking-wider">Add Confidential Note</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500 font-medium">Priority:</span>
+                        {(['NORMAL', 'HIGH', 'URGENT'] as const).map((pr) => (
+                          <button
+                            key={pr}
+                            type="button"
+                            onClick={() => setNotePriority(pr)}
+                            className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                              notePriority === pr
+                                ? pr === 'URGENT'
+                                  ? 'bg-rose-600 text-white'
+                                  : pr === 'HIGH'
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-blue-600 text-white'
+                                : 'bg-white text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {pr}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <textarea
+                      rows={3}
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder="Type internal note (e.g. 'Site visit conducted; verified 3 active luxury villa projects in Indirapuram. Recommended for high-value homeowner RFQs')..."
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500"
+                    />
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleAddNote(selectedArchitect.id)}
+                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Note to Dossier</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Recorded Notes List */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Recorded Internal Notes ({selectedArchitect.internalNotes?.length || 0})
+                    </h4>
+
+                    {selectedArchitect.internalNotes && selectedArchitect.internalNotes.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {selectedArchitect.internalNotes.map((n) => (
+                          <div
+                            key={n.id}
+                            className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-4 text-xs"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-navy-950">{n.author || 'Super Admin Desk'}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {new Date(n.createdAt).toLocaleString()}
+                                </span>
+                                {n.priority && (
+                                  <span
+                                    className={`px-2 py-0.2 rounded text-[9px] font-black uppercase ${
+                                      n.priority === 'URGENT'
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                        : n.priority === 'HIGH'
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                        : 'bg-blue-100 text-blue-800'
+                                    }`}
+                                  >
+                                    {n.priority}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{n.text}</p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteNote(selectedArchitect.id, n.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 transition cursor-pointer"
+                              title="Delete note"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center text-slate-400 text-xs italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        No internal notes recorded yet for this architect.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 4: SPECIAL DISCOUNT === */}
+              {activeDossierTab === 'DISCOUNT' && (
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-md space-y-6">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-lg font-black text-navy-950 flex items-center gap-2">
+                        <Tag className="w-5 h-5 text-amber-500" />
+                        <span>Special Platform Discount Configuration</span>
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Configure promotional voucher codes and exclusive discounts attached when dispatching this architect to homeowners.
+                      </p>
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                      <span className="text-xs font-bold text-slate-700">Discount Enabled:</span>
+                      <input
+                        type="checkbox"
+                        checked={discountForm.enabled}
+                        onChange={(e) => setDiscountForm({ ...discountForm, enabled: e.target.checked })}
+                        className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Discount Settings Form */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Discount Type</label>
+                          <select
+                            value={discountForm.type}
+                            onChange={(e) => setDiscountForm({ ...discountForm, type: e.target.value as any })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="PERCENTAGE">Percentage (% Off)</option>
+                            <option value="FLAT">Flat Amount (₹ Off)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {discountForm.type === 'PERCENTAGE' ? 'Discount Percentage (%)' : 'Flat Amount (₹)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={discountForm.amount}
+                            onChange={(e) => setDiscountForm({ ...discountForm, amount: Number(e.target.value) })}
+                            min="1"
+                            max={discountForm.type === 'PERCENTAGE' ? 50 : 100000}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Coupon Promo Code</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={discountForm.code}
+                              onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
+                              placeholder="e.g. BGARCH10"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black focus:outline-none focus:border-amber-500 font-mono text-amber-700"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setDiscountForm({ ...discountForm, code: `BGARCH${selectedArchitect.name.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()}${discountForm.amount}` })}
+                              className="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-[10px] font-bold text-slate-700 cursor-pointer"
+                              title="Generate code from name"
+                            >
+                              Auto
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Valid Until</label>
+                          <input
+                            type="date"
+                            value={discountForm.validUntil}
+                            onChange={(e) => setDiscountForm({ ...discountForm, validUntil: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Discount Scope & Terms</label>
+                        <textarea
+                          rows={2}
+                          value={discountForm.terms}
+                          onChange={(e) => setDiscountForm({ ...discountForm, terms: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Voucher Preview Card */}
+                    <div className="flex flex-col justify-center">
+                      <div className="p-6 rounded-3xl bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 text-white shadow-lg space-y-3 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider font-mono bg-white/20 px-2.5 py-0.5 rounded-full">
+                            BuildGhar Exclusive Voucher
+                          </span>
+                          <Gift className="w-5 h-5 text-amber-200" />
+                        </div>
+                        <div className="text-3xl font-black font-display">
+                          {discountForm.type === 'PERCENTAGE' ? `${discountForm.amount}% OFF` : `₹${discountForm.amount} OFF`}
+                        </div>
+                        <div className="text-xs text-amber-100 font-medium">
+                          Valid for architectural blueprints & 3D elevations by <strong>{selectedArchitect.name}</strong>.
+                        </div>
+                        <div className="pt-2 border-t border-white/20 flex items-center justify-between font-mono text-xs">
+                          <span className="font-black bg-white text-amber-800 px-2.5 py-1 rounded-lg">
+                            {discountForm.code || 'BGARCH10'}
+                          </span>
+                          <span className="text-[10px] text-amber-200">Expires: {discountForm.validUntil}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveDiscount(selectedArchitect.id)}
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Save Special Discount Offer</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB 5: SEND TO CUSTOMER === */}
+              {activeDossierTab === 'SEND_CUSTOMER' && (
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-md space-y-6">
+                  <div>
+                    <h3 className="text-lg font-black text-navy-950 flex items-center gap-2">
+                      <SendHorizontal className="w-5 h-5 text-emerald-600" />
+                      <span>Dispatch Architect Recommendation to Customer</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Directly share this architect’s credentials, portfolio, and an exclusive discount coupon with any registered homeowner via WhatsApp and In-App Portal.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Customer Selection & Channel */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-800 mb-1">
+                          Select Registered Customer: <span className="text-rose-500">*</span>
+                        </label>
+                        {customers.length > 0 ? (
+                          <select
+                            value={sendForm.selectedCustomerId}
+                            onChange={(e) => setSendForm({ ...sendForm, selectedCustomerId: e.target.value })}
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">-- Choose Homeowner --</option>
+                            {customers.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({c.phone}) • {c.city}, {c.state} [{c.id}]
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800 border border-amber-200">
+                            No registered customers found. Homeowners will automatically appear here when they register or submit RFQs.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Attached Coupon Code</label>
+                          <input
+                            type="text"
+                            value={sendForm.discountCode}
+                            onChange={(e) => setSendForm({ ...sendForm, discountCode: e.target.value.toUpperCase() })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono text-amber-700"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Discount Tag</label>
+                          <input
+                            type="text"
+                            value={sendForm.discountApplied}
+                            onChange={(e) => setSendForm({ ...sendForm, discountApplied: e.target.value })}
+                            placeholder="e.g. 10% OFF"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-emerald-700"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Delivery Channel</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { ch: 'ALL', label: 'WhatsApp + Portal' },
+                            { ch: 'WHATSAPP', label: 'WhatsApp Only' },
+                            { ch: 'PORTAL', label: 'Portal Only' },
+                          ].map((c) => (
+                            <button
+                              key={c.ch}
+                              type="button"
+                              onClick={() => setSendForm({ ...sendForm, channel: c.ch as any })}
+                              className={`p-2 rounded-xl text-xs font-bold border transition cursor-pointer text-center ${
+                                sendForm.channel === c.ch
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Recommendation Note</label>
+                        <textarea
+                          rows={3}
+                          value={sendForm.customNote}
+                          onChange={(e) => setSendForm({ ...sendForm, customNote: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live WhatsApp / In-App Message Preview */}
+                    <div className="space-y-3">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                        Message Preview Dispatched to Homeowner:
+                      </span>
+                      <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs font-mono text-slate-800 space-y-2 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                        🏛️ <strong>BuildGhar Professional Architect Recommendation</strong>
+                        <br />
+                        Hello <strong>{customers.find((c) => c.id === sendForm.selectedCustomerId)?.name || '[Customer Name]'}</strong>,
+                        <br />
+                        Our Central Architecture & Engineering Governance Desk recommends licensed Architect <strong>{selectedArchitect.name}</strong> ({selectedArchitect.firmName}, COA Lic: <strong>{selectedArchitect.coaNumber || 'Verified'}</strong>) for your architectural planning & design in <strong>{selectedArchitect.city}</strong>.
+                        <br />
+                        🎁 <strong>Special Platform Voucher:</strong> Use code <strong>{sendForm.discountCode}</strong> for <strong>{sendForm.discountApplied}</strong> off on your project drawings!
+                        <br />
+                        📝 <strong>Governance Desk Note:</strong>
+                        <br />
+                        &quot;{sendForm.customNote}&quot;
+                        <br />
+                        👉 https://ghar-design.vercel.app/professionals
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDispatchToCustomer(selectedArchitect)}
+                          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
+                        >
+                          <SendHorizontal className="w-4 h-4" />
+                          <span>Dispatch Recommendation Now</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Previous Customer Dispatches Log */}
+                  <div className="pt-4 border-t border-slate-200 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Previous Homeowner Recommendations ({selectedArchitect.customerShares?.length || 0})
+                    </h4>
+                    {selectedArchitect.customerShares && selectedArchitect.customerShares.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {selectedArchitect.customerShares.map((s) => (
+                          <div key={s.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                            <div className="font-bold text-navy-950">{s.customerName}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">{s.customerPhone}</div>
+                            <div className="text-[10px] text-emerald-700 font-bold">
+                              {s.discountApplied} • Code: {s.discountCode}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Sent: {new Date(s.sentAt).toLocaleDateString()} via {s.channel}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">This architect has not been dispatched to any customer yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ---------------- 5. STATUS LIFECYCLE ACTION FOOTER ---------------- */}
+              <div className="p-6 border-t border-slate-200 bg-white rounded-3xl shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSuspendToggle(selectedArchitect.id, selectedArchitect.accountStatus)}
+                    className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    {selectedArchitect.accountStatus === 'SUSPENDED' ? 'Reinstate Partner' : 'Suspend Account'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to permanently delete "${selectedArchitect.name || selectedArchitect.firmName}"?`)) {
+                        deleteArchitectAccount(selectedArchitect.id);
+                        setSelectedArchitect(null);
+                        loadData();
+                        success('Architect record deleted.');
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-bold text-rose-700 transition flex items-center gap-1.5 cursor-pointer"
+                    title="Permanently delete this architect from database"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Record</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenRemarksModal('REJECTED')}
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer"
+                  >
+                    Reject Application
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenRemarksModal('CHANGES_REQUESTED')}
+                    className="px-4 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition cursor-pointer"
+                  >
+                    Request Changes
+                  </button>
+
+                  <button
+                    onClick={() => handleApprove(selectedArchitect.id)}
+                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Approve Partner</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ---------------- QUICK STANDALONE SEND MODAL (Direct from Table Row) ---------------- */}
+      {quickSendArch && (
+        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-navy-950 flex items-center gap-2">
+                  <SendHorizontal className="w-4 h-4 text-emerald-600" />
+                  <span>Recommend Architect to Homeowner</span>
+                </h3>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {quickSendArch.name} ({quickSendArch.firmName}) • {quickSendArch.id}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickSendArch(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">Select Registered Customer:</label>
+                <select
+                  value={sendForm.selectedCustomerId}
+                  onChange={(e) => setSendForm({ ...sendForm, selectedCustomerId: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                >
+                  <option value="">-- Choose Homeowner --</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.phone}) • {c.city} [{c.id}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Coupon Code</label>
+                  <input
+                    type="text"
+                    value={sendForm.discountCode}
+                    onChange={(e) => setSendForm({ ...sendForm, discountCode: e.target.value.toUpperCase() })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-amber-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Discount Tag</label>
+                  <input
+                    type="text"
+                    value={sendForm.discountApplied}
+                    onChange={(e) => setSendForm({ ...sendForm, discountApplied: e.target.value })}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Recommendation Note</label>
+                <textarea
+                  rows={2}
+                  value={sendForm.customNote}
+                  onChange={(e) => setSendForm({ ...sendForm, customNote: e.target.value })}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Delivery Channel</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['ALL', 'WHATSAPP', 'PORTAL'] as const).map((ch) => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => setSendForm({ ...sendForm, channel: ch })}
+                      className={`p-1.5 rounded-lg font-bold transition text-center cursor-pointer ${
+                        sendForm.channel === ch ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setQuickSendArch(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDispatchToCustomer(quickSendArch)}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <SendHorizontal className="w-3.5 h-3.5" />
+                <span>Dispatch Recommendation</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- REMARKS / FEEDBACK FULL-SCREEN VIEW ---------------- */}
+      {showRemarksModal && (
+        <div className="admin-fullscreen-modal fixed inset-0 z-60 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150">
+          <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowRemarksModal(false)}
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="hidden sm:inline">Back to Architects Network</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                  {pendingAction === 'CHANGES_REQUESTED' ? 'Request Profile Modifications' : 'Reject Architect Application'}
+                </h2>
+                <div className="text-[11px] text-slate-400 font-mono truncate">
+                  Compliance Feedback & Audit Desk • {selectedArchitect?.name || 'Architect'}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowRemarksModal(false)}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">Close</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 max-w-[1000px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-xl space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-800 mb-2">
+                  Official Compliance Feedback & Audit Reason for {selectedArchitect?.name}: <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={6}
+                  value={remarksText}
+                  onChange={(e) => setRemarksText(e.target.value)}
+                  placeholder="Specify exact modifications needed (e.g. illegible COA registration certificate, mismatched GST/PAN, or site visit requirement)."
+                  className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowRemarksModal(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRemarksAction}
+                  className={`px-6 py-2.5 text-white font-bold rounded-xl shadow-md transition cursor-pointer ${
+                    pendingAction === 'CHANGES_REQUESTED'
+                      ? 'bg-amber-600 hover:bg-amber-700'
+                      : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  {pendingAction === 'CHANGES_REQUESTED' ? 'Send Modification Request' : 'Confirm Application Rejection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

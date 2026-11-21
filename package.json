@@ -1,0 +1,39 @@
+{
+  "name": "ghar-design",
+  "version": "1.0.0",
+  "description": "GharDesign - Indian Civil Construction, Architecture & Interior Design Marketplace",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "deploy": "node scripts/deploy.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "npm run dev --workspace=@ghar-design/web",
+    "dev:api": "npm run dev --workspace=@ghar-design/api",
+    "build": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build --workspace=@ghar-design/shared",
+    "build:web": "npm run build --workspace=@ghar-design/web",
+    "build:api": "npm run build --workspace=@ghar-design/api",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "npm run db:migrate --workspace=@ghar-design/api",
+    "db:seed": "npm run db:seed --workspace=@ghar-design/api",
+    "db:studio": "npm run db:studio --workspace=@ghar-design/api",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "keywords": [
+    "construction",
+    "architecture",
+    "interior-design",
+    "marketplace",
+    "india",
+    "civil-engineering",
+    "react",
+    "express",
+    "typescript",
+    "prisma"
+  ],
+  "author": "GharDesign Team",
+  "license": "MIT"
+}

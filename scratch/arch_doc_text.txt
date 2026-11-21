@@ -1,0 +1,975 @@
+0: MASTER DEVELOPMENT PROMPT — BUILD GHAR ARCHITECTURE PANEL
+1: 1. Project Overview
+2: I am developing a complete civil engineering, architecture, interior design, home construction, and renovation management platform named Build Ghar.
+3: I want you to develop a complete, professional, production-oriented Architect / Architecture Firm Panel and integrate it into the existing Build Ghar website.
+4: Existing technology stack
+5: Frontend: React.js
+6: Styling: Tailwind CSS
+7: Backend: Node.js with Express.js
+8: Database: MongoDB
+9: Authentication: Mobile number + OTP
+10: API communication: REST APIs
+11: File storage: Secure cloud storage or an existing project-compatible storage service
+12: Architecture: Modular, scalable, role-based application
+13: Important: First inspect the existing project, source code, database models, routes, authentication system, UI components, and Admin Panel. Extend the existing project instead of creating a separate website or replacing working features. Reuse existing design components, layouts, APIs, and conventions wherever possible.
+14: Do not unnecessarily rebuild existing Customer or Admin Panels.
+15: 2. Architecture Panel — Main Objective
+16: Create a dedicated portal for architects and architecture firms who want to register on Build Ghar and provide professional services to customers.
+17: Architects should be able to:
+18: Register using their mobile number and OTP.
+19: Create an architect or architecture firm profile.
+20: Enter business details and select service categories.
+21: Upload professional and business verification documents.
+22: Submit their application for Admin approval.
+23: Access their full dashboard only after Admin approval.
+24: Receive construction, renovation, architectural planning, and interior design quotation requests assigned by Admin.
+25: Prepare detailed quotations and submit them to Admin.
+26: Track quotations, customer decisions, bookings, and assigned projects.
+27: Manage project execution, milestones, progress reports, and supporting documents.
+28: Track payments, invoices, and settlements.
+29: Communicate with Admin and customers through authorized platform features.
+30: The complete workflow must be connected to the existing Build Ghar platform.
+31: 3. Architect Registration and Authentication
+32: Step 1: Registration page
+33: Create a dedicated registration page at:
+34: /architect/register
+35: The registration page should include:
+36: Build Ghar logo and branding
+37: Professional and clean UI
+38: Mobile number input
+39: Country code selection, defaulting to India (+91)
+40: Send OTP button
+41: OTP verification screen
+42: Resend OTP with a countdown
+43: Change mobile number option
+44: Terms and Conditions and Privacy Policy acceptance
+45: Login link for existing architects
+46: Authentication requirements
+47: Validate mobile numbers on the backend.
+48: Send OTP using a configurable SMS/OTP provider.
+49: Verify OTP on the server.
+50: Apply OTP expiry, resend cooldown, and rate limiting.
+51: Never store OTPs in plain text.
+52: Prevent repeated verification attempts and brute-force attacks.
+53: Create a secure session using the existing authentication strategy.
+54: Use HTTP-only secure cookies where appropriate.
+55: Never treat frontend-only verification as successful authentication.
+56: After successful OTP verification, create an architect account with an initial status of PROFILE_INCOMPLETE.
+57: If the mobile number already belongs to an account, handle login or registration appropriately without creating duplicate accounts.
+58: Architect login
+59: Create the login page at:
+60: /architect/login
+61: Existing architects should log in using their registered mobile number and OTP.
+62: After login, redirect according to account status:
+63: PROFILE_INCOMPLETE → Complete Profile
+64: PENDING_APPROVAL → Application Status
+65: CHANGES_REQUESTED → Edit Profile and Resubmit
+66: APPROVED → Architecture Dashboard
+67: REJECTED → Application Status and Support
+68: SUSPENDED → Restricted Access and Support
+69: Only approved and active architects may access the complete Architecture Panel.
+70: 4. Architect Profile Creation
+71: After registration, redirect the architect to a multi-step profile completion wizard.
+72: Display a progress indicator showing the completion percentage and allow saving drafts.
+73: Step 1: Personal details
+74: Collect:
+75: Full name
+76: Profile photograph
+77: Professional designation
+78: Registered mobile number
+79: Email address
+80: Alternate contact number (optional)
+81: Communication address
+82: State
+83: City
+84: District
+85: PIN code
+86: Years of professional experience
+87: Short professional biography
+88: Step 2: Business details
+89: Collect:
+90: Business or firm name
+91: Business type
+92: Business logo
+93: Firm registration number, where applicable
+94: Business establishment year
+95: Business address
+96: Office city and state
+97: PIN code
+98: Website (optional)
+99: Business email
+100: GSTIN, if applicable
+101: PAN details, as required for the business and applicable law
+102: Team size
+103: Number of architects and designers
+104: Service locations and operational areas
+105: Business type options
+106: Allow the architect to select one or more applicable business types:
+107: Individual Architect
+108: Architecture Firm
+109: Architectural Consultancy
+110: Architecture and Interior Design Firm
+111: Civil Engineering Consultancy
+112: Construction Planning Consultancy
+113: Home Design and Planning Studio
+114: Renovation Consultancy
+115: Other
+116: Display additional fields conditionally based on the selected business type.
+117: Do not make company registration or GST registration mandatory for every individual. Configure requirements according to the business type and applicable laws.
+118: Step 3: Professional services
+119: Allow multiple service selections:
+120: 2D House Plan
+121: 3D House Design
+122: Architectural Design
+123: Floor Plan Design
+124: Structural Design and Consultancy
+125: Interior Design
+126: Exterior Design
+127: Elevation Design
+128: Residential Construction Planning
+129: Commercial Building Design
+130: House Construction Consultancy
+131: Home Renovation
+132: Building Extension
+133: Vastu Consultancy, if offered
+134: Electrical and Plumbing Planning
+135: Landscape Design
+136: Building Estimation and BOQ
+137: Material Quantity Estimation
+138: Project Management Consultancy
+139: Site Supervision
+140: Turnkey Project Consultancy
+141: For each service, allow the architect to specify:
+142: Service description
+143: Starting price or pricing method, if applicable
+144: Typical delivery time
+145: Whether the service is currently available
+146: Pricing information must not automatically override a quotation prepared for a specific customer.
+147: Step 4: Experience and portfolio
+148: Allow architects to add previous projects.
+149: Each portfolio entry should support:
+150: Project name
+151: Project category
+152: Project location
+153: Project description
+154: Completion year
+155: Project images
+156: Relevant drawings or documents, where appropriate
+157: Allow multiple projects and image uploads.
+158: Do not publish private portfolio content before the relevant approval or visibility rules are satisfied.
+159: Step 5: Business documents
+160: Create a secure document upload section.
+161: Potential documents include:
+162: PAN card or applicable business PAN documentation
+163: Aadhaar or other accepted identity proof, if required
+164: Business registration certificate, where applicable
+165: Professional qualification certificate
+166: Council of Architecture registration certificate and number, where applicable
+167: GST registration certificate, if applicable
+168: Business address proof
+169: Authorization letter for a firm representative, if applicable
+170: Other documents requested by Admin
+171: For each document, collect:
+172: Document type
+173: Document number, only when necessary
+174: File upload
+175: Upload date
+176: Verification status
+177: Admin remarks
+178: Support PDF, JPG, JPEG, and PNG with configurable file size limits.
+179: Use secure file storage, private document URLs, server-side file validation, access controls, and malware scanning where available.
+180: Never expose identity documents publicly. Collect only information necessary for verification and comply with applicable Indian privacy and data-protection requirements.
+181: Step 6: Review and submit
+182: Display all profile information, selected services, and uploaded documents for review.
+183: Provide:
+184: Edit buttons for each section
+185: Save as Draft
+186: Submit for Approval
+187: Declaration checkbox
+188: Confirmation message after successful submission
+189: Upon submission:
+190: Validate all required information on the server.
+191: Save the profile and document metadata.
+192: Change the account status to PENDING_APPROVAL.
+193: Record the submission timestamp.
+194: Notify Admin through the existing notification system.
+195: Display the application reference number.
+196: Redirect the architect to the Application Status page.
+197: 5. Admin Approval Workflow
+198: Integrate architect verification into the existing Admin Panel.
+199: Create an Admin section named:
+200: Architect Management
+201: Suggested route: /admin/architects
+202: Admin sidebar options
+203: All Architects
+204: Pending Applications
+205: Approved Architects
+206: Changes Requested
+207: Rejected Applications
+208: Suspended Architects
+209: Verification Documents
+210: Architect Services
+211: Architect Performance
+212: Admin application review page
+213: Display:
+214: Architect name
+215: Firm name
+216: Registered mobile number
+217: Business type
+218: City and state
+219: Services offered
+220: Experience
+221: Submission date
+222: Profile completion status
+223: Document verification status
+224: Admin should be able to open a detailed application and inspect all submitted information and documents.
+225: Admin actions
+226: Approve Application
+227: Confirm required verification checks are completed.
+228: Change status to APPROVED.
+229: Record the reviewer, approval date, and audit entry.
+230: Notify the architect.
+231: Enable Architecture Panel access.
+232: Request Changes
+233: Enter mandatory remarks describing corrections needed.
+234: Change status to CHANGES_REQUESTED.
+235: Notify the architect.
+236: Allow the architect to update and resubmit the application.
+237: Reject Application
+238: Record a rejection reason.
+239: Change status to REJECTED.
+240: Notify the architect.
+241: Apply configurable reapplication rules.
+242: Suspend Architect
+243: Record the suspension reason.
+244: Disable restricted account actions and new quotation assignments.
+245: Preserve historical quotations, projects, invoices, and audit records.
+246: Notify the architect according to platform policy.
+247: Admin actions must require appropriate permissions and be recorded in an audit log.
+248: Architects must never be able to approve their own applications or modify their approval status through frontend requests or direct API calls.
+249: 6. Architecture Panel Layout
+250: After approval, display a complete responsive dashboard.
+251: Layout requirements
+252: Collapsible left sidebar
+253: Top navigation bar
+254: Build Ghar logo
+255: Architect or firm profile menu
+256: Notification icon
+257: Search functionality where appropriate
+258: Breadcrumb navigation
+259: Main content area
+260: Responsive mobile navigation
+261: Loading, empty, success, and error states
+262: Confirmation dialogs for important actions
+263: Use a modern construction and architecture-oriented design. Maintain a consistent visual identity with the existing Build Ghar website.
+264: Use reusable React components and consistent typography, spacing, forms, tables, buttons, cards, and modal dialogs.
+265: 7. Architecture Panel Sidebar
+266: Implement the following sidebar structure.
+267: 1. Dashboard
+268: Overview
+269: Notifications
+270: Recent Activity
+271: 2. Profile Management
+272: My Profile
+273: Business Details
+274: Services Offered
+275: Portfolio and Previous Projects
+276: Documents and Verification
+277: Service Areas
+278: Edit Profile
+279: 3. Quotation Management
+280: Assigned Quotation Requests
+281: Generate Quotation
+282: Quotation List
+283: Draft Quotations
+284: Submitted Quotations
+285: Revision Requested
+286: Approved / Customer-Selected Quotations
+287: Rejected Quotations
+288: Expired Quotations
+289: 4. Booking Management
+290: New Booking Requests
+291: Confirmed Bookings
+292: Booking List
+293: Booking Details
+294: Schedule and Site Visits
+295: Booking Documents
+296: 5. Project Management
+297: Active Projects
+298: Project Overview
+299: Project Planning
+300: Project Milestones
+301: Work Progress Updates
+302: Site Visit Reports
+303: Drawings and Documents
+304: Change Requests
+305: Completed Projects
+306: Cancelled Projects
+307: 6. Customer Management
+308: My Customers
+309: Customer Project Details
+310: Customer Communication
+311: Customer Feedback
+312: Only show customer information that the architect is authorized to access.
+313: 7. Billing and Payments
+314: My Earnings
+315: Payment History
+316: Customer Payments
+317: Invoices
+318: Payment Requests
+319: Milestone Payment Tracking
+320: Settlements
+321: Platform Fees and Commission
+322: Tax and Financial Reports
+323: 8. Reports and Analytics
+324: Quotation Performance
+325: Booking Conversion
+326: Active Projects
+327: Project Completion
+328: Earnings Reports
+329: Customer Ratings
+330: 9. Support and Communication
+331: Admin Messages
+332: Support Tickets
+333: Help Center
+334: FAQs
+335: Notifications
+336: 10. Settings
+337: Account Settings
+338: Security Settings
+339: Notification Preferences
+340: Change Mobile Number
+341: Logout
+342: Build the sidebar so new modules can be added later without redesigning the entire application.
+343: 8. Dashboard Design
+344: The dashboard must display live data from the backend rather than hardcoded sample numbers.
+345: Summary cards
+346: Total Assigned Requests
+347: Quotations in Draft
+348: Quotations Submitted
+349: Quotations Awaiting Revision
+350: Customer-Selected Quotations
+351: Active Bookings
+352: Active Projects
+353: Completed Projects
+354: Pending Payments
+355: Total Earnings
+356: Use clear status indicators and clickable cards that navigate to their corresponding filtered lists.
+357: Dashboard sections
+358: Recent quotation requests
+359: Upcoming deadlines
+360: Recent customer-selected quotations
+361: New booking requests
+362: Active project progress
+363: Pending milestone submissions
+364: Recent payments and settlements
+365: Notifications and admin messages
+366: Profile verification status
+367: Performance chart
+368: Provide date filters where useful, such as the last 7 days, last 30 days, and custom date range.
+369: Show empty states for new architects who have not yet received any requests.
+370: 9. Quotation Management — Core Workflow
+371: This is one of the most important modules.
+372: The existing Customer Panel allows customers to submit requests for construction, renovation, architecture, and interior design. Admin reviews and assigns suitable requests to registered architects or architecture firms.
+373: Build the Architecture Panel to receive and process those assigned requests.
+374: Step 1: Assigned Quotation Requests
+375: Route: /architect/quotations/assigned
+376: Display all quotation requests assigned to the logged-in architect.
+377: Each record should show:
+378: Request ID
+379: Customer name or authorized customer reference
+380: Project location
+381: Project category
+382: Plot width, length, and other supplied dimensions
+383: Number of floors
+384: Construction or renovation requirements
+385: Required services
+386: Customer's estimated budget, if provided
+387: Expected timeline
+388: Request submission date
+389: Quotation deadline
+390: Uploaded drawings, photos, and documents
+391: Current request status
+392: Provide filters for service type, deadline, location, and status.
+393: Actions:
+394: View Details
+395: Download Authorized Documents
+396: Accept Request
+397: Decline Request with Reason
+398: Generate Quotation
+399: Request Additional Information through the authorized workflow
+400: Only architects assigned to a request may access its confidential details.
+401: An architect's acceptance of an assignment must not itself mean the customer has booked the architect.
+402: Step 2: Generate Quotation
+403: Route: /architect/quotations/create
+404: Allow an architect to create a quotation from an assigned request.
+405: The quotation form should include the following sections.
+406: A. Project Information
+407: Automatically linked request ID
+408: Customer and project reference
+409: Project location
+410: Project type
+411: Scope of work
+412: Plot and building dimensions
+413: Number of floors
+414: Required services
+415: Proposed project duration
+416: B. Service-wise Cost Breakdown
+417: Allow multiple line items with:
+418: Service name
+419: Detailed description
+420: Quantity
+421: Unit
+422: Unit price
+423: Discount, if applicable
+424: Tax rate, where applicable
+425: Line total
+426: Suggested line items:
+427: Site visit and consultation
+428: Architectural planning
+429: 2D drawings
+430: 3D elevation and visualization
+431: Structural design and consultancy
+432: Interior design
+433: Electrical and plumbing drawings
+434: BOQ and estimation
+435: Project management
+436: Site supervision
+437: Additional services
+438: These are examples, not mandatory charges. Allow the architect to add, edit, and remove line items.
+439: Calculate totals on the server and validate all monetary values.
+440: C. Quotation Summary
+441: Display:
+442: Subtotal
+443: Discount
+444: Applicable taxes
+445: Additional charges
+446: Final quotation amount
+447: Proposed payment schedule
+448: Estimated delivery time
+449: Quotation validity date
+450: D. Scope and Terms
+451: Provide fields for:
+452: Included services
+453: Excluded services
+454: Deliverables
+455: Number of revisions included
+456: Expected timelines
+457: Customer responsibilities
+458: Payment terms
+459: Assumptions and limitations
+460: Additional terms and conditions
+461: Clearly distinguish architectural design and consultancy fees from the actual cost of construction, building materials, government fees, and other third-party expenses.
+462: Do not present a design consultancy quotation as a complete construction contract unless the architect explicitly includes that scope.
+463: E. Attachments
+464: Allow optional uploads of:
+465: Proposed floor plans
+466: Concept designs
+467: BOQ documents
+468: Supporting PDFs
+469: Other relevant project documents
+470: Quotation actions
+471: Provide these buttons:
+472: Save as Draft
+473: Preview Quotation
+474: Submit to Admin
+475: Cancel
+476: After submission:
+477: Validate the quotation on the backend.
+478: Generate a unique quotation number.
+479: Save a versioned quotation record.
+480: Set status to SUBMITTED_TO_ADMIN.
+481: Record the submission date and architect ID.
+482: Notify Admin.
+483: Display the quotation in Quotation List.
+484: Architects must not be able to modify a submitted quotation silently. If changes are requested, create a revision while preserving the previous version and its audit history.
+485: 10. Quotation List and Status Management
+486: Route: /architect/quotations
+487: Create a searchable, filterable quotation table.
+488: Columns:
+489: Quotation Number
+490: Request ID
+491: Project Name
+492: Customer Reference
+493: Quotation Amount
+494: Submission Date
+495: Valid Until
+496: Current Status
+497: Last Updated
+498: Actions
+499: Recommended quotation statuses
+500: DRAFT
+501: SUBMITTED_TO_ADMIN
+502: UNDER_ADMIN_REVIEW
+503: REVISION_REQUESTED
+504: RESUBMITTED
+505: FORWARDED_TO_CUSTOMER
+506: CUSTOMER_VIEWED
+507: CUSTOMER_SELECTED
+508: CUSTOMER_REJECTED
+509: EXPIRED
+510: WITHDRAWN
+511: Use a centralized status-transition system with server-side validation.
+512: The architect should be able to:
+513: View quotation details
+514: Preview the final quotation
+515: Download an authorized PDF
+516: Review Admin feedback
+517: Edit a draft
+518: Revise a quotation when requested
+519: View customer selection or rejection updates
+520: Review quotation history
+521: Do not allow an architect to set a quotation to CUSTOMER_SELECTED manually. This status must originate from the verified customer selection workflow.
+522: 11. Approved / Customer-Selected Quotations
+523: Route: /architect/quotations/approved
+524: In the Architecture Panel, this section should show quotations that the customer has selected through the official Build Ghar workflow.
+525: Recommended display fields:
+526: Quotation Number
+527: Customer Reference
+528: Project Name
+529: Accepted Quotation Amount
+530: Selected Services
+531: Selection Date
+532: Proposed Start Date
+533: Booking Status
+534: Next Action
+535: Workflow
+536: The architect submits a quotation to Admin.
+537: Admin reviews and forwards eligible quotations to the customer.
+538: The customer compares quotations in the Customer Panel.
+539: The customer selects an architect or quotation.
+540: The backend records the selection.
+541: The architect receives a notification.
+542: The quotation appears under Approved / Customer-Selected Quotations.
+543: The system initiates the booking confirmation process.
+544: Important distinction: Customer selection does not automatically mean that a contract is signed, payment is completed, or construction has started. Those are separate stages.
+545: Create a clear action to review the booking terms and confirm the engagement where required.
+546: If a customer selects another architect, other quotations should be marked appropriately without allowing the selected architect to overwrite the decision.
+547: 12. Booking Management
+548: When a customer selects an architect, connect the quotation to a booking.
+549: Create a booking record containing:
+550: Unique booking ID
+551: Accepted quotation version
+552: Architect ID
+553: Customer ID
+554: Project ID
+555: Agreed scope
+556: Final agreed price
+557: Payment schedule
+558: Contract or engagement document
+559: Booking date
+560: Proposed start date
+561: Current booking status
+562: Booking statuses
+563: PENDING_CONFIRMATION
+564: AWAITING_CUSTOMER_ACTION
+565: AWAITING_PAYMENT
+566: CONFIRMED
+567: SCHEDULED
+568: IN_PROGRESS
+569: COMPLETED
+570: CANCELLED
+571: DISPUTED
+572: Allow architects to review the booking, confirm their availability, upload an engagement document, and propose a start date.
+573: Where payment is required, the booking must remain in the appropriate pending status until the required conditions are met.
+574: Send booking status updates to the Admin Panel and Customer Panel.
+575: 13. Project Management and Construction Workflow
+576: Once a booking is confirmed, create or link a project in Project Management.
+577: A project can involve architecture services alone or a broader construction, renovation, or interior design engagement.
+578: Do not assume that every architect booking automatically includes on-site construction execution. Enable project modules according to the contracted scope and authorized role.
+579: Project setup
+580: Store:
+581: Project ID
+582: Customer
+583: Assigned architect or firm
+584: Related booking and quotation
+585: Site address
+586: Project type
+587: Contract value
+588: Agreed deliverables
+589: Start date
+590: Estimated completion date
+591: Project team
+592: Milestone schedule
+593: Project status
+594: Milestone examples
+595: For a design-only engagement:
+596: Initial consultation
+597: Site measurement
+598: Concept design
+599: Preliminary floor plan
+600: Customer feedback
+601: Revised drawings
+602: Final architectural drawings
+603: Final document handover
+604: For a construction or turnkey engagement, allow a separately configured milestone template such as:
+605: Site preparation
+606: Foundation
+607: Structural framework
+608: Brickwork
+609: Plumbing and electrical rough-in
+610: Plastering
+611: Flooring
+612: Painting
+613: Fixtures and finishing
+614: Final inspection and handover
+615: Milestones must be configurable according to the actual project scope. Do not force design-only projects to follow construction milestones.
+616: Work progress updates
+617: Allow the architect or authorized project manager to submit:
+618: Milestone name
+619: Work description
+620: Previous progress percentage
+621: Updated progress percentage
+622: Work completion date
+623: Progress photographs
+624: Site visit report
+625: Supporting documents
+626: Issues or delays
+627: Next planned activity
+628: The system should display project progress in the Customer Panel.
+629: Validate progress values between 0% and 100%. Do not mark a project complete simply because one progress update reaches 100%.
+630: Allow Admin or the authorized customer to review submitted milestones according to the configured approval policy.
+631: 14. Milestone Payments and Settlement Tracking
+632: Integrate the Architecture Panel with the existing Build Ghar Billing and Payment Management modules.
+633: For engagements that use milestone-based payments, display:
+634: Agreed contract amount
+635: Payment schedule
+636: Milestone value
+637: Amount due
+638: Amount paid
+639: Pending amount
+640: Payment status
+641: Invoice
+642: Transaction reference
+643: Settlement status
+644: Example payment workflow
+645: The architect and customer agree on the payment schedule.
+646: A milestone is submitted for review.
+647: The milestone is approved by the authorized party.
+648: The system creates the applicable payment request or invoice.
+649: The customer completes payment through the configured payment gateway.
+650: The backend verifies payment through a trusted gateway callback or webhook.
+651: The payment record is updated.
+652: The architect sees the payment status.
+653: Settlement is processed according to the platform's actual payment and commission arrangements.
+654: Support partial payments where the agreed terms permit them.
+655: Do not treat a screenshot or client-side success message as proof of payment. Never mark an invoice as paid without verified payment confirmation.
+656: Do not release payments automatically merely because a percentage of progress has been entered. Use the agreed milestone approval and payment policy.
+657: If Build Ghar holds or distributes customer funds, implement the necessary payment-provider capabilities, reconciliation, refund handling, and applicable legal/compliance requirements before enabling that flow. Do not assume that a normal payment gateway automatically supports escrow or split settlements.
+658: 15. Notifications and Communication
+659: Integrate with the existing notification infrastructure.
+660: Trigger notifications for:
+661: Registration completed
+662: Profile submitted
+663: Application approved
+664: Changes requested
+665: Application rejected
+666: New quotation assignment
+667: Assignment deadline approaching
+668: Quotation submitted
+669: Admin requests quotation revision
+670: Quotation forwarded to customer
+671: Customer selects quotation
+672: Booking confirmed
+673: Project milestone submitted
+674: Milestone approved or rejected
+675: Payment received
+676: Settlement processed
+677: Customer message received
+678: Provide in-app notifications and optional SMS or email notifications through configured providers.
+679: Each notification should include a meaningful message, timestamp, read/unread state, and relevant destination link.
+680: Build a secure communication flow so architects can communicate only with customers and administrators associated with their assignments or projects.
+681: 16. Database Design
+682: Inspect existing database schemas first and reuse existing entities wherever possible.
+683: If the required entities do not exist, design normalized, appropriately indexed MongoDB collections or equivalent models.
+684: Suggested entities:
+685: Architect
+686: _id
+687: userId
+688: fullName
+689: mobileNumber
+690: email
+691: profile
+692: businessDetails
+693: businessTypes
+694: services
+695: serviceAreas
+696: experience
+697: portfolio
+698: profileCompletion
+699: verificationStatus
+700: accountStatus
+701: createdAt
+702: updatedAt
+703: ArchitectDocument
+704: _id
+705: architectId
+706: documentType
+707: secureFileReference
+708: verificationStatus
+709: adminRemarks
+710: reviewedBy
+711: reviewedAt
+712: createdAt
+713: ArchitectApplication
+714: _id
+715: architectId
+716: applicationNumber
+717: applicationStatus
+718: submittedAt
+719: reviewedBy
+720: reviewedAt
+721: adminRemarks
+722: history
+723: QuotationRequest
+724: Reuse the existing customer quotation request entity where available.
+725: It should support:
+726: Customer reference
+727: Project requirements
+728: Site details
+729: Required services
+730: Attachments
+731: Assigned architects
+732: Assignment status
+733: Deadline
+734: Request history
+735: Quotation
+736: _id
+737: quotationNumber
+738: requestId
+739: architectId
+740: customerId
+741: projectId
+742: items
+743: subtotal
+744: discount
+745: taxes
+746: totalAmount
+747: scopeOfWork
+748: exclusions
+749: paymentTerms
+750: validUntil
+751: attachments
+752: status
+753: currentVersion
+754: versionHistory
+755: submittedAt
+756: selectedAt
+757: createdAt
+758: updatedAt
+759: Booking
+760: _id
+761: bookingNumber
+762: quotationId
+763: quotationVersion
+764: architectId
+765: customerId
+766: projectId
+767: agreedAmount
+768: bookingStatus
+769: contractReference
+770: paymentSchedule
+771: startDate
+772: createdAt
+773: updatedAt
+774: Project
+775: _id
+776: projectNumber
+777: bookingId
+778: architectId
+779: customerId
+780: projectDetails
+781: scopeOfWork
+782: milestones
+783: progress
+784: projectStatus
+785: startDate
+786: estimatedCompletionDate
+787: createdAt
+788: updatedAt
+789: Payment and Invoice
+790: Reuse the existing Billing and Payment models. Extend them only where necessary to support architect-related invoices, milestone payments, platform fees, refunds, and settlements.
+791: Notification and AuditLog
+792: Use existing notification and audit models where available. Ensure that sensitive administrative actions, quotation revisions, booking decisions, and payment status changes have traceable records.
+793: Define references, indexes, uniqueness constraints, validation rules, and deletion policies appropriately. Preserve financial and project history.
+794: 17. Backend API Requirements
+795: Follow the existing API conventions. If these routes do not already exist, implement equivalent endpoints.
+796: Authentication
+797: POST /api/architect/auth/send-otp
+798: POST /api/architect/auth/verify-otp
+799: POST /api/architect/auth/logout
+800: GET /api/architect/auth/me
+801: Profile
+802: GET /api/architect/profile
+803: PUT /api/architect/profile
+804: POST /api/architect/profile/documents
+805: GET /api/architect/profile/documents
+806: DELETE /api/architect/profile/documents/:documentId — only when permitted
+807: POST /api/architect/profile/submit
+808: Quotation management
+809: GET /api/architect/quotation-requests
+810: GET /api/architect/quotation-requests/:requestId
+811: POST /api/architect/quotation-requests/:requestId/accept
+812: POST /api/architect/quotation-requests/:requestId/decline
+813: POST /api/architect/quotations
+814: GET /api/architect/quotations
+815: GET /api/architect/quotations/:quotationId
+816: PUT /api/architect/quotations/:quotationId
+817: POST /api/architect/quotations/:quotationId/submit
+818: POST /api/architect/quotations/:quotationId/revise
+819: GET /api/architect/quotations/:quotationId/history
+820: Bookings
+821: GET /api/architect/bookings
+822: GET /api/architect/bookings/:bookingId
+823: POST /api/architect/bookings/:bookingId/confirm
+824: POST /api/architect/bookings/:bookingId/propose-start-date
+825: Projects
+826: GET /api/architect/projects
+827: GET /api/architect/projects/:projectId
+828: GET /api/architect/projects/:projectId/milestones
+829: POST /api/architect/projects/:projectId/milestones
+830: PUT /api/architect/projects/:projectId/milestones/:milestoneId
+831: POST /api/architect/projects/:projectId/progress-updates
+832: GET /api/architect/projects/:projectId/progress-updates
+833: Payments and notifications
+834: GET /api/architect/payments
+835: GET /api/architect/invoices
+836: GET /api/architect/settlements
+837: GET /api/architect/notifications
+838: PATCH /api/architect/notifications/:notificationId/read
+839: Implement pagination, sorting, filtering, request validation, consistent error responses, authorization middleware, and rate limiting.
+840: These endpoints are a suggested contract, not permission to duplicate existing APIs. Adapt them to the actual codebase.
+841: 18. Security and Access Control
+842: Implement robust role-based access control for:
+843: Customer
+844: Architect
+845: Admin
+846: Project Manager, if supported
+847: Other existing authorized roles
+848: Mandatory security rules:
+849: Every protected backend endpoint must verify authentication and authorization.
+850: Architects must only access their own profiles and authorized assignments, quotations, bookings, and projects.
+851: Admin-only operations must never be accessible to architects.
+852: Approval statuses must only be changed by authorized backend operations.
+853: Validate all incoming data on the server.
+854: Prevent IDOR vulnerabilities and unauthorized document access.
+855: Use secure file uploads and private document access.
+856: Protect sensitive information and secrets.
+857: Apply rate limits to authentication and sensitive endpoints.
+858: Maintain audit logs for critical actions.
+859: Verify payment gateway signatures and webhook events.
+860: Prevent duplicate submissions and race conditions in customer selection, booking, and payment operations.
+861: Use transactions or suitable consistency controls for multi-step financial operations.
+862: Keep API keys and credentials in environment variables.
+863: Use appropriate CORS, CSRF protection where applicable, secure cookie settings, and production HTTPS.
+864: Never expose sensitive identity or business documents in public APIs.
+865: 19. UI and Functional Requirements
+866: The entire Architecture Panel must be responsive and usable on desktop, tablet, and mobile.
+867: Use:
+868: React components
+869: Tailwind CSS
+870: Reusable form components
+871: Consistent validation
+872: Accessible controls
+873: Searchable tables
+874: Pagination
+875: Status badges
+876: Filter panels
+877: Confirmation dialogs
+878: Toast notifications
+879: Loading skeletons
+880: Empty-state screens
+881: Error boundaries where appropriate
+882: Use suitable charts for earnings, quotation conversion, and project progress.
+883: Every visible button must perform its intended action. Do not leave important actions as decorative buttons or non-functional placeholders.
+884: All data displayed in the panel must come from the backend. Use realistic seed data only in a designated development environment, never as a substitute for production functionality.
+885: 20. Testing and Acceptance Criteria
+886: Before declaring the Architecture Panel complete, test the following scenarios.
+887: Registration and approval
+888: A new architect registers with a mobile number.
+889: OTP verification works and invalid or expired OTPs are rejected.
+890: Duplicate accounts are prevented.
+891: An incomplete profile cannot be submitted.
+892: Documents upload securely.
+893: Submission creates a pending application.
+894: A pending architect cannot access protected panel functionality.
+895: Admin can approve, reject, or request changes.
+896: Changes can be submitted again for review.
+897: An approved architect can access the panel.
+898: A suspended architect cannot perform restricted actions.
+899: Quotations
+900: Admin can assign an existing customer request to an architect.
+901: Only authorized architects can view assigned requests.
+902: An architect can save a draft and submit a quotation.
+903: Totals are calculated and validated on the server.
+904: Admin can review and request revisions.
+905: Quotation history is preserved.
+906: The correct quotation reaches the customer through the existing workflow.
+907: Customer selection is recorded only by an authorized customer-side action.
+908: Other architects cannot alter the selection.
+909: Bookings and projects
+910: Customer selection creates the appropriate booking workflow.
+911: Booking confirmation follows the configured conditions.
+912: Confirmed bookings link to the correct project.
+913: Milestones and progress updates are saved.
+914: Customers see authorized progress updates.
+915: Payment requests and settlement states reflect verified backend records.
+916: Security and reliability
+917: Unauthorized API requests are rejected.
+918: Architects cannot access another architect's records by changing IDs.
+919: Admin endpoints remain protected.
+920: Invalid file types and oversized uploads are rejected.
+921: Payment webhooks cannot be replayed to create duplicate payments.
+922: Lists support pagination and filtering.
+923: Errors are handled without exposing secrets.
+924: Existing Customer and Admin Panel functionality continues to work.
+925: Write appropriate unit tests, integration tests, and end-to-end tests for the critical workflows.
+926: 21. Implementation Instructions for Antigravity or Claude
+927: Follow these implementation phases in order.
+928: Phase 1 — Inspect the existing project
+929: Review the folder structure, dependencies, frontend routes, backend routes, database schemas, authentication, Admin Panel, Customer Panel, quotation workflow, notifications, and payment modules.
+930: Identify which features already exist and which require implementation. Provide a short implementation plan before making major structural changes.
+931: Phase 2 — Build authentication and registration
+932: Implement architect mobile OTP authentication, profile completion, secure document upload, application submission, and account-status-based routing.
+933: Phase 3 — Integrate Admin approval
+934: Add Architect Management to the existing Admin Panel, including application review, document verification, approval, rejection, change requests, and audit history.
+935: Phase 4 — Build the Architecture Dashboard
+936: Implement the responsive sidebar, dashboard cards, profile management, service management, portfolio, documents, notifications, and settings.
+937: Phase 5 — Build quotation management
+938: Implement assigned quotation requests, quotation generation, pricing calculations, draft management, submission, Admin review, revisions, quotation history, and customer selection tracking.
+939: Phase 6 — Build booking and project management
+940: Integrate confirmed bookings, project creation, configurable milestones, progress updates, site reports, customer communication, and document management.
+941: Phase 7 — Integrate billing and payments
+942: Reuse existing financial modules to display invoices, payment status, milestone payment schedules, and settlements. Do not create a second, disconnected payment system.
+943: Phase 8 — Testing and finalization
+944: Run migrations or schema updates where required, verify API integrations, test role permissions, fix errors, and ensure existing platform functionality remains intact.
+945: At the end of each phase, verify that the implemented features work before moving forward.
+946: 22. Final Deliverables
+947: Provide a fully integrated implementation with:
+948: Architect registration and OTP login
+949: Multi-step architect profile wizard
+950: Secure document upload
+951: Admin approval workflow
+952: Complete Architecture Panel sidebar
+953: Live dashboard
+954: Quotation request assignment and tracking
+955: Quotation generation and revision management
+956: Customer-selected quotations
+957: Booking management
+958: Project and milestone tracking
+959: Progress reports and supporting documents
+960: Billing and payment integration
+961: Notifications and communication
+962: Database models and indexes
+963: Backend APIs
+964: Frontend routes and reusable components
+965: Role-based access controls
+966: Validation and error handling
+967: Tests for critical workflows
+968: Updated environment variable documentation
+969: Setup and deployment instructions
+970: Final instructions
+971: Do not only generate a UI design or static frontend. Implement the actual frontend, backend, database integration, and connected workflows.
+972: Do not replace the existing project with a new template. Do not delete existing working features or overwrite existing database data. If a required service, credential, payment gateway, or SMS provider is unavailable, implement a clean integration interface and document the configuration required.
+973: Do not claim a feature is complete unless its end-to-end workflow has been implemented and tested.
+974: Start by inspecting the existing Build Ghar codebase. Then implement the Architecture Panel step by step, integrating every module with the existing Customer Panel and Admin Panel.
