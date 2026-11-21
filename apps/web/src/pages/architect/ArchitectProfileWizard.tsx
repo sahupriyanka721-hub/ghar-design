@@ -356,6 +356,18 @@ export const ArchitectProfileWizard: React.FC = () => {
 
   const [serviceCities, setServiceCities] = useState<string[]>([]);
   const [citySearchQuery, setCitySearchQuery] = useState('');
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const cityDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target as Node)) {
+        setIsCityDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const INDIAN_STATES_AND_CITIES: Record<string, string[]> = {
     'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'West Delhi', 'East Delhi', 'Central Delhi', 'Dwarka', 'Rohini', 'Connaught Place'],
@@ -489,10 +501,12 @@ export const ArchitectProfileWizard: React.FC = () => {
 
   const filteredCities = useMemo(() => {
     const q = citySearchQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!q) {
+      return ALL_INDIA_CITIES.slice(0, 60);
+    }
     return ALL_INDIA_CITIES.filter(
       (item) => item.city.toLowerCase().includes(q) || item.state.toLowerCase().includes(q)
-    ).slice(0, 40);
+    ).slice(0, 60);
   }, [citySearchQuery, ALL_INDIA_CITIES]);
 
   // Load existing profile & draft safely without ever erasing user progress
@@ -669,14 +683,13 @@ export const ArchitectProfileWizard: React.FC = () => {
       setPortfolioProjects(realProjects);
     }
 
-    // Restore Operating Cities (if empty, auto-include firm city)
-    const firmCity = draft?.business?.city || existing?.city || '';
-    if (draft?.serviceCities && Array.isArray(draft.serviceCities) && draft.serviceCities.length > 0) {
+    // Restore Operating Cities (never force auto-selection of firm city)
+    if (draft?.serviceCities && Array.isArray(draft.serviceCities)) {
       setServiceCities(draft.serviceCities);
-    } else if (existing?.serviceCities && Array.isArray(existing.serviceCities) && existing.serviceCities.length > 0) {
+    } else if (existing?.serviceCities && Array.isArray(existing.serviceCities)) {
       setServiceCities(existing.serviceCities);
-    } else if (firmCity) {
-      setServiceCities([firmCity]);
+    } else {
+      setServiceCities([]);
     }
 
     // Restore Bank Details without overwriting
@@ -746,13 +759,6 @@ export const ArchitectProfileWizard: React.FC = () => {
       console.warn('Draft auto-save warning:', e);
     }
   }, [personal, business, directors, businessVerification, bank, selectedServices, serviceCities, portfolioProjects]);
-
-  // Auto-sync firm's headquarters city into coverage areas if none selected
-  useEffect(() => {
-    if (business.city?.trim() && serviceCities.length === 0 && !hasUserClearedCitiesRef.current) {
-      setServiceCities([business.city.trim()]);
-    }
-  }, [business.city]);
 
   const toggleService = (srvNameOrObj: any) => {
     const srvName = typeof srvNameOrObj === 'string' ? srvNameOrObj : srvNameOrObj?.name || String(srvNameOrObj);
@@ -3170,91 +3176,137 @@ export const ArchitectProfileWizard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Live Search Input Box */}
-                <div className="relative">
-                  <div className="relative">
+                {/* Searchable Dropdown Container */}
+                <div ref={cityDropdownRef} className="relative">
+                  {/* Dropdown Input / Trigger */}
+                  <div
+                    className="relative flex items-center bg-white border-2 border-slate-200 hover:border-sky-400 focus-within:border-sky-500 rounded-2xl shadow-xs transition"
+                  >
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={citySearchQuery}
-                      onChange={(e) => setCitySearchQuery(e.target.value)}
-                      placeholder="Search operating cities (e.g. Jaipur, Delhi, Mumbai)..."
-                      className="w-full pl-10 pr-10 py-3 bg-white border-2 border-slate-200 hover:border-slate-300 focus:border-sky-500 rounded-2xl text-xs font-semibold focus:outline-none shadow-xs transition placeholder:text-slate-400 text-slate-900"
+                      onFocus={() => setIsCityDropdownOpen(true)}
+                      onChange={(e) => {
+                        setCitySearchQuery(e.target.value);
+                        setIsCityDropdownOpen(true);
+                      }}
+                      placeholder="Search & select cities from dropdown (e.g. Jaipur, Delhi, Mumbai)..."
+                      className="w-full pl-10 pr-20 py-3 bg-transparent text-xs font-semibold focus:outline-none placeholder:text-slate-400 text-slate-900 rounded-2xl"
                     />
-                    {citySearchQuery && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {citySearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setCitySearchQuery('')}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                          title="Clear search"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setCitySearchQuery('')}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        onClick={() => setIsCityDropdownOpen(!isCityDropdownOpen)}
+                        className="text-slate-500 hover:text-sky-600 p-1.5 rounded-lg hover:bg-sky-50 transition flex items-center justify-center cursor-pointer"
+                        title={isCityDropdownOpen ? 'Close dropdown' : 'Open city dropdown'}
                       >
-                        <X className="w-4 h-4" />
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isCityDropdownOpen ? 'rotate-180 text-sky-600' : ''}`} />
                       </button>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Filtered Search Results Dropdown/Box when searching */}
-                  {citySearchQuery.trim() && (
-                    <div className="mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 space-y-2 max-h-64 overflow-y-auto z-20">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 pb-1 border-b border-slate-100">
-                        <span>Search Results for "{citySearchQuery}"</span>
-                        <span className="text-slate-400">{filteredCities.length} match(es)</span>
+                  {/* Floating Searchable Dropdown Menu */}
+                  {isCityDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 space-y-2 max-h-80 overflow-hidden z-50 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                      {/* Dropdown Header */}
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 pb-2 border-b border-slate-100 shrink-0">
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                          <span>
+                            {citySearchQuery.trim()
+                              ? `Search Results for "${citySearchQuery}"`
+                              : 'Select Operating Cities across India'}
+                          </span>
+                        </span>
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                          {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'}
+                        </span>
                       </div>
 
-                      {filteredCities.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {filteredCities.map(({ city, state }) => {
-                            const isSelected = serviceCities.includes(city);
-                            return (
-                              <button
-                                key={city}
-                                type="button"
-                                onClick={() => toggleCity(city)}
-                                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between text-left transition ${
-                                  isSelected
-                                    ? 'bg-sky-50 border border-sky-300 text-sky-900 font-bold'
-                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-transparent'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 truncate">
-                                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-sky-600' : 'text-slate-400'}`} />
-                                  <span className="truncate">{city}</span>
-                                  <span className="text-[10px] text-slate-400 truncate">({state})</span>
-                                </div>
-                                {isSelected ? (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white shrink-0">
-                                    ✓ Selected
-                                  </span>
-                                ) : (
-                                  <span className="text-[11px] text-sky-600 font-bold shrink-0 hover:underline">
-                                    + Add
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="py-2 text-center text-xs text-slate-500">
-                          No predefined city matches "{citySearchQuery}".
-                        </div>
-                      )}
+                      {/* City Options List */}
+                      <div className="overflow-y-auto pr-1 space-y-1 flex-1 max-h-56">
+                        {filteredCities.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {filteredCities.map(({ city, state }) => {
+                              const isSelected = serviceCities.includes(city);
+                              return (
+                                <button
+                                  key={city}
+                                  type="button"
+                                  onClick={() => toggleCity(city)}
+                                  className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between text-left transition cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-sky-500 text-white font-bold shadow-xs'
+                                      : 'bg-slate-50 hover:bg-sky-50 text-slate-800 hover:text-sky-900 border border-slate-100'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <MapPin className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                                    <span className="truncate">{city}</span>
+                                    <span className={`text-[10px] truncate ${isSelected ? 'text-sky-100' : 'text-slate-400'}`}>({state})</span>
+                                  </div>
+                                  {isSelected ? (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/20 text-white shrink-0 flex items-center gap-1">
+                                      <Check className="w-3 h-3" /> Selected
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-sky-600 font-bold shrink-0 hover:underline">
+                                      + Add
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-xs text-slate-500 space-y-1">
+                            <p>No predefined city matches "{citySearchQuery}".</p>
+                            <p className="text-[11px] text-slate-400">You can add it below as a custom city.</p>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Option to add custom typed city */}
                       {citySearchQuery.trim() && !serviceCities.includes(citySearchQuery.trim()) && (
-                        <div className="pt-2 border-t border-slate-100">
+                        <div className="pt-2 border-t border-slate-100 shrink-0">
                           <button
                             type="button"
                             onClick={() => {
                               toggleCity(citySearchQuery.trim());
                               setCitySearchQuery('');
                             }}
-                            className="w-full px-3 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs"
+                            className="w-full px-3 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
                           >
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>+ Add "{citySearchQuery.trim()}" as Custom Operating Locality / City</span>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add "{citySearchQuery.trim()}" as Custom Operating City</span>
                           </button>
                         </div>
                       )}
+
+                      {/* Dropdown Footer Actions */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs shrink-0">
+                        <span className="text-[11px] font-medium text-slate-500">
+                          {serviceCities.length} selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCityDropdownOpen(false)}
+                          className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+                        >
+                          Done
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
