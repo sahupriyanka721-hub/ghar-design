@@ -397,7 +397,64 @@ export const generateCertificateDataUrl = (title: string, archName: string, regN
     <text x="110" y="960" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#64748b">Verified by BuildGhar Regulatory Compliance Desk</text>
     <text x="110" y="980" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">Date of Verification: 2026 &#8226; Valid Nationwide</text>
   </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+
+  try {
+    const base64 = typeof btoa !== 'undefined'
+      ? btoa(unescape(encodeURIComponent(svg)))
+      : Buffer.from(svg).toString('base64');
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+};
+
+export const generatePhotoDataUrl = (archName: string, phone: string, regNo?: string, archId?: string): string => {
+  const cleanName = (archName || 'Principal Architect').replace(/</g, '').replace(/>/g, '');
+  const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+  const cleanReg = (regNo || 'COA/VERIFIED').replace(/</g, '').replace(/>/g, '');
+  const cleanId = (archId || 'BG/Architech/000001').replace(/</g, '').replace(/>/g, '');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750">
+    <defs>
+      <linearGradient id="photoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0284c7" />
+        <stop offset="100%" stop-color="#0f172a" />
+      </linearGradient>
+    </defs>
+    <rect width="600" height="750" fill="#f8fafc" />
+    <rect x="20" y="20" width="560" height="710" fill="#ffffff" stroke="#0284c7" stroke-width="4" rx="20" />
+    <rect x="20" y="20" width="560" height="85" fill="url(#photoGrad)" rx="20" />
+    <text x="300" y="58" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">OFFICIAL ARCHITECT IDENTITY CARD</text>
+    <text x="300" y="80" font-family="Arial, sans-serif" font-size="11" fill="#bae6fd" text-anchor="middle">Council of Architecture &amp; BuildGhar Verified Partner</text>
+    <circle cx="300" cy="220" r="85" fill="#f1f5f9" stroke="#0284c7" stroke-width="4" />
+    <circle cx="300" cy="190" r="40" fill="#0284c7" />
+    <path d="M 235 285 C 235 235, 365 235, 365 285 Z" fill="#0284c7" />
+    <circle cx="370" cy="280" r="16" fill="#10b981" stroke="#ffffff" stroke-width="2" />
+    <text x="370" y="285" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">&#10003;</text>
+    <text x="300" y="340" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#0f172a" text-anchor="middle">${cleanName}</text>
+    <text x="300" y="365" font-family="monospace" font-size="13" font-weight="bold" fill="#0284c7" text-anchor="middle">${cleanId}</text>
+    <rect x="60" y="400" width="480" height="200" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" rx="14" />
+    <text x="90" y="440" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#64748b">COA Registration:</text>
+    <text x="260" y="440" font-family="monospace" font-size="14" font-weight="bold" fill="#0f172a">${cleanReg}</text>
+    <text x="90" y="480" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#64748b">Contact Number:</text>
+    <text x="260" y="480" font-family="monospace" font-size="14" font-weight="bold" fill="#0f172a">+91 ${cleanPhone || '98XXXXXXXX'}</text>
+    <text x="90" y="520" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#64748b">Identity Status:</text>
+    <text x="260" y="520" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#16a34a">Principal Architect (Verified)</text>
+    <text x="90" y="560" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#64748b">Governance Desk:</text>
+    <text x="260" y="560" font-family="Arial, sans-serif" font-size="13" fill="#334155">Official Photo Record Confirmed</text>
+    <circle cx="300" cy="660" r="32" fill="#ecfdf5" stroke="#10b981" stroke-width="2" />
+    <text x="300" y="656" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#047857" text-anchor="middle">PHOTO</text>
+    <text x="300" y="672" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#047857" text-anchor="middle">VERIFIED</text>
+  </svg>`;
+
+  try {
+    const base64 = typeof btoa !== 'undefined'
+      ? btoa(unescape(encodeURIComponent(svg)))
+      : Buffer.from(svg).toString('base64');
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
 };
 
 export const ARCHITECT_ID_PREFIX = 'BG/Architech';

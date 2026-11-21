@@ -3310,61 +3310,6 @@ export const ArchitectProfileWizard: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Quick Add Regional Hubs & Firm City */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500">
-                      Popular Hubs (Click to add / remove):
-                    </span>
-                    {business.city && !serviceCities.includes(business.city) && (
-                      <button
-                        type="button"
-                        onClick={() => toggleCity(business.city)}
-                        className="text-[11px] font-bold text-sky-700 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <MapPin className="w-3 h-3 text-sky-600" />
-                        <span>+ Add Firm City ({business.city})</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {business.city && (
-                      <button
-                        type="button"
-                        onClick={() => toggleCity(business.city)}
-                        className={`px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          serviceCities.includes(business.city)
-                            ? 'bg-sky-600 text-white shadow-2xs'
-                            : 'bg-sky-50 text-sky-800 border border-sky-300 hover:bg-sky-100'
-                        }`}
-                      >
-                        <MapPin className="w-3 h-3" />
-                        <span>{business.city} (HQ)</span>
-                        {serviceCities.includes(business.city) ? <Check className="w-3 h-3 ml-0.5" /> : <Plus className="w-3 h-3 ml-0.5" />}
-                      </button>
-                    )}
-                    {['Jaipur', 'Delhi NCR', 'Mumbai', 'Bengaluru', 'Pune', 'Hyderabad', 'Ahmedabad', 'Lucknow', 'Chandigarh', 'Indore'].map((c) => {
-                      if (business.city && c.toLowerCase() === business.city.toLowerCase()) return null;
-                      const isSel = serviceCities.includes(c);
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => toggleCity(c)}
-                          className={`px-3 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
-                            isSel
-                              ? 'bg-sky-600 text-white font-bold shadow-2xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          <span>{c}</span>
-                          {isSel ? <Check className="w-3 h-3 ml-0.5" /> : <Plus className="w-3 h-3 ml-0.5" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
 
               {/* ================= COMPREHENSIVE APPLICATION REVIEW ================= */}
