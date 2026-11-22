@@ -94,9 +94,9 @@ export const Header: React.FC = () => {
     return '/dashboard';
   };
 
-  // Public frontend only displays customer & partner accounts.
-  // Super Admin session stays completely hidden on public frontend pages.
-  const showFrontendUser = Boolean(user && user.role !== 'ADMIN');
+  // Public frontend only displays customer (homeowner) accounts.
+  // Architect, Vendor and Admin partner sessions should never take over the main public consumer website header.
+  const showFrontendUser = Boolean(user && user.role === 'CUSTOMER');
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'Services', path: '/services' },

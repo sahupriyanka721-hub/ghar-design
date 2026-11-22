@@ -104,18 +104,15 @@ export function resolveActiveSession(pathname: string): { user: User | null; tok
     return { user: null, token: null };
   }
 
-  // target === 'ANY' (public pages like home, about, services, etc.)
+  // target === 'ANY' (public consumer pages like home, about, services, etc.)
+  // On public consumer pages, only return customer session so partner/architect logins don't bleed into consumer frontend
   const cust = readStoredUser(CUST_USER_KEY) || readStoredUser('customer_user');
   if (cust) return { user: cust, token: localStorage.getItem(CUST_TOKEN_KEY) || localStorage.getItem('customer_token') };
-  const pro = readStoredUser(PRO_USER_KEY) || readStoredUser('pro_user');
-  if (pro) return { user: pro, token: localStorage.getItem(PRO_TOKEN_KEY) || localStorage.getItem('pro_token') };
-  const adm = readStoredUser(ADMIN_USER_KEY) || readStoredUser('admin_user');
-  if (adm) return { user: adm, token: localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem('admin_token') };
-  const ven = readStoredUser(VENDOR_USER_KEY) || readStoredUser('vendor_user');
-  if (ven) return { user: ven, token: localStorage.getItem(VENDOR_TOKEN_KEY) || localStorage.getItem('vendor_token') };
-
   const legacy = readStoredUser('user');
-  return { user: legacy, token: localStorage.getItem('token') };
+  if (legacy && legacy.role === 'CUSTOMER') {
+    return { user: legacy, token: localStorage.getItem('token') };
+  }
+  return { user: null, token: null };
 }
 
 interface AuthContextType {
