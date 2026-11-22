@@ -967,12 +967,13 @@ export const AdminArchitects: React.FC = () => {
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">KYC Status</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     No architect records found matching current criteria.
                   </td>
                 </tr>
@@ -987,7 +988,7 @@ export const AdminArchitects: React.FC = () => {
                   return (
                     <tr
                       key={arch.id}
-                      className="hover:bg-sky-50/40 transition group cursor-pointer"
+                      className="hover:bg-sky-50/60 transition group cursor-pointer"
                       onClick={() => {
                         const enriched = ensureArchitectStatutoryDocuments(arch);
                         setSelectedArchitect({ ...enriched });
@@ -995,17 +996,19 @@ export const AdminArchitects: React.FC = () => {
                       }}
                     >
                       {/* 1. Photo */}
-                      <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3.5 px-3 text-center">
                         <div
-                          className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-600 to-navy-900 text-white font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display mx-auto overflow-hidden border border-slate-200/90 relative group/avatar cursor-pointer"
-                          onClick={() => handleViewPhoto(arch)}
-                          title="Click to inspect full photo"
+                          className="w-11 h-11 rounded-2xl bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display mx-auto overflow-hidden border border-slate-200 relative group/avatar cursor-pointer"
+                          title="Click to view full architect profile dossier"
                         >
-                          {arch.profilePhoto ? (
-                            <img src={arch.profilePhoto} alt={arch.name} className="w-full h-full object-cover rounded-2xl" />
-                          ) : (
-                            <span>{(arch.firmName || arch.name || 'PA').slice(0, 2).toUpperCase()}</span>
-                          )}
+                          <img
+                            src={arch.profilePhoto || generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id)}
+                            alt={arch.name}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id);
+                            }}
+                            className="w-full h-full object-cover rounded-2xl"
+                          />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                             <Eye className="w-3.5 h-3.5 text-white" />
                           </div>
@@ -1013,7 +1016,7 @@ export const AdminArchitects: React.FC = () => {
                       </td>
 
                       {/* 2. Architect ID */}
-                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3.5 px-4">
                         <div className="flex flex-col gap-0.5">
                           {isApproved ? (
                             <>
@@ -1139,8 +1142,8 @@ export const AdminArchitects: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 7. Status & Approve Action */}
-                      <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                      {/* 7. Status */}
+                      <td className="py-3.5 px-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                           <span
                             className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -1160,7 +1163,10 @@ export const AdminArchitects: React.FC = () => {
                           {!isApproved && (
                             <button
                               type="button"
-                              onClick={() => handleApprove(arch.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApprove(arch.id);
+                              }}
                               className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
                               title="Approve this architect partner"
                             >
@@ -1169,6 +1175,23 @@ export const AdminArchitects: React.FC = () => {
                             </button>
                           )}
                         </div>
+                      </td>
+
+                      {/* 8. Action: View Profile */}
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const enriched = ensureArchitectStatutoryDocuments(arch);
+                            setSelectedArchitect({ ...enriched });
+                            setActiveDossierTab('CREDENTIALS');
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                          title="Open full architect profile & KYC verification"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Profile</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1247,11 +1270,14 @@ export const AdminArchitects: React.FC = () => {
                     onClick={() => handleViewPhoto(selectedArchitect)}
                     title="Click to view full size photo"
                   >
-                    {selectedArchitect.profilePhoto ? (
-                      <img src={selectedArchitect.profilePhoto} alt={selectedArchitect.name} className="w-full h-full object-cover rounded-2xl" />
-                    ) : (
-                      selectedArchitect.name.slice(0, 2).toUpperCase()
-                    )}
+                    <img
+                      src={selectedArchitect.profilePhoto || generatePhotoDataUrl(selectedArchitect.name, selectedArchitect.phone, selectedArchitect.coaNumber, selectedArchitect.id)}
+                      alt={selectedArchitect.name}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = generatePhotoDataUrl(selectedArchitect.name, selectedArchitect.phone, selectedArchitect.coaNumber, selectedArchitect.id);
+                      }}
+                      className="w-full h-full object-cover rounded-2xl"
+                    />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/heroAvatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                       <Eye className="w-5 h-5 text-white" />
                     </div>

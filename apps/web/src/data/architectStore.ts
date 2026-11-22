@@ -546,17 +546,28 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   const resolvedPhoto =
     arch.profilePhoto ||
     (cleanPhone ? localStorage.getItem(`arch_photo_${cleanPhone}`) : '') ||
-    localStorage.getItem(`arch_photo_+91${cleanPhone}`) ||
+    (cleanPhone ? localStorage.getItem(`arch_photo_+91${cleanPhone}`) : '') ||
+    (cleanPhone ? localStorage.getItem(`profile_photo_${cleanPhone}`) : '') ||
+    (cleanPhone ? localStorage.getItem(`user_photo_${cleanPhone}`) : '') ||
+    localStorage.getItem('registered_arch_photo') ||
+    localStorage.getItem('arch_photo_guest') ||
     '';
+
+  const validPhotoUrl = (resolvedPhoto && (resolvedPhoto.startsWith('data:') || resolvedPhoto.startsWith('http')))
+    ? resolvedPhoto
+    : generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id);
+
+  arch.profilePhoto = validPhotoUrl;
+
   compiled.push({
     id: 'doc-photo',
     documentType: 'PROFILE_PHOTO' as any,
     title: `Principal Architect Photo - ${arch.name || 'Principal Architect'}`,
     fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
     fileSize: 'Photo Image (JPG/PNG)',
-    fileUrl: (resolvedPhoto && resolvedPhoto.startsWith('data:')) ? resolvedPhoto : generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id),
+    fileUrl: validPhotoUrl,
     storageKey: `arch_photo_${cleanUserPhone}`,
-    isOriginalUpload: Boolean(resolvedPhoto && resolvedPhoto.startsWith('data:')),
+    isOriginalUpload: Boolean(resolvedPhoto && (resolvedPhoto.startsWith('data:') || resolvedPhoto.startsWith('http'))),
     status: 'VERIFIED',
     uploadedAt: now,
   });
@@ -702,6 +713,10 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   });
 
   const finalDocs = Array.from(mergedMap.values());
+  const docPhoto = finalDocs.find((d) => d.id === 'doc-photo' || (d as any).documentType === 'PROFILE_PHOTO');
+  if (docPhoto && docPhoto.fileUrl && (docPhoto.fileUrl.startsWith('data:') || docPhoto.fileUrl.startsWith('http'))) {
+    arch.profilePhoto = docPhoto.fileUrl;
+  }
   arch.documents = finalDocs;
   arch.kycDocuments = finalDocs;
   return arch;
