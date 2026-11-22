@@ -2563,49 +2563,55 @@ export const AdminArchitects: React.FC = () => {
         </div>
       )}
 
-      {/* ---------------- MODAL: DOCUMENT REVIEW & INSPECTION (WITH APPROVE / CANCEL) ---------------- */}
+      {/* ---------------- FULLSCREEN: DOCUMENT REVIEW & INSPECTION ---------------- */}
       {activeReviewDoc && (
         <div
-          className="admin-modal-overlay fixed inset-0 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4"
+          className="admin-fullscreen-modal fixed inset-0 flex flex-col bg-slate-950 overflow-y-auto text-slate-100 animate-in fade-in duration-150"
           style={{ zIndex: 100000 }}
-          onClick={() => setActiveReviewDoc(null)}
         >
-          <div
-            className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 relative"
-            style={{ zIndex: 100001 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
-                  <FileCheck2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-navy-950 text-base">{activeReviewDoc.title}</h3>
-                    {(activeReviewDoc.isOriginalUpload || activeReviewDoc.fileName) && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                        Original Uploaded Document
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    {activeReviewDoc.fileName ? <strong className="text-slate-700">{activeReviewDoc.fileName} • </strong> : null}
-                    {activeReviewDoc.documentType} • Applicant: <strong className="text-slate-800">{selectedArchitect ? (selectedArchitect.firmName ? `${selectedArchitect.firmName} (${selectedArchitect.name})` : selectedArchitect.name) : 'Architect Applicant'}</strong>{selectedArchitect?.accountStatus === 'APPROVED' ? ` • [${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]` : ''}
-                  </div>
-                </div>
-              </div>
+          {/* Top Sticky Header */}
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
                 type="button"
                 onClick={() => setActiveReviewDoc(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span>Back to Partner Application (वापस जाएं)</span>
               </button>
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-white text-base truncate">{activeReviewDoc.title}</h3>
+                  {(activeReviewDoc.isOriginalUpload || activeReviewDoc.fileName) && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/40">
+                      Original Uploaded File
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono truncate">
+                  {activeReviewDoc.fileName ? `${activeReviewDoc.fileName} • ` : ''}
+                  {activeReviewDoc.documentType} • Applicant: {selectedArchitect ? (selectedArchitect.firmName ? `${selectedArchitect.firmName} (${selectedArchitect.name})` : selectedArchitect.name) : 'Architect Applicant'}
+                  {selectedArchitect?.accountStatus === 'APPROVED' ? ` • [${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]` : ''}
+                </div>
+              </div>
             </div>
 
-            {/* Document Visual Preview Card */}
-            <div className="bg-slate-900/5 rounded-2xl border border-slate-200 p-4 text-center overflow-hidden flex items-center justify-center min-h-[320px] max-h-[60vh]">
+            <button
+              type="button"
+              onClick={() => setActiveReviewDoc(null)}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              title="Close viewer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Full Page Document Viewer Body */}
+          <div className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-8 py-6 flex flex-col space-y-4">
+            {/* Visual Preview */}
+            <div className="bg-slate-900 rounded-3xl border border-slate-800 p-4 sm:p-6 text-center overflow-hidden flex items-center justify-center flex-1 min-h-[60vh] shadow-2xl">
               {activeReviewDoc.fileUrl ? (
                 activeReviewDoc.fileUrl.startsWith('data:application/pdf') ||
                 activeReviewDoc.fileType?.includes('pdf') ||
@@ -2613,7 +2619,7 @@ export const AdminArchitects: React.FC = () => {
                   <iframe
                     src={activeReviewDoc.fileUrl}
                     title={activeReviewDoc.title}
-                    className="w-full h-[500px] rounded-xl border border-slate-200 bg-white"
+                    className="w-full h-[70vh] rounded-2xl border border-slate-700 bg-white"
                   />
                 ) : (
                   <img
@@ -2637,34 +2643,34 @@ export const AdminArchitects: React.FC = () => {
                             );
                       (e.target as HTMLImageElement).src = fb;
                     }}
-                    className="max-h-[55vh] max-w-full mx-auto rounded-xl shadow-md border border-slate-200 object-contain bg-white"
+                    className="max-h-[72vh] max-w-full mx-auto rounded-2xl shadow-2xl border border-slate-700 object-contain bg-black/50"
                   />
                 )
               ) : (
-                <div className="py-12 text-slate-400 text-xs">No visual document preview available.</div>
+                <div className="py-24 text-slate-500 text-sm">No visual document preview available.</div>
               )}
             </div>
 
-            {/* File Info Bar & Download */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-sky-50/70 rounded-2xl border border-sky-200 text-xs">
+            {/* Audit Status & Download Bar */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs text-slate-300">
               <div>
-                <div className="font-bold text-navy-950">Audit Verification Status:</div>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="font-bold text-white text-sm">Audit Verification Status:</div>
+                <div className="flex items-center gap-2 mt-1">
                   {activeReviewDoc.status === 'VERIFIED' && (
-                    <span className="text-emerald-700 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Document Verified &amp; Confirmed</span>
+                    <span className="text-emerald-400 font-bold flex items-center gap-1.5 text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Document Verified & Confirmed</span>
                     </span>
                   )}
                   {activeReviewDoc.status === 'REJECTED' && (
-                    <span className="text-rose-700 font-bold flex items-center gap-1">
-                      <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span className="text-rose-400 font-bold flex items-center gap-1.5 text-xs">
+                      <XCircle className="w-4 h-4 text-rose-400" />
                       <span>Cancelled / Rejected: {activeReviewDoc.rejectionReason}</span>
                     </span>
                   )}
                   {(!activeReviewDoc.status || activeReviewDoc.status === 'PENDING') && (
-                    <span className="text-amber-700 font-bold flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="text-amber-400 font-bold flex items-center gap-1.5 text-xs">
+                      <Clock className="w-4 h-4 text-amber-400" />
                       <span>Pending Super Admin Review</span>
                     </span>
                   )}
@@ -2677,52 +2683,52 @@ export const AdminArchitects: React.FC = () => {
                   await downloadDocumentFile(activeReviewDoc, selectedArchitect?.name || 'Architect', selectedArchitect?.coaNumber || 'COA/VERIFIED');
                   success(`Downloading ${activeReviewDoc.fileName || activeReviewDoc.title}`);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border border-emerald-500 shadow-2xs inline-flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border border-emerald-500 shadow-md inline-flex items-center gap-2 transition shrink-0 cursor-pointer text-xs"
               >
                 <Download className="w-4 h-4 text-white" />
                 <span>Download Original Document</span>
               </button>
             </div>
+          </div>
 
-            {/* Modal Bottom Actions: Approval & Cancel/Reject */}
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          {/* Sticky Bottom Actions Bar */}
+          <div className="sticky bottom-0 z-40 bg-navy-950/95 backdrop-blur-md border-t border-navy-900 px-4 sm:px-8 py-4 shadow-2xl flex items-center justify-between gap-4 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveReviewDoc(null)}
+              className="px-5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 text-xs font-semibold cursor-pointer transition"
+            >
+              Back to Dossier
+            </button>
+
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setActiveReviewDoc(null)}
-                className="px-4 py-2 text-slate-500 hover:text-slate-800 text-xs font-semibold cursor-pointer"
+                onClick={() => {
+                  const target = activeReviewDoc;
+                  setActiveReviewDoc(null);
+                  setShowDocRejectModal(target);
+                  setDocRejectReason('Document copy illegible / COA number verification failed');
+                }}
+                className="px-6 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs inline-flex items-center gap-2 transition cursor-pointer"
+                title="Cancel or reject this document"
               >
-                Close Preview
+                <XCircle className="w-4 h-4 text-rose-400" />
+                <span>Cancel (रद्द करें)</span>
               </button>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = activeReviewDoc;
-                    setActiveReviewDoc(null);
-                    setShowDocRejectModal(target);
-                    setDocRejectReason('Document copy illegible / COA number verification failed');
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
-                  title="Cancel or reject this document"
-                >
-                  <XCircle className="w-4 h-4 text-rose-600" />
-                  <span>Cancel (रद्द करें)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleDocumentApprove(activeReviewDoc.id);
-                    setActiveReviewDoc(null);
-                  }}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-2 shadow-md transition cursor-pointer active:scale-98"
-                  title="Submit and confirm this document verification"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-white" />
-                  <span>Submit (स्वीकृत व सबमिट करें)</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDocumentApprove(activeReviewDoc.id);
+                  setActiveReviewDoc(null);
+                }}
+                className="px-7 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-2 shadow-lg transition cursor-pointer active:scale-98"
+                title="Submit and confirm this document verification"
+              >
+                <CheckCircle2 className="w-4 h-4 text-white" />
+                <span>Submit (स्वीकृत व सबमिट करें)</span>
+              </button>
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ import {
   Share2,
   X,
   User,
+  ArrowLeft,
 } from 'lucide-react';
 import { getPlatformBookings, getPlatformRequests, getRegisteredCustomers } from '../../data/customerStore.js';
 import { getProfessionalByPhone } from '../../data/professionalStore.js';
@@ -364,70 +365,89 @@ export const CustomerSelectedQuotations: React.FC = () => {
         </div>
       )}
 
-      {/* ================= INSPECT CLIENT & AGREEMENT DOSSIER MODAL ================= */}
+      {/* ================= INSPECT CLIENT & AGREEMENT DOSSIER FULL PAGE ================= */}
       {inspectingQuote && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-[#1e3d6b] text-white p-5 sm:p-6 flex items-start justify-between gap-4 shrink-0">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase tracking-wider">
-                    Accepted Quotation Reference
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">
-                    {inspectingQuote.bookingStatus}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black font-display text-white">
-                  {inspectingQuote.quotationNumber}
-                </h2>
-                <p className="text-xs text-slate-300">
-                  {inspectingQuote.projectName} • {inspectingQuote.location}
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 bg-[#f4f7fb] overflow-y-auto flex flex-col w-full h-full min-h-screen font-sans animate-in fade-in duration-150">
+          <div className="h-1 bg-gradient-to-r from-amber-400 via-sky-500 to-indigo-600 pointer-events-none shrink-0" />
 
+          {/* Sticky Executive Top Navigation Header */}
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
                 type="button"
                 onClick={() => setInspectingQuote(null)}
-                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span>Back to Selected Quotations (वापस जाएं)</span>
               </button>
+
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                    Accepted Quotation Reference
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">
+                    {inspectingQuote.bookingStatus}
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black font-display text-white truncate mt-0.5">
+                  {inspectingQuote.quotationNumber}
+                  <span className="text-xs font-normal text-slate-300 ml-2 font-sans">
+                    • {inspectingQuote.projectName} • {inspectingQuote.location}
+                  </span>
+                </h2>
+              </div>
             </div>
 
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-              {/* Client Profile Card */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-blue-600/10 text-blue-600 border border-blue-200 flex items-center justify-center font-bold text-lg font-display shrink-0">
+            <button
+              type="button"
+              onClick={() => setInspectingQuote(null)}
+              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Close Full Page Dossier"
+            >
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Close</span>
+            </button>
+          </div>
+
+          {/* Full Page Body */}
+          <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-6">
+            {/* Client Profile Card */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-600/10 text-blue-600 border border-blue-200 flex items-center justify-center font-bold text-xl font-display shrink-0">
                     {(inspectingQuote.customerName || 'CU').slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{inspectingQuote.customerName}</h3>
-                    <div className="text-[11px] text-slate-500 font-mono">
+                    <h3 className="text-lg font-bold text-slate-900">{inspectingQuote.customerName}</h3>
+                    <div className="text-xs text-slate-500 font-mono mt-1">
                       Site Address: {inspectingQuote.location}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2.5">
                   {inspectingQuote.customerPhone && (
                     <>
                       <a
                         href={`tel:${inspectingQuote.customerPhone.replace(/\D/g, '')}`}
-                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold border border-blue-200 transition flex items-center gap-1.5"
+                        className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold border border-blue-200 transition flex items-center gap-2 text-xs"
                       >
-                        <Phone className="w-3.5 h-3.5" />
+                        <Phone className="w-4 h-4" />
                         <span>{inspectingQuote.customerPhone}</span>
                       </a>
                       <a
                         href={`https://wa.me/91${inspectingQuote.customerPhone.replace(/\D/g, '').slice(-10)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 transition flex items-center gap-1.5"
+                        className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 transition flex items-center gap-2 text-xs"
                       >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
+                        <Share2 className="w-4 h-4" />
+                        <span>WhatsApp Chat</span>
                       </a>
                     </>
                   )}
@@ -435,40 +455,40 @@ export const CustomerSelectedQuotations: React.FC = () => {
               </div>
 
               {/* Commercials Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-mono uppercase font-bold block mb-1">Contract Value:</span>
-                  <span className="font-black text-blue-900 font-mono text-sm block">
+                  <span className="font-black text-blue-900 font-mono text-base block">
                     {formatINR(inspectingQuote.agreedAmountPaise)}
                   </span>
-                  <span className="text-[10px] text-emerald-600 font-bold">✓ Milestone Escrow Enabled</span>
+                  <span className="text-[11px] text-emerald-600 font-bold">✓ Milestone Escrow Enabled</span>
                 </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-mono uppercase font-bold block mb-1">Selection Date:</span>
-                  <span className="font-bold text-slate-800 text-xs block">
+                  <span className="font-bold text-slate-800 text-sm block">
                     {formatDate(inspectingQuote.selectionDate)}
                   </span>
-                  <span className="text-[10px] text-slate-500">Customer Accepted Quote</span>
+                  <span className="text-[11px] text-slate-500">Customer Accepted Quote</span>
                 </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-mono uppercase font-bold block mb-1">Proposed Start Date:</span>
-                  <span className="font-bold text-sky-900 font-mono text-xs block">
+                  <span className="font-bold text-sky-900 font-mono text-sm block">
                     {inspectingQuote.proposedStartDate}
                   </span>
-                  <span className="text-[10px] text-slate-500">Target Mobilization</span>
+                  <span className="text-[11px] text-slate-500">Target Mobilization</span>
                 </div>
               </div>
 
               {/* Scope of Work */}
-              <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <span className="text-[10px] text-slate-400 font-mono uppercase font-bold block">
                   Agreed Technical Scope of Work:
                 </span>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {inspectingQuote.selectedServices.map((srv, idx) => (
                     <span
                       key={idx}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-900 border border-blue-200"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-900 border border-blue-200 shadow-2xs"
                     >
                       {srv}
                     </span>
@@ -476,32 +496,30 @@ export const CustomerSelectedQuotations: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Modal Actions */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setInspectingQuote(null)}
-                className="px-4 py-2 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-white transition cursor-pointer text-xs"
-              >
-                Close
-              </button>
+          {/* Sticky Full Page Action Footer */}
+          <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 sm:px-8 py-4 shadow-2xl flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <button
+              type="button"
+              onClick={() => setInspectingQuote(null)}
+              className="px-5 py-2.5 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer text-xs"
+            >
+              Back to Selected Quotations
+            </button>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const q = inspectingQuote;
-                    setInspectingQuote(null);
-                    handleOpenConfirm(q);
-                  }}
-                  className="px-5 py-2 bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold rounded-xl shadow-md shadow-sky-600/20 hover:from-sky-700 hover:to-blue-700 transition flex items-center gap-1.5 cursor-pointer text-xs"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Proceed to Confirm Engagement</span>
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const q = inspectingQuote;
+                setInspectingQuote(null);
+                handleOpenConfirm(q);
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold rounded-xl shadow-md shadow-sky-600/20 hover:from-sky-700 hover:to-blue-700 transition flex items-center gap-2 cursor-pointer text-xs sm:text-sm active:scale-98"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Proceed to Confirm Engagement</span>
+            </button>
           </div>
         </div>
       )}

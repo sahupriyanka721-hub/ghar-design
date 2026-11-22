@@ -24,6 +24,7 @@ import {
   FileText,
   CheckCircle2,
   Share2,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   getPlatformRequests,
@@ -440,14 +441,27 @@ export const AssignedRequests: React.FC = () => {
         </div>
       )}
 
-      {/* ================= FULL INQUIRY & CUSTOMER DOSSIER MODAL ================= */}
+      {/* ================= FULL INQUIRY & CUSTOMER DOSSIER FULL PAGE VIEW ================= */}
       {selectedInquiry && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Modal Top Header */}
-            <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-[#1e3d6b] text-white p-5 sm:p-6 flex items-start justify-between gap-4 shrink-0">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-[#f4f7fb] overflow-y-auto flex flex-col w-full h-full min-h-screen font-sans animate-in fade-in duration-150">
+          <div className="h-1 bg-gradient-to-r from-amber-400 via-sky-500 to-indigo-600 pointer-events-none shrink-0" />
+
+          {/* Sticky Executive Top Navigation Header */}
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSelectedInquiry(null)}
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span>Back to Assigned Inquiries (वापस जाएं)</span>
+              </button>
+
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase tracking-wider">
                     Customer Project Dossier
                   </span>
@@ -456,260 +470,262 @@ export const AssignedRequests: React.FC = () => {
                     {selectedInquiry.request?.categorySlug?.replace(/-/g, ' ')}
                   </span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-black font-display text-white">
+                <h2 className="text-base sm:text-lg font-black font-display text-white truncate mt-0.5">
                   {selectedInquiry.request?.requestCode}
+                  <span className="text-xs font-normal text-slate-300 ml-2 font-sans">
+                    • Homeowner: <strong className="text-white">{selectedInquiry.request?.customerName}</strong>
+                    • Site: <strong className="text-white">{selectedInquiry.request?.locality}, {selectedInquiry.request?.city}</strong>
+                    • <span className="text-amber-300">Bid Deadline: {selectedInquiry.responseDeadline}</span>
+                  </span>
                 </h2>
-                <div className="text-xs text-slate-300 flex flex-wrap items-center gap-2">
-                  <span>Homeowner: <strong>{selectedInquiry.request?.customerName}</strong></span>
-                  <span>•</span>
-                  <span>Site: <strong>{selectedInquiry.request?.locality}, {selectedInquiry.request?.city}</strong></span>
-                  <span>•</span>
-                  <span className="text-amber-300">Bid Deadline: {selectedInquiry.responseDeadline}</span>
-                </div>
               </div>
+            </div>
 
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setSelectedInquiry(null)}
-                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
-                title="Close"
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Close Full Page Dossier"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">Close</span>
               </button>
             </div>
+          </div>
 
-            {/* Modal Scrollable Body */}
-            <div className="overflow-y-auto p-5 sm:p-6 space-y-6 bg-slate-50/60 flex-1 text-xs">
-              {/* Homeowner Profile Strip */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-600/10 text-blue-600 border border-blue-200 flex items-center justify-center font-black text-xl font-display shrink-0">
-                      {(selectedInquiry.request?.customerName || 'CU').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-slate-900">
-                          {selectedInquiry.request?.customerName}
-                        </h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          {matchedCustomer?.status || 'VERIFIED HOMEOWNER'}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                        Customer ID: {matchedCustomer?.id || `BG/${(selectedInquiry.request?.customerName || 'CUS').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()}/0001`}
-                        {matchedCustomer?.registeredAt && ` • Member since ${formatDate(matchedCustomer.registeredAt)}`}
-                      </div>
-                    </div>
+          {/* Full Page Body */}
+          <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-6">
+            {/* Homeowner Profile Strip */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-600/10 text-blue-600 border border-blue-200 flex items-center justify-center font-black text-2xl font-display shrink-0">
+                    {(selectedInquiry.request?.customerName || 'CU').slice(0, 2).toUpperCase()}
                   </div>
-
-                  {/* Direct Contact Buttons */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {selectedInquiry.request?.customerPhone && (
-                      <a
-                        href={`tel:${selectedInquiry.request.customerPhone.replace(/\D/g, '')}`}
-                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold border border-blue-200 transition flex items-center gap-1.5"
-                        title="Call Homeowner"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{selectedInquiry.request.customerPhone}</span>
-                      </a>
-                    )}
-                    {selectedInquiry.request?.customerPhone && (
-                      <a
-                        href={`https://wa.me/91${selectedInquiry.request.customerPhone.replace(/\D/g, '').slice(-10)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 transition flex items-center gap-1.5"
-                        title="Chat on WhatsApp"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
-                      </a>
-                    )}
-                    {selectedInquiry.request?.customerEmail && (
-                      <a
-                        href={`mailto:${selectedInquiry.request.customerEmail}`}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center gap-1.5"
-                        title="Send Email"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                        <span>Email</span>
-                      </a>
-                    )}
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {selectedInquiry.request?.customerName}
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        {matchedCustomer?.status || 'VERIFIED HOMEOWNER'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono mt-1">
+                      Customer ID: {matchedCustomer?.id || `BG/${(selectedInquiry.request?.customerName || 'CUS').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()}/0001`}
+                      {matchedCustomer?.registeredAt && ` • Member since ${formatDate(matchedCustomer.registeredAt)}`}
+                    </div>
                   </div>
                 </div>
 
-                {/* Customer Address Details */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Plot / House Address:</span>
-                    <span className="font-semibold text-slate-800">
-                      {matchedCustomer?.housePlotNumber || selectedInquiry.request?.address || 'Site Plot Specified'}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Locality / Sector:</span>
-                    <span className="font-semibold text-slate-800">
-                      {matchedCustomer?.streetLocality || selectedInquiry.request?.locality || 'Locality'}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">City & State:</span>
-                    <span className="font-semibold text-slate-800">
-                      {selectedInquiry.request?.city}, {matchedCustomer?.state || selectedInquiry.request?.state || 'India'} {matchedCustomer?.pinCode ? `(${matchedCustomer.pinCode})` : ''}
-                    </span>
-                  </div>
+                {/* Direct Contact Buttons */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {selectedInquiry.request?.customerPhone && (
+                    <a
+                      href={`tel:${selectedInquiry.request.customerPhone.replace(/\D/g, '')}`}
+                      className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold border border-blue-200 transition flex items-center gap-2 text-xs"
+                      title="Call Homeowner"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>{selectedInquiry.request.customerPhone}</span>
+                    </a>
+                  )}
+                  {selectedInquiry.request?.customerPhone && (
+                    <a
+                      href={`https://wa.me/91${selectedInquiry.request.customerPhone.replace(/\D/g, '').slice(-10)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold border border-emerald-200 transition flex items-center gap-2 text-xs"
+                      title="Chat on WhatsApp"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>WhatsApp Chat</span>
+                    </a>
+                  )}
+                  {selectedInquiry.request?.customerEmail && (
+                    <a
+                      href={`mailto:${selectedInquiry.request.customerEmail}`}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center gap-2 text-xs"
+                      title="Send Email"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Send Email</span>
+                    </a>
+                  )}
                 </div>
               </div>
 
-              {/* Project Engineering & Architectural Brief */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-wider text-navy-950 font-display flex items-center gap-2">
-                  <Building className="w-4 h-4 text-blue-600" />
-                  <span>Property & Architectural Specifications</span>
-                </h4>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Property Type:</span>
-                    <span className="font-bold text-slate-900">{selectedInquiry.request?.propertyType || 'Residential'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Plot Dimensions:</span>
-                    <span className="font-bold text-slate-900">
-                      {selectedInquiry.request?.plotWidth && selectedInquiry.request?.plotLength
-                        ? `${selectedInquiry.request.plotWidth} × ${selectedInquiry.request.plotLength} ${selectedInquiry.request.measurementUnit || 'ft'}`
-                        : `${selectedInquiry.request?.plotArea || '1500'} ${selectedInquiry.request?.measurementUnit || 'SQFT'}`}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Total Plot Area:</span>
-                    <span className="font-bold text-blue-900">
-                      {selectedInquiry.request?.plotArea || 1500} {selectedInquiry.request?.measurementUnit || 'SQFT'}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Target Budget:</span>
-                    <span className="font-bold text-amber-700">{selectedInquiry.request?.budgetRange || 'Market Rate'}</span>
-                  </div>
-                </div>
-
-                {/* Floors, Bedrooms, Bathrooms if present */}
-                {(selectedInquiry.request?.floors || selectedInquiry.request?.bedrooms || selectedInquiry.request?.bathrooms || selectedInquiry.request?.builtUpArea) && (
-                  <div className="flex flex-wrap gap-2 pt-1 text-xs">
-                    {selectedInquiry.request?.floors && (
-                      <span className="px-3 py-1 bg-slate-100 rounded-lg font-semibold text-slate-700">
-                        Structure: <strong>{selectedInquiry.request.floors} Floors</strong>
-                      </span>
-                    )}
-                    {selectedInquiry.request?.bedrooms && (
-                      <span className="px-3 py-1 bg-slate-100 rounded-lg font-semibold text-slate-700">
-                        Bedrooms: <strong>{selectedInquiry.request.bedrooms} BHK</strong>
-                      </span>
-                    )}
-                    {selectedInquiry.request?.bathrooms && (
-                      <span className="px-3 py-1 bg-slate-100 rounded-lg font-semibold text-slate-700">
-                        Bathrooms: <strong>{selectedInquiry.request.bathrooms}</strong>
-                      </span>
-                    )}
-                    {selectedInquiry.request?.builtUpArea && (
-                      <span className="px-3 py-1 bg-slate-100 rounded-lg font-semibold text-slate-700">
-                        Built-up: <strong>{selectedInquiry.request.builtUpArea} sq ft</strong>
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Requested Services Tags */}
-                {selectedInquiry.request?.requiredServices && selectedInquiry.request.requiredServices.length > 0 && (
-                  <div className="space-y-1.5 pt-2">
-                    <span className="text-slate-400 text-[10px] uppercase font-bold block">
-                      Requested Technical Drawings & Engineering Deliverables:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedInquiry.request.requiredServices.map((srv: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-900 border border-blue-200"
-                        >
-                          {srv}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Customer Project Description */}
-                <div className="space-y-1.5 pt-2">
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">
-                    Client's Detailed Project Scope & Instructions:
+              {/* Customer Address Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                <div className="p-3.5 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Plot / House Address:</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {matchedCustomer?.housePlotNumber || selectedInquiry.request?.address || 'Site Plot Specified'}
                   </span>
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 leading-relaxed font-sans text-xs">
-                    {selectedInquiry.request?.description || 'Full architectural design and civil engineering drawings required as per local municipal bylaws.'}
-                  </div>
                 </div>
-
-                {/* Admin Technical Note */}
-                {selectedInquiry.internalNotes && (
-                  <div className="text-blue-900 bg-blue-50/90 p-3.5 rounded-xl border border-blue-200 text-xs flex items-start gap-2.5">
-                    <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold block">GharDesign Chief Engineer Technical Note:</span>
-                      <span className="text-blue-800 mt-0.5 block">{selectedInquiry.internalNotes}</span>
-                    </div>
-                  </div>
-                )}
+                <div className="p-3.5 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Locality / Sector:</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {matchedCustomer?.streetLocality || selectedInquiry.request?.locality || 'Locality'}
+                  </span>
+                </div>
+                <div className="p-3.5 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">City & State:</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {selectedInquiry.request?.city}, {matchedCustomer?.state || selectedInquiry.request?.state || 'India'} {matchedCustomer?.pinCode ? `(${matchedCustomer.pinCode})` : ''}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Modal Bottom Actions Footer */}
-            <div className="p-4 sm:p-5 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2">
-                {selectedInquiry.status === 'PENDING' ? (
-                  <>
-                    <button
-                      onClick={() => handleRespond(selectedInquiry.id, 'ACCEPTED')}
-                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Accept Inquiry</span>
-                    </button>
-                    <button
-                      onClick={() => handleRespond(selectedInquiry.id, 'DECLINED')}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs font-bold transition border border-slate-200 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Decline</span>
-                    </button>
-                  </>
-                ) : selectedInquiry.status === 'ACCEPTED' ? (
-                  <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
-                    ✓ Inquiry Accepted & Active
+            {/* Project Engineering & Architectural Brief */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-6">
+              <h4 className="text-sm font-black uppercase tracking-wider text-navy-950 font-display flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Building className="w-5 h-5 text-blue-600" />
+                <span>Property & Architectural Specifications</span>
+              </h4>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Property Type:</span>
+                  <span className="font-bold text-slate-900 text-sm">{selectedInquiry.request?.propertyType || 'Residential'}</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Plot Dimensions:</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {selectedInquiry.request?.plotWidth && selectedInquiry.request?.plotLength
+                      ? `${selectedInquiry.request.plotWidth} × ${selectedInquiry.request.plotLength} ${selectedInquiry.request.measurementUnit || 'ft'}`
+                      : `${selectedInquiry.request?.plotArea || '1500'} ${selectedInquiry.request?.measurementUnit || 'SQFT'}`}
                   </span>
-                ) : (
-                  <span className="text-xs text-slate-500 bg-slate-100 px-3.5 py-2 rounded-xl">
-                    Inquiry Declined
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Total Plot Area:</span>
+                  <span className="font-extrabold text-blue-900 text-sm">
+                    {selectedInquiry.request?.plotArea || 1500} {selectedInquiry.request?.measurementUnit || 'SQFT'}
                   </span>
-                )}
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Target Budget:</span>
+                  <span className="font-bold text-amber-700 text-sm">{selectedInquiry.request?.budgetRange || 'Market Rate'}</span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Link
-                  to={`/professional/quotation-builder?requestId=${selectedInquiry.requestId}`}
-                  className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4 text-gold-400" />
-                  <span>Prepare Itemized BOQ Quotation</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setSelectedInquiry(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
-                >
-                  Close
-                </button>
+              {/* Floors, Bedrooms, Bathrooms if present */}
+              {(selectedInquiry.request?.floors || selectedInquiry.request?.bedrooms || selectedInquiry.request?.bathrooms || selectedInquiry.request?.builtUpArea) && (
+                <div className="flex flex-wrap gap-2.5 pt-1 text-xs">
+                  {selectedInquiry.request?.floors && (
+                    <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl font-semibold text-slate-700 border border-slate-200">
+                      Structure: <strong>{selectedInquiry.request.floors} Floors</strong>
+                    </span>
+                  )}
+                  {selectedInquiry.request?.bedrooms && (
+                    <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl font-semibold text-slate-700 border border-slate-200">
+                      Bedrooms: <strong>{selectedInquiry.request.bedrooms} BHK</strong>
+                    </span>
+                  )}
+                  {selectedInquiry.request?.bathrooms && (
+                    <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl font-semibold text-slate-700 border border-slate-200">
+                      Bathrooms: <strong>{selectedInquiry.request.bathrooms}</strong>
+                    </span>
+                  )}
+                  {selectedInquiry.request?.builtUpArea && (
+                    <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl font-semibold text-slate-700 border border-slate-200">
+                      Built-up: <strong>{selectedInquiry.request.builtUpArea} sq ft</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Requested Services Tags */}
+              {selectedInquiry.request?.requiredServices && selectedInquiry.request.requiredServices.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">
+                    Requested Technical Drawings & Engineering Deliverables:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedInquiry.request.requiredServices.map((srv: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-900 border border-blue-200 shadow-2xs"
+                      >
+                        {srv}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Customer Project Description */}
+              <div className="space-y-2 pt-2">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">
+                  Client's Detailed Project Scope & Instructions:
+                </span>
+                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 text-slate-800 leading-relaxed font-sans text-sm">
+                  {selectedInquiry.request?.description || 'Full architectural design and civil engineering drawings required as per local municipal bylaws.'}
+                </div>
               </div>
+
+              {/* Admin Technical Note */}
+              {selectedInquiry.internalNotes && (
+                <div className="text-blue-900 bg-blue-50/90 p-4 rounded-2xl border border-blue-200 text-xs flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-sm">GharDesign Chief Engineer Technical Note:</span>
+                    <span className="text-blue-800 mt-1 block leading-relaxed">{selectedInquiry.internalNotes}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sticky Full Page Action Footer */}
+          <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 sm:px-8 py-4 shadow-2xl flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-3">
+              {selectedInquiry.status === 'PENDING' ? (
+                <>
+                  <button
+                    onClick={() => handleRespond(selectedInquiry.id, 'ACCEPTED')}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-98"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Accept Inquiry (स्वीकार करें)</span>
+                  </button>
+                  <button
+                    onClick={() => handleRespond(selectedInquiry.id, 'DECLINED')}
+                    className="px-5 py-3 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs sm:text-sm font-bold transition border border-slate-200 cursor-pointer active:scale-98"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Decline (अस्वीकार करें)</span>
+                  </button>
+                </>
+              ) : selectedInquiry.status === 'ACCEPTED' ? (
+                <span className="text-xs sm:text-sm text-emerald-800 font-bold bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Inquiry Accepted & Active (स्वीकृत)</span>
+                </span>
+              ) : (
+                <span className="text-xs sm:text-sm text-slate-500 bg-slate-100 px-4 py-2.5 rounded-xl border border-slate-200">
+                  Inquiry Declined (अस्वीकृत)
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Link
+                to={`/professional/quotation-builder?requestId=${selectedInquiry.requestId}`}
+                className="px-6 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer border border-gold-500/30 active:scale-98"
+              >
+                <PlusCircle className="w-4 h-4 text-gold-400" />
+                <span>Prepare Itemized BOQ Quotation (कोटेशन बनाएं)</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSelectedInquiry(null)}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+              >
+                Back to Inquiries
+              </button>
             </div>
           </div>
         </div>
