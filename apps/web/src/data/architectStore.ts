@@ -537,164 +537,173 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
     } catch (e) {}
   }
 
-  // If no documents attached yet, but architect has structured KYC (directorsKyc, businessVerification, profilePhoto, or bankDetails), compile from them
-  if (existingDocs.length === 0 && (arch.directorsKyc?.length || arch.businessVerification || arch.bankDetails || arch.profilePhoto)) {
-    const compiled: ArchitectKycDocument[] = [];
-    const now = arch.registeredAt || new Date().toISOString();
+  // 4. Ensure Statutory Documents: Always compile full comprehensive set & merge with existing records
+  const cleanUserPhone = cleanPhone || 'guest';
+  const now = arch.registeredAt || arch.updatedAt || new Date().toISOString();
+  const compiled: ArchitectKycDocument[] = [];
 
-    // 0. Principal Architect Photo
-    const photoUrl = arch.profilePhoto || (cleanPhone ? localStorage.getItem(`arch_photo_${cleanPhone}`) : '') || '';
-    if (photoUrl && photoUrl.length > 20) {
-      compiled.push({
-        id: 'doc-photo',
-        documentType: 'PROFILE_PHOTO' as any,
-        title: `Principal Architect Photo - ${arch.name || 'Profile'}`,
-        fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
-        fileSize: 'Photo Image (JPG/PNG)',
-        fileUrl: photoUrl,
-        storageKey: `arch_photo_${cleanPhone}`,
-        isOriginalUpload: true,
-        status: 'VERIFIED',
-        uploadedAt: now,
-      });
-    }
+  // (A) Principal Architect Photo
+  const resolvedPhoto =
+    arch.profilePhoto ||
+    (cleanPhone ? localStorage.getItem(`arch_photo_${cleanPhone}`) : '') ||
+    localStorage.getItem(`arch_photo_+91${cleanPhone}`) ||
+    '';
+  compiled.push({
+    id: 'doc-photo',
+    documentType: 'PROFILE_PHOTO' as any,
+    title: `Principal Architect Photo - ${arch.name || 'Principal Architect'}`,
+    fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
+    fileSize: 'Photo Image (JPG/PNG)',
+    fileUrl: (resolvedPhoto && resolvedPhoto.startsWith('data:')) ? resolvedPhoto : generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id),
+    storageKey: `arch_photo_${cleanUserPhone}`,
+    isOriginalUpload: Boolean(resolvedPhoto && resolvedPhoto.startsWith('data:')),
+    status: 'VERIFIED',
+    uploadedAt: now,
+  });
 
-    (arch.directorsKyc || []).forEach((d, idx) => {
+  // (B) Director(s) KYC Documents
+  if (arch.directorsKyc && arch.directorsKyc.length > 0) {
+    arch.directorsKyc.forEach((d, idx) => {
       const panUrl = (d as any).panFileUrl || d.panDocUrl || '';
-      if (panUrl || d.panFileName || d.panNumber) {
-        compiled.push({
-          id: `doc-dir-${d.id}-pan`,
-          documentType: 'PAN_CARD',
-          title: `${d.name || `Director #${idx + 1}`} - PAN Card (${d.panNumber || 'Attached'})`,
-          fileName: d.panFileName || '',
-          fileSize: d.panFileSize || 'PDF / Image Document',
-          fileUrl: panUrl,
-          storageKey: d.panStorageKey,
-          isOriginalUpload: Boolean(d.panStorageKey || (panUrl && panUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-      const aadharUrl = (d as any).aadharFileUrl || d.aadharDocUrl || '';
-      if (aadharUrl || d.aadharFileName || d.aadharNumber) {
-        compiled.push({
-          id: `doc-dir-${d.id}-aadhaar`,
-          documentType: 'AADHAAR_CARD',
-          title: `${d.name || `Director #${idx + 1}`} - Aadhaar Card (${d.aadharNumber || 'Attached'})`,
-          fileName: d.aadharFileName || '',
-          fileSize: d.aadharFileSize || 'PDF / Image Document',
-          fileUrl: aadharUrl,
-          storageKey: d.aadharStorageKey,
-          isOriginalUpload: Boolean(d.aadharStorageKey || (aadharUrl && aadharUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-    });
-
-    const biz = arch.businessVerification;
-    if (biz) {
-      const coaUrl = (biz as any).coaFileUrl || biz.coaDocUrl || '';
-      if (coaUrl || biz.coaFileName || biz.coaNumber || arch.coaNumber) {
-        compiled.push({
-          id: 'doc-coa',
-          documentType: 'COA_CERTIFICATE',
-          title: `Council of Architecture (COA) Registration Certificate - ${biz.coaNumber || arch.coaNumber || 'COA/VERIFIED'}`,
-          fileName: biz.coaFileName || '',
-          fileSize: biz.coaFileSize || 'PDF / Image Document',
-          fileUrl: coaUrl,
-          storageKey: biz.coaStorageKey,
-          isOriginalUpload: Boolean(biz.coaStorageKey || (coaUrl && coaUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-      const bizPanUrl = (biz as any).panFileUrl || biz.panDocUrl || '';
-      if (bizPanUrl || biz.panFileName || biz.panNumber || arch.panNumber) {
-        compiled.push({
-          id: 'doc-biz-pan',
-          documentType: 'FIRM_PAN',
-          title: `Firm / Company PAN Card - ${biz.panNumber || arch.panNumber || 'Attached'}`,
-          fileName: biz.panFileName || '',
-          fileSize: biz.panFileSize || 'PDF / Image Document',
-          fileUrl: bizPanUrl,
-          storageKey: biz.panStorageKey,
-          isOriginalUpload: Boolean(biz.panStorageKey || (bizPanUrl && bizPanUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-      const gstUrl = (biz as any).gstFileUrl || biz.gstDocUrl || '';
-      if (gstUrl || biz.gstFileName || biz.gstin || arch.gstin) {
-        compiled.push({
-          id: 'doc-gst',
-          documentType: 'GSTIN_CERTIFICATE',
-          title: `GST Registration Certificate - ${biz.gstin || arch.gstin || 'Attached'}`,
-          fileName: biz.gstFileName || '',
-          fileSize: biz.gstFileSize || 'PDF / Image Document',
-          fileUrl: gstUrl,
-          storageKey: biz.gstStorageKey,
-          isOriginalUpload: Boolean(biz.gstStorageKey || (gstUrl && gstUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-      const bizProofUrl = (biz as any).businessProofFileUrl || biz.businessProofDocUrl || '';
-      if (bizProofUrl || biz.businessProofFileName || biz.businessProofNumber) {
-        compiled.push({
-          id: 'doc-biz-proof',
-          documentType: 'FIRM_REGISTRATION',
-          title: `Business Proof (${biz.businessProofType || 'Statutory Registration'}) - ${biz.businessProofNumber || 'Attached'}`,
-          fileName: biz.businessProofFileName || '',
-          fileSize: biz.businessProofFileSize || 'PDF / Image Document',
-          fileUrl: bizProofUrl,
-          storageKey: biz.businessProofStorageKey,
-          isOriginalUpload: Boolean(biz.businessProofStorageKey || (bizProofUrl && bizProofUrl.length > 20)),
-          status: 'PENDING',
-          uploadedAt: now,
-        });
-      }
-    }
-
-    if (arch.bankDetails?.cancelledChequeUrl) {
       compiled.push({
-        id: 'doc-cheque',
-        documentType: 'CANCELLED_CHEQUE',
-        title: `Cancelled Cheque / Bank Proof - ${arch.bankDetails.bankName || 'Bank Proof'}`,
-        fileName: arch.bankDetails.cancelledChequeFileName || 'cancelled_cheque.jpg',
-        fileSize: 'Bank Document (Cheque)',
-        fileUrl: arch.bankDetails.cancelledChequeUrl,
-        storageKey: (arch.bankDetails as any).cancelledChequeStorageKey || `arch_cheque_${cleanPhone}`,
-        isOriginalUpload: Boolean(arch.bankDetails.cancelledChequeUrl && arch.bankDetails.cancelledChequeUrl.length > 20),
-        status: arch.bankDetails.isChequeAccepted ? 'VERIFIED' : 'PENDING',
+        id: `doc-dir-${d.id || idx + 1}-pan`,
+        documentType: 'PAN_CARD',
+        title: `${d.name || arch.name} - PAN Card (${d.panNumber || arch.panNumber || 'Attached'})`,
+        fileName: d.panFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_PAN.jpg`,
+        fileSize: d.panFileSize || 'PAN Document (JPEG/PDF)',
+        fileUrl: panUrl,
+        storageKey: d.panStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_${d.id || idx + 1}`,
+        isOriginalUpload: Boolean(d.panStorageKey || (panUrl && panUrl.startsWith('data:'))),
+        status: 'PENDING',
         uploadedAt: now,
       });
-    }
 
-    if (compiled.length > 0) {
-      existingDocs = compiled;
-    }
-  }
-
-  // Ensure photo document is present if photo exists
-  const resolvedPhoto = arch.profilePhoto || (cleanPhone ? localStorage.getItem(`arch_photo_${cleanPhone}`) : '') || '';
-  if (resolvedPhoto && resolvedPhoto.length > 20 && !existingDocs.some((d) => d.id === 'doc-photo' || d.documentType === 'PROFILE_PHOTO')) {
-    existingDocs.unshift({
-      id: 'doc-photo',
-      documentType: 'PROFILE_PHOTO' as any,
-      title: `Principal Architect Photo - ${arch.name || 'Profile'}`,
-      fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
-      fileSize: 'Photo Image (JPG/PNG)',
-      fileUrl: resolvedPhoto,
-      storageKey: `arch_photo_${cleanPhone}`,
-      isOriginalUpload: true,
-      status: 'VERIFIED',
-      uploadedAt: arch.updatedAt || new Date().toISOString(),
+      const aadharUrl = (d as any).aadharFileUrl || d.aadharDocUrl || '';
+      compiled.push({
+        id: `doc-dir-${d.id || idx + 1}-aadhaar`,
+        documentType: 'AADHAAR_CARD',
+        title: `${d.name || arch.name} - Aadhaar Card (${d.aadharNumber || 'Attached'})`,
+        fileName: d.aadharFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_Aadhaar.jpg`,
+        fileSize: d.aadharFileSize || 'Aadhaar Document (JPEG/PDF)',
+        fileUrl: aadharUrl,
+        storageKey: d.aadharStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_AADHAAR_${d.id || idx + 1}`,
+        isOriginalUpload: Boolean(d.aadharStorageKey || (aadharUrl && aadharUrl.startsWith('data:'))),
+        status: 'PENDING',
+        uploadedAt: now,
+      });
+    });
+  } else {
+    compiled.push({
+      id: `doc-dir-1-pan`,
+      documentType: 'PAN_CARD',
+      title: `${arch.name} - PAN Card (${arch.panNumber || 'Attached'})`,
+      fileName: `${arch.name.replace(/\s+/g, '_')}_PAN.jpg`,
+      fileSize: 'PAN Document (JPEG/PDF)',
+      fileUrl: '',
+      storageKey: `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_1`,
+      isOriginalUpload: false,
+      status: 'PENDING',
+      uploadedAt: now,
     });
   }
 
-  arch.documents = existingDocs || [];
-  arch.kycDocuments = existingDocs || [];
+  // (C) Council of Architecture (COA) Registration Certificate
+  const biz = arch.businessVerification || {} as any;
+  const coaUrl = (biz as any).coaFileUrl || biz.coaDocUrl || '';
+  compiled.push({
+    id: 'doc-coa',
+    documentType: 'COA_CERTIFICATE',
+    title: `Council of Architecture (COA) Registration Certificate - ${biz.coaNumber || arch.coaNumber || 'COA/VERIFIED'}`,
+    fileName: biz.coaFileName || 'COA_Registration_Certificate.pdf',
+    fileSize: biz.coaFileSize || 'COA Certificate (PDF)',
+    fileUrl: coaUrl,
+    storageKey: biz.coaStorageKey || `arch_doc_${cleanUserPhone}_BIZ_COA`,
+    isOriginalUpload: Boolean(biz.coaStorageKey || (coaUrl && coaUrl.startsWith('data:'))),
+    status: 'PENDING',
+    uploadedAt: now,
+  });
+
+  // (D) Firm / Company PAN Card
+  const bizPanUrl = (biz as any).panFileUrl || biz.panDocUrl || '';
+  compiled.push({
+    id: 'doc-biz-pan',
+    documentType: 'FIRM_PAN',
+    title: `Firm / Company PAN Card - ${biz.panNumber || arch.panNumber || 'Attached'}`,
+    fileName: biz.panFileName || 'Firm_PAN_Card.jpg',
+    fileSize: biz.panFileSize || 'PAN Document (JPEG/PDF)',
+    fileUrl: bizPanUrl,
+    storageKey: biz.panStorageKey || `arch_doc_${cleanUserPhone}_BIZ_PAN`,
+    isOriginalUpload: Boolean(biz.panStorageKey || (bizPanUrl && bizPanUrl.startsWith('data:'))),
+    status: 'PENDING',
+    uploadedAt: now,
+  });
+
+  // (E) GST Registration Certificate
+  const gstUrl = (biz as any).gstFileUrl || biz.gstDocUrl || '';
+  compiled.push({
+    id: 'doc-gst',
+    documentType: 'GSTIN_CERTIFICATE',
+    title: `GST Registration Certificate - ${biz.gstin || arch.gstin || 'Attached'}`,
+    fileName: biz.gstFileName || 'GSTIN_Registration_Certificate.pdf',
+    fileSize: biz.gstFileSize || 'GST Certificate (PDF)',
+    fileUrl: gstUrl,
+    storageKey: biz.gstStorageKey || `arch_doc_${cleanUserPhone}_BIZ_GST`,
+    isOriginalUpload: Boolean(biz.gstStorageKey || (gstUrl && gstUrl.startsWith('data:'))),
+    status: 'PENDING',
+    uploadedAt: now,
+  });
+
+  // (F) Business Proof (Certificate of Incorporation / Registration)
+  const bizProofUrl = (biz as any).businessProofFileUrl || biz.businessProofDocUrl || '';
+  compiled.push({
+    id: 'doc-biz-proof',
+    documentType: 'FIRM_REGISTRATION',
+    title: `Business Proof (${biz.businessProofType || 'Certificate of Incorporation (COI)'}) - ${biz.businessProofNumber || 'Attached'}`,
+    fileName: biz.businessProofFileName || 'Business_Registration_Proof.pdf',
+    fileSize: biz.businessProofFileSize || 'Statutory Proof (PDF/JPEG)',
+    fileUrl: bizProofUrl,
+    storageKey: biz.businessProofStorageKey || `arch_doc_${cleanUserPhone}_BIZ_PROOF`,
+    isOriginalUpload: Boolean(biz.businessProofStorageKey || (bizProofUrl && bizProofUrl.startsWith('data:'))),
+    status: 'PENDING',
+    uploadedAt: now,
+  });
+
+  // (G) Bank Cancelled Cheque
+  const chequeUrl = arch.bankDetails?.cancelledChequeUrl || '';
+  compiled.push({
+    id: 'doc-cheque',
+    documentType: 'CANCELLED_CHEQUE',
+    title: `Bank Cancelled Cheque (${arch.bankDetails?.bankName || 'Escrow Account'})`,
+    fileName: arch.bankDetails?.cancelledChequeFileName || 'Cancelled_Cheque.jpg',
+    fileSize: 'Bank Document (Cheque)',
+    fileUrl: chequeUrl,
+    storageKey: (arch.bankDetails as any)?.cancelledChequeStorageKey || `arch_cheque_${cleanUserPhone}`,
+    isOriginalUpload: Boolean(chequeUrl && chequeUrl.length > 20),
+    status: arch.bankDetails?.isChequeAccepted ? 'VERIFIED' : 'PENDING',
+    uploadedAt: now,
+  });
+
+  // Merge compiled documents with any existing documents so verified statuses & uploads are preserved
+  const mergedMap = new Map<string, ArchitectKycDocument>();
+  compiled.forEach((cDoc) => mergedMap.set(cDoc.id, cDoc));
+
+  existingDocs.forEach((eDoc) => {
+    const existingInCompiled = mergedMap.get(eDoc.id);
+    if (existingInCompiled) {
+      mergedMap.set(eDoc.id, {
+        ...existingInCompiled,
+        ...eDoc,
+        status: eDoc.status || existingInCompiled.status,
+        fileUrl: (eDoc.fileUrl && eDoc.fileUrl.length > 20) ? eDoc.fileUrl : existingInCompiled.fileUrl,
+      });
+    } else {
+      mergedMap.set(eDoc.id, eDoc);
+    }
+  });
+
+  const finalDocs = Array.from(mergedMap.values());
+  arch.documents = finalDocs;
+  arch.kycDocuments = finalDocs;
   return arch;
 };
 

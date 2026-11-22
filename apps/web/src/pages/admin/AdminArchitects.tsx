@@ -2380,34 +2380,38 @@ export const AdminArchitects: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => handleOpenRemarksModal('REJECTED')}
-                    disabled={selectedArchitect.accountStatus === 'APPROVED'}
-                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold transition cursor-pointer shadow-2xs flex items-center gap-1.5"
+                    title="Reject this architect application"
                   >
-                    Reject Application
+                    <XCircle className="w-4 h-4 text-rose-600" />
+                    <span>Reject Application</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => handleOpenRemarksModal('CHANGES_REQUESTED')}
-                    disabled={selectedArchitect.accountStatus === 'APPROVED'}
-                    className="px-4 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition cursor-pointer shadow-2xs flex items-center gap-1.5"
+                    title="Request corrections or document updates"
                   >
-                    Request Changes
+                    <Clock className="w-4 h-4 text-sky-600" />
+                    <span>Request Changes</span>
                   </button>
 
                   {selectedArchitect.accountStatus === 'APPROVED' || selectedArchitect.isVerified ? (
-                    <button
-                      disabled
-                      className="px-6 py-2 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black shadow-xs flex items-center gap-1.5 cursor-not-allowed"
-                      title="Architect Partner is already approved and active"
+                    <div
+                      className="px-6 py-2.5 rounded-xl bg-emerald-700 text-white font-black text-xs shadow-md flex items-center gap-2"
+                      title="Architect Partner is already approved and officially verified"
                     >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Partner Approved ✓</span>
-                    </button>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      <span>Partner Approved ✓ [{formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]</span>
+                    </div>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => handleApprove(selectedArchitect.id)}
-                      className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-98"
+                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition flex items-center gap-2 cursor-pointer active:scale-98"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Approve Partner</span>
@@ -2632,10 +2636,11 @@ export const AdminArchitects: React.FC = () => {
                     setShowDocRejectModal(target);
                     setDocRejectReason('Document copy illegible / COA number verification failed');
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                  title="Cancel or reject this document"
                 >
                   <XCircle className="w-4 h-4 text-rose-600" />
-                  <span>Cancel / Reject Document (रद्द करें)</span>
+                  <span>Cancel (रद्द करें)</span>
                 </button>
 
                 <button
@@ -2644,10 +2649,11 @@ export const AdminArchitects: React.FC = () => {
                     handleDocumentApprove(activeReviewDoc.id);
                     setActiveReviewDoc(null);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-2 shadow-md transition cursor-pointer active:scale-98"
+                  title="Submit and confirm this document verification"
                 >
                   <CheckCircle2 className="w-4 h-4 text-white" />
-                  <span>Confirm Document (पुष्टि करें)</span>
+                  <span>Submit (स्वीकृत व सबमिट करें)</span>
                 </button>
               </div>
             </div>
