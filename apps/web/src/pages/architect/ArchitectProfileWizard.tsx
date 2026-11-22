@@ -1768,28 +1768,21 @@ export const ArchitectProfileWizard: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Firm Entity / Constitution (फर्म का प्रकार) <span className="text-rose-500">*</span>
+                    Business Type <span className="text-rose-500">*</span>
                   </label>
                   <select
-                    value={business.businessType}
+                    value={business.businessType === 'HUB' || business.businessType === 'Architecture Firm' ? 'Individual' : (business.businessType || 'Individual')}
                     onChange={(e) => setBusiness({ ...business, businessType: e.target.value as ArchitectBusinessType })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
                   >
-                    <option value="Architecture Firm">Architecture Firm / Studio</option>
-                    <option value="Individual">Individual / Sole Proprietorship</option>
-                    <option value="Partnership">Partnership Firm</option>
-                    <option value="LLP">Limited Liability Partnership (LLP)</option>
+                    <option value="Individual">Individual</option>
+                    <option value="HUF">HUF</option>
+                    <option value="LLP">LLP</option>
+                    <option value="Partnership">Partnership</option>
                     <option value="Private Limited Company">Private Limited Company</option>
                     <option value="Public Limited Company">Public Limited Company</option>
-                    <option value="HUF">Hindu Undivided Family (HUF)</option>
-                    <option value="NGO">NGO / Trust</option>
-                    <option value="AOP/BOI">AOP / BOI</option>
-                    {business.businessType && ![
-                      'Architecture Firm', 'Individual', 'HUB', 'HUF', 'LLP', 'Partnership',
-                      'Private Limited Company', 'Public Limited Company', 'NGO', 'AOP/BOI'
-                    ].includes(business.businessType) && (
-                      <option value={business.businessType}>{business.businessType}</option>
-                    )}
+                    <option value="NGO">NGO</option>
+                    <option value="AOP/BOI">AOP/BOI</option>
                   </select>
                 </div>
 
@@ -3448,9 +3441,9 @@ export const ArchitectProfileWizard: React.FC = () => {
                     </div>
 
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm Entity / Constitution:</span>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Business Type:</span>
                       <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 text-xs font-bold inline-block">
-                        {business.businessType || 'Architecture Firm'}
+                        {business.businessType === 'HUB' || business.businessType === 'Architecture Firm' ? 'Individual' : (business.businessType || 'Individual')}
                       </span>
                     </div>
 
