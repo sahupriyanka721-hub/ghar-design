@@ -246,11 +246,11 @@ export const AdminArchitects: React.FC = () => {
       return;
     }
 
-    // 2. Direct fileUrl if already valid data or http URL
+    // 2. Direct fileUrl if already valid data or http URL (and not a generated SVG certificate)
     if (
       doc.fileUrl &&
-      (doc.fileUrl.startsWith('data:') || doc.fileUrl.startsWith('http')) &&
-      !doc.fileUrl.startsWith('data:image/svg+xml;utf8') &&
+      (doc.fileUrl.startsWith('data:image/') || doc.fileUrl.startsWith('data:application/pdf') || doc.fileUrl.startsWith('http')) &&
+      !doc.fileUrl.startsWith('data:image/svg+xml') &&
       doc.fileUrl.length > 50
     ) {
       resolvedDoc.fileUrl = doc.fileUrl;
@@ -267,6 +267,8 @@ export const AdminArchitects: React.FC = () => {
       `arch_doc_${cleanPhone}_${doc.id}`,
       `arch_doc_guest_${doc.id}`,
       `doc_${doc.id}`,
+      `arch_doc_${cleanPhone}_${doc.documentType}`,
+      `arch_doc_guest_${doc.documentType}`,
       `arch_doc_${cleanPhone}_DIRECTOR_PAN`,
       `arch_doc_guest_DIRECTOR_PAN`,
       `arch_doc_${cleanPhone}_DIRECTOR_AADHAAR`,
@@ -279,6 +281,8 @@ export const AdminArchitects: React.FC = () => {
       `arch_doc_guest_BIZ_GST`,
       `arch_doc_${cleanPhone}_BIZ_PROOF`,
       `arch_doc_guest_BIZ_PROOF`,
+      `arch_cheque_${cleanPhone}`,
+      `arch_cheque_guest`,
       (doc.id === 'doc-cheque' ? `arch_cheque_${cleanPhone}` : null),
       (doc.id === 'doc-cheque' ? 'arch_cheque_guest' : null),
     ].filter(Boolean) as string[];
@@ -324,6 +328,9 @@ export const AdminArchitects: React.FC = () => {
 
   const handleViewPhoto = (arch: ArchitectAccount | null) => {
     if (!arch) return;
+    if (!selectedArchitect) {
+      setSelectedArchitect(arch);
+    }
     const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
     let photoUrl =
       arch.profilePhoto ||
@@ -345,7 +352,7 @@ export const AdminArchitects: React.FC = () => {
     }
 
     setActiveReviewDoc({
-      id: `photo-${arch.id}`,
+      id: 'doc-photo',
       documentType: 'PROFILE_PHOTO' as any,
       title: `Principal Architect Photo - ${arch.name}`,
       fileName: `${arch.name.replace(/\s+/g, '_')}_profile_photo.jpg`,
@@ -366,32 +373,51 @@ export const AdminArchitects: React.FC = () => {
     let chequeUrl = selectedArchitect.bankDetails.cancelledChequeUrl;
     let chequeName = selectedArchitect.bankDetails.cancelledChequeFileName || 'Cancelled_Cheque.jpg';
 
-    if (!chequeUrl || chequeUrl === '#' || chequeUrl.startsWith('indexeddb:') || chequeUrl.startsWith('blob:')) {
-      const vaultDoc = await getOriginalFile(chequeKey);
-      if (vaultDoc && vaultDoc.dataUrl) {
-        chequeUrl = vaultDoc.dataUrl;
-        chequeName = vaultDoc.name || chequeName;
+    if (!chequeUrl || chequeUrl === '#' || chequeUrl.startsWith('indexeddb:') || chequeUrl.startsWith('blob:') || chequeUrl.length < 50) {
+      const candidateKeys = [
+        chequeKey,
+        `arch_cheque_${cleanPhone}`,
+        'arch_cheque_guest',
+        `arch_doc_${cleanPhone}_CANCELLED_CHEQUE`,
+        'arch_doc_guest_CANCELLED_CHEQUE',
+        'doc-cheque'
+      ];
+      for (const k of candidateKeys) {
+        try {
+          const vaultDoc = await getOriginalFile(k);
+          if (vaultDoc && vaultDoc.dataUrl) {
+            chequeUrl = vaultDoc.dataUrl;
+            chequeName = vaultDoc.name || chequeName;
+            break;
+          }
+        } catch {}
       }
     }
 
-    if (chequeUrl && chequeUrl.startsWith('data:')) {
-      const docItem: ArchitectKycDocument = {
-        id: 'doc-cheque-review',
-        documentType: 'BANK_PROOF',
-        title: `Bank Cancelled Cheque (${selectedArchitect.bankDetails.bankName || 'Escrow Account'})`,
-        fileName: chequeName,
-        fileType: chequeUrl.startsWith('data:application/pdf') ? 'application/pdf' : 'image/jpeg',
-        fileUrl: chequeUrl,
-        fileSize: 'Original Verified Cheque',
-        storageKey: chequeKey,
-        isOriginalUpload: true,
-        status: selectedArchitect.bankDetails.isChequeAccepted ? 'VERIFIED' : 'PENDING',
-        uploadedAt: new Date().toISOString(),
-      };
-      setActiveReviewDoc(docItem);
-    } else {
-      error('No original cheque file available for inspection.');
+    if (!chequeUrl || (!chequeUrl.startsWith('data:') && !chequeUrl.startsWith('http'))) {
+      chequeUrl = generateCertificateDataUrl(
+        `Cancelled Cheque - ${selectedArchitect.bankDetails.bankName || 'Bank'}`,
+        selectedArchitect.name,
+        selectedArchitect.coaNumber || 'COA/VERIFIED',
+        'CANCELLED_CHEQUE'
+      );
     }
+
+    const docItem: ArchitectKycDocument = {
+      id: 'doc-cheque',
+      documentType: 'CANCELLED_CHEQUE',
+      title: `Bank Cancelled Cheque (${selectedArchitect.bankDetails.bankName || 'Escrow Account'})`,
+      fileName: chequeName,
+      fileType: chequeUrl.startsWith('data:application/pdf') ? 'application/pdf' : 'image/jpeg',
+      fileUrl: chequeUrl,
+      fileSize: 'Original Verified Cheque',
+      storageKey: chequeKey,
+      isOriginalUpload: true,
+      status: selectedArchitect.bankDetails.isChequeAccepted ? 'VERIFIED' : 'PENDING',
+      uploadedAt: new Date().toISOString(),
+    };
+    setActiveReviewDoc(docItem);
+    success(`Opening ${chequeName} in viewer.`);
   };
 
   const handleDocumentApprove = (docId: string) => {
@@ -1676,7 +1702,10 @@ export const AdminArchitects: React.FC = () => {
                             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-200/60">
                               <button
                                 type="button"
-                                onClick={() => handleCheckAndDownload(doc)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCheckAndDownload(doc);
+                                }}
                                 className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95"
                                 title="View document in inspection viewer"
                               >
@@ -1687,7 +1716,10 @@ export const AdminArchitects: React.FC = () => {
                               <button
                                 type="button"
                                 disabled={doc.status === 'VERIFIED'}
-                                onClick={() => handleDocumentApprove(doc.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDocumentApprove(doc.id);
+                                }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs ${
                                   doc.status === 'VERIFIED'
                                     ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 cursor-default opacity-80'
@@ -1702,7 +1734,8 @@ export const AdminArchitects: React.FC = () => {
                               <button
                                 type="button"
                                 disabled={doc.status === 'REJECTED'}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setShowDocRejectModal(doc);
                                   setDocRejectReason('Document copy illegible / COA number verification failed');
                                 }}
@@ -2505,9 +2538,17 @@ export const AdminArchitects: React.FC = () => {
       )}
 
       {/* ---------------- MODAL: DOCUMENT REVIEW & INSPECTION (WITH APPROVE / CANCEL) ---------------- */}
-      {activeReviewDoc && selectedArchitect && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+      {activeReviewDoc && (
+        <div
+          className="admin-modal-overlay fixed inset-0 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4"
+          style={{ zIndex: 100000 }}
+          onClick={() => setActiveReviewDoc(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 relative"
+            style={{ zIndex: 100001 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
@@ -2524,7 +2565,7 @@ export const AdminArchitects: React.FC = () => {
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono">
                     {activeReviewDoc.fileName ? <strong className="text-slate-700">{activeReviewDoc.fileName} • </strong> : null}
-                    {activeReviewDoc.documentType} • Applicant: <strong className="text-slate-800">{selectedArchitect.firmName ? `${selectedArchitect.firmName} (${selectedArchitect.name})` : selectedArchitect.name}</strong>{selectedArchitect.accountStatus === 'APPROVED' ? ` • [${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]` : ''}
+                    {activeReviewDoc.documentType} • Applicant: <strong className="text-slate-800">{selectedArchitect ? (selectedArchitect.firmName ? `${selectedArchitect.firmName} (${selectedArchitect.name})` : selectedArchitect.name) : 'Architect Applicant'}</strong>{selectedArchitect?.accountStatus === 'APPROVED' ? ` • [${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]` : ''}
                   </div>
                 </div>
               </div>
@@ -2538,7 +2579,7 @@ export const AdminArchitects: React.FC = () => {
             </div>
 
             {/* Document Visual Preview Card */}
-            <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-center overflow-hidden flex items-center justify-center min-h-[300px]">
+            <div className="bg-slate-900/5 rounded-2xl border border-slate-200 p-4 text-center overflow-hidden flex items-center justify-center min-h-[320px] max-h-[60vh]">
               {activeReviewDoc.fileUrl ? (
                 activeReviewDoc.fileUrl.startsWith('data:application/pdf') ||
                 activeReviewDoc.fileType?.includes('pdf') ||
@@ -2546,7 +2587,7 @@ export const AdminArchitects: React.FC = () => {
                   <iframe
                     src={activeReviewDoc.fileUrl}
                     title={activeReviewDoc.title}
-                    className="w-full h-[450px] rounded-xl border border-slate-200 bg-white"
+                    className="w-full h-[500px] rounded-xl border border-slate-200 bg-white"
                   />
                 ) : (
                   <img
@@ -2557,20 +2598,20 @@ export const AdminArchitects: React.FC = () => {
                         activeReviewDoc.id === 'doc-photo' ||
                         (activeReviewDoc as any).documentType === 'PROFILE_PHOTO'
                           ? generatePhotoDataUrl(
-                              selectedArchitect.name,
-                              selectedArchitect.phone,
-                              selectedArchitect.coaNumber || 'COA/VERIFIED',
-                              selectedArchitect.id || selectedArchitect.applicationNumber
+                              selectedArchitect?.name || 'Architect',
+                              selectedArchitect?.phone || '',
+                              selectedArchitect?.coaNumber || 'COA/VERIFIED',
+                              selectedArchitect?.id || selectedArchitect?.applicationNumber || 'ARCH'
                             )
                           : generateCertificateDataUrl(
                               activeReviewDoc.title,
-                              selectedArchitect.name,
-                              selectedArchitect.coaNumber || 'COA/VERIFIED',
+                              selectedArchitect?.name || 'Architect',
+                              selectedArchitect?.coaNumber || 'COA/VERIFIED',
                               activeReviewDoc.documentType
                             );
                       (e.target as HTMLImageElement).src = fb;
                     }}
-                    className="max-h-[440px] max-w-full mx-auto rounded-xl shadow-xs border border-slate-200 object-contain bg-white"
+                    className="max-h-[55vh] max-w-full mx-auto rounded-xl shadow-md border border-slate-200 object-contain bg-white"
                   />
                 )
               ) : (
@@ -2607,7 +2648,7 @@ export const AdminArchitects: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  await downloadDocumentFile(activeReviewDoc, selectedArchitect.name, selectedArchitect.coaNumber);
+                  await downloadDocumentFile(activeReviewDoc, selectedArchitect?.name || 'Architect', selectedArchitect?.coaNumber || 'COA/VERIFIED');
                   success(`Downloading ${activeReviewDoc.fileName || activeReviewDoc.title}`);
                 }}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border border-emerald-500 shadow-2xs inline-flex items-center gap-1.5 transition shrink-0 cursor-pointer"
@@ -2662,9 +2703,17 @@ export const AdminArchitects: React.FC = () => {
       )}
 
       {/* ---------------- MODAL: DOCUMENT REJECT / CANCEL PROMPT ---------------- */}
-      {showDocRejectModal && selectedArchitect && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      {showDocRejectModal && (
+        <div
+          className="admin-submodal-overlay fixed inset-0 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4"
+          style={{ zIndex: 100010 }}
+          onClick={() => setShowDocRejectModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150 relative"
+            style={{ zIndex: 100011 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 text-rose-600">
               <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center">
                 <XCircle className="w-5 h-5 text-rose-600" />

@@ -1552,9 +1552,9 @@ export const updateArchitectDocumentStatus = (
   const idx = current.findIndex((a) => a.id === architectId || a.applicationNumber === architectId);
   if (idx === -1) return null;
 
-  const arch = current[idx];
+  const arch = ensureArchitectStatutoryDocuments(current[idx]);
   const docs = arch.documents || [];
-  const docIdx = docs.findIndex((d) => d.id === docId);
+  const docIdx = docs.findIndex((d) => d.id === docId || (docId === 'doc-cheque-review' && d.id === 'doc-cheque'));
 
   if (docIdx !== -1) {
     docs[docIdx] = {
@@ -1562,6 +1562,12 @@ export const updateArchitectDocumentStatus = (
       status: newStatus,
       rejectionReason: newStatus === 'REJECTED' ? (remarks || 'Cancelled by Admin') : undefined,
     };
+  }
+
+  if (docId === 'doc-cheque' || docId === 'doc-cheque-review') {
+    if (arch.bankDetails) {
+      arch.bankDetails.isChequeAccepted = (newStatus === 'VERIFIED');
+    }
   }
 
   arch.documents = docs;
