@@ -1499,8 +1499,8 @@ export const AdminArchitects: React.FC = () => {
                             <span className="font-bold text-navy-950 text-sm">{selectedArchitect.firmName}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Owner / Director / Entity</span>
-                            <span className="font-bold text-slate-800">{selectedArchitect.businessType}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Firm Entity / Constitution</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.businessType || 'Architecture Firm'}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">COA License No</span>

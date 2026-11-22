@@ -1768,24 +1768,24 @@ export const ArchitectProfileWizard: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    OWNER / Director <span className="text-rose-500">*</span>
+                    Firm Entity / Constitution (फर्म का प्रकार) <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={business.businessType}
                     onChange={(e) => setBusiness({ ...business, businessType: e.target.value as ArchitectBusinessType })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
                   >
-                    <option value="Individual">Individual</option>
-                    <option value="HUB">HUB</option>
-                    <option value="HUF">HUF</option>
-                    <option value="LLP">LLP</option>
-                    <option value="Partnership">Partnership</option>
+                    <option value="Architecture Firm">Architecture Firm / Studio</option>
+                    <option value="Individual">Individual / Sole Proprietorship</option>
+                    <option value="Partnership">Partnership Firm</option>
+                    <option value="LLP">Limited Liability Partnership (LLP)</option>
                     <option value="Private Limited Company">Private Limited Company</option>
                     <option value="Public Limited Company">Public Limited Company</option>
-                    <option value="NGO">NGO</option>
-                    <option value="AOP/BOI">AOP/BOI</option>
+                    <option value="HUF">Hindu Undivided Family (HUF)</option>
+                    <option value="NGO">NGO / Trust</option>
+                    <option value="AOP/BOI">AOP / BOI</option>
                     {business.businessType && ![
-                      'Individual', 'HUB', 'HUF', 'LLP', 'Partnership',
+                      'Architecture Firm', 'Individual', 'HUB', 'HUF', 'LLP', 'Partnership',
                       'Private Limited Company', 'Public Limited Company', 'NGO', 'AOP/BOI'
                     ].includes(business.businessType) && (
                       <option value={business.businessType}>{business.businessType}</option>
@@ -1877,6 +1877,19 @@ export const ArchitectProfileWizard: React.FC = () => {
                     onChange={(e) => setBusiness({ ...business, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) })}
                     placeholder="Enter 15-character GSTIN (optional)"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-sky-500 focus:bg-white uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Firm / MSME / ROC Reg No. (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={business.firmRegistrationNumber || ''}
+                    onChange={(e) => setBusiness({ ...business, firmRegistrationNumber: e.target.value })}
+                    placeholder="e.g. UDYAM-XX-00-0000000 / CIN / Reg No."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
                   />
                 </div>
 
@@ -3412,9 +3425,9 @@ export const ArchitectProfileWizard: React.FC = () => {
                 </div>
 
                 {/* 2. Firm / Company Profile */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-sky-300 transition-all shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-xs font-black text-navy-950 flex items-center gap-2">
+                <div className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-sky-300 transition-all shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <span className="text-sm font-black text-navy-950 flex items-center gap-2 font-display">
                       <Building2 className="w-4 h-4 text-sky-600" />
                       <span>2. Firm & Legal Entity Profile</span>
                     </span>
@@ -3427,88 +3440,155 @@ export const ArchitectProfileWizard: React.FC = () => {
                       <span>Edit (Step 2)</span>
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Firm / Company Name:</span>
-                      <strong className="text-navy-950 text-xs">{business.firmName || '—'}</strong>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm / Company Name:</span>
+                      <strong className="text-navy-950 text-sm font-display block">{business.firmName || '—'}</strong>
                     </div>
+
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Owner / Director Type:</span>
-                      <strong className="text-navy-950 text-xs">{business.businessType || '—'}</strong>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm Entity / Constitution:</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 text-xs font-bold inline-block">
+                        {business.businessType || 'Architecture Firm'}
+                      </span>
                     </div>
+
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Establishment Year:</span>
-                      <strong className="text-navy-950 text-xs">{business.establishmentYear || '—'}</strong>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Principal Architect / Owner:</span>
+                      <strong className="text-navy-950 text-xs block">{personal.name || 'Registered Practitioner'}</strong>
+                      {personal.designation && <span className="text-[10px] text-slate-500 font-medium">({personal.designation})</span>}
                     </div>
+
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Team Size:</span>
-                      <strong className="text-navy-950 text-xs">{business.teamSize ? `${business.teamSize} Members` : '—'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Qualified Architects:</span>
-                      <strong className="text-navy-950 text-xs">{business.architectsCount ? `${business.architectsCount} Architects` : '—'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">Firm Registration No:</span>
-                      <strong className="font-mono text-navy-950 text-xs">{business.firmRegistrationNumber || '—'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">District & State:</span>
-                      <strong className="text-navy-950 text-xs">
-                        {business.district ? `${business.district}, ` : ''}{business.state || '—'}
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Council of Architecture (COA) Reg:</span>
+                      <strong className="font-mono text-sky-700 text-xs font-black block">
+                        {business.coaNumber || 'COA Verified Partner'}
                       </strong>
                     </div>
+
                     <div>
-                      <span className="text-slate-500 block text-[11px]">City & Pincode:</span>
-                      <strong className="text-navy-950 text-xs">
-                        {business.city || '—'} {business.pincode ? `(${business.pincode})` : ''}
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm / Company PAN:</span>
+                      <strong className="font-mono text-navy-950 text-xs block">{business.panNumber || '—'}</strong>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">GSTIN Registration:</span>
+                      <strong className="font-mono text-navy-950 text-xs block">
+                        {business.gstin || 'Composition / Exempt'}
                       </strong>
                     </div>
+
                     <div>
-                      <span className="text-slate-500 block text-[11px] mb-1">Firm Brochure / PDF:</span>
-                      <div className="flex items-center gap-2">
-                        {business.website ? (
-                          <div className="flex items-center gap-1.5 p-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span className="text-[11px] text-emerald-800 font-bold truncate max-w-[100px]">
-                              {firmBrochureFileName || 'Brochure Attached'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPreview('Firm Brochure / Profile', business.website, firmBrochureFileName, undefined, () => firmBrochureInputRef.current?.click())}
-                              className="px-1.5 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 text-[10px] font-bold inline-flex items-center gap-0.5 cursor-pointer ml-1"
-                              title="View Brochure"
-                            >
-                              <Eye className="w-2.5 h-2.5" />
-                              <span>View</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => firmBrochureInputRef.current?.click()}
-                              className="text-[10px] text-sky-700 font-bold hover:underline cursor-pointer"
-                            >
-                              Change
-                            </button>
-                          </div>
-                        ) : (
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Year of Establishment:</span>
+                      <strong className="text-navy-950 text-xs block">
+                        {business.establishmentYear
+                          ? `${business.establishmentYear} (${new Date().getFullYear() - Number(business.establishmentYear)} Yrs Standing)`
+                          : '—'}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Practice Team Strength:</span>
+                      <strong className="text-navy-950 text-xs block">
+                        {business.teamSize ? `${business.teamSize} Members` : '—'}
+                        {business.architectsCount ? ` • ${business.architectsCount} Architects` : ''}
+                      </strong>
+                    </div>
+
+                    {business.firmRegistrationNumber ? (
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm / MSME Reg No:</span>
+                        <strong className="font-mono text-navy-950 text-xs block">{business.firmRegistrationNumber}</strong>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Firm Registration Status:</span>
+                        <span className="text-emerald-700 font-bold text-xs flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>COA Registered Entity</span>
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="sm:col-span-2 md:col-span-3">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Firm Brochure / Presentation:</span>
+                      {business.website ? (
+                        <div className="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl inline-flex">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs text-emerald-900 font-bold truncate max-w-[200px]">
+                            {firmBrochureFileName || 'Brochure Attached'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview('Firm Brochure / Profile', business.website, firmBrochureFileName, undefined, () => firmBrochureInputRef.current?.click())}
+                            className="px-2 py-0.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer ml-1"
+                            title="View Brochure"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => firmBrochureInputRef.current?.click()}
-                            className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            className="text-[11px] text-sky-700 font-bold hover:underline cursor-pointer ml-1"
                           >
-                            <Upload className="w-3 h-3" />
-                            <span>Upload Brochure</span>
+                            Change
                           </button>
-                        )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => firmBrochureInputRef.current?.click()}
+                          className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-200 w-fit"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Firm Brochure / Profile</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Registered Office Address */}
+                  <div className="pt-3 border-t border-slate-100 text-xs">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1.5">
+                      Registered Office Location & Address:
+                    </span>
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="font-bold text-navy-950 text-xs leading-relaxed">
+                          {business.address ? `${business.address}, ` : ''}
+                          {business.district && business.district !== business.city ? `${business.district}, ` : ''}
+                          {business.city ? `${business.city}, ` : ''}
+                          {business.state || 'India'}
+                          {business.pincode ? ` - ${business.pincode}` : ''}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px]">
+                          {business.city && (
+                            <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700">
+                              City: <strong className="text-navy-950">{business.city}</strong>
+                            </span>
+                          )}
+                          {business.district && (
+                            <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700">
+                              District: <strong className="text-navy-950">{business.district}</strong>
+                            </span>
+                          )}
+                          {business.state && (
+                            <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700">
+                              State: <strong className="text-navy-950">{business.state}</strong>
+                            </span>
+                          )}
+                          {business.pincode && (
+                            <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 font-mono">
+                              PIN: <strong className="text-navy-950">{business.pincode}</strong>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  {business.address && (
-                    <div className="pt-2 border-t border-slate-100 text-xs">
-                      <span className="text-slate-500 block text-[11px]">Office Address:</span>
-                      <p className="text-slate-700 mt-0.5">{business.address}</p>
-                    </div>
-                  )}
                 </div>
 
                 {/* 3. Architectural Services Offered */}
