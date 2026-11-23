@@ -188,6 +188,8 @@ export const QuotationBuilder: React.FC = () => {
         lineItems,
         subtotalPaise,
         discountPaise,
+        netTotalPaise: taxableAmountPaise,
+        taxableAmountPaise,
         taxPaise,
         finalAmountPaise,
         includedDeliverables: deliverables,
@@ -467,6 +469,10 @@ export const QuotationBuilder: React.FC = () => {
                 value={discountRupees}
                 onChange={(e) => setDiscountRupees(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
               />
+            </div>
+            <div className="flex justify-between text-slate-300">
+              <span>Net Total:</span>
+              <span className="font-semibold text-white">{formatINR(taxableAmountPaise)}</span>
             </div>
             <div className="flex justify-between text-slate-300">
               <span>GST (18%):</span>

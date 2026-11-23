@@ -444,16 +444,24 @@ export const QuotationDetail: React.FC = () => {
               <span>Subtotal:</span>
               <span className="font-semibold text-slate-800">{formatINR(quotation.subtotalPaise)}</span>
             </div>
-            <div className="flex justify-between text-emerald-700">
-              <span>Special Discount:</span>
-              <span className="font-semibold">-{formatINR(quotation.discountPaise)}</span>
+            {Boolean(quotation.discountPaise) && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Discount to Client:</span>
+                <span className="font-semibold">-{formatINR(quotation.discountPaise)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-600">
+              <span>Net Total:</span>
+              <span className="font-semibold text-slate-800">
+                {formatINR(quotation.netTotalPaise || quotation.taxableAmountPaise || Math.max(0, (quotation.subtotalPaise || 0) - (quotation.discountPaise || 0)))}
+              </span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>GST (18%):</span>
               <span className="font-semibold text-slate-800">{formatINR(quotation.taxPaise)}</span>
             </div>
             <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold text-navy-950">
-              <span>Final Total Amount:</span>
+              <span>Final Quotation Total:</span>
               <span className="text-gold-700">{formatINR(quotation.finalAmountPaise)}</span>
             </div>
             <div className="pt-1 text-[11px] text-slate-500">

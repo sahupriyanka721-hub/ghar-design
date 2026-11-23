@@ -75,10 +75,15 @@ export function buildQuotationPdfBlob(
   const architectName = architect?.firmName || architect?.name || quote.architectName || 'COA Verified Architect';
   const coaNum = architect?.coaNumber || quote.coaNumber || 'COA/VERIFIED/2026';
   
-  const totalPaise = quote.totalAmountPaise || (quote.totalAmount ? quote.totalAmount * 100 : 45000000);
+  const totalPaise = quote.finalAmountPaise || quote.totalAmountPaise || (quote.totalAmount ? quote.totalAmount * 100 : 45000000);
   const totalRupees = Math.round(totalPaise / 100);
-  const gstRupees = Math.round((totalRupees * 0.18) / 1.18);
-  const subtotalRupees = totalRupees - gstRupees;
+  const discountRupees = Math.round((quote.discountPaise || 0) / 100);
+  const rawSubtotalRupees = Math.round((quote.subtotalPaise || 0) / 100);
+  const gstRupees = quote.taxPaise ? Math.round(quote.taxPaise / 100) : Math.round((totalRupees * 0.18) / 1.18);
+  const netTotalRupees = quote.netTotalPaise || quote.taxableAmountPaise
+    ? Math.round((quote.netTotalPaise || quote.taxableAmountPaise) / 100)
+    : (rawSubtotalRupees > 0 && discountRupees > 0 ? rawSubtotalRupees - discountRupees : totalRupees - gstRupees);
+  const subtotalRupees = rawSubtotalRupees > 0 ? rawSubtotalRupees : netTotalRupees + discountRupees;
   const advancePercent = quote.advancePercentage || 25;
   const advanceRupees = Math.round((totalRupees * advancePercent) / 100);
 
@@ -175,26 +180,42 @@ export function buildQuotationPdfBlob(
 
   // 6. Summary box on right
   const summaryTop = currentY - 8;
-  const summaryBoxY = summaryTop - 80;
+  const hasDiscount = discountRupees > 0;
+  const boxHeight = hasDiscount ? 104 : 84;
+  const summaryBoxY = summaryTop - (hasDiscount ? 100 : 80);
   ops.push('0.95 0.97 1.0 rg');
-  ops.push(`300 ${summaryBoxY.toFixed(2)} 255.28 84 re`);
+  ops.push(`300 ${summaryBoxY.toFixed(2)} 255.28 ${boxHeight} re`);
   ops.push('f');
   ops.push('0.7 0.8 0.9 RG');
   ops.push('0.5 w');
-  ops.push(`300 ${summaryBoxY.toFixed(2)} 255.28 84 re`);
+  ops.push(`300 ${summaryBoxY.toFixed(2)} 255.28 ${boxHeight} re`);
   ops.push('S');
 
-  drawText(ops, 'BOQ Net Subtotal:', 315, summaryTop - 16, 'F1', 8.5, [0.3, 0.35, 0.4]);
-  drawText(ops, `Rs. ${subtotalRupees.toLocaleString('en-IN')}`, 460, summaryTop - 16, 'F1', 8.5, [0.1, 0.15, 0.2]);
+  let lineY = summaryTop - 15;
+  drawText(ops, 'Subtotal:', 315, lineY, 'F1', 8.5, [0.3, 0.35, 0.4]);
+  drawText(ops, `Rs. ${subtotalRupees.toLocaleString('en-IN')}`, 460, lineY, 'F1', 8.5, [0.1, 0.15, 0.2]);
 
-  drawText(ops, 'GST (18% Included):', 315, summaryTop - 34, 'F1', 8.5, [0.3, 0.35, 0.4]);
-  drawText(ops, `Rs. ${gstRupees.toLocaleString('en-IN')}`, 460, summaryTop - 34, 'F1', 8.5, [0.1, 0.15, 0.2]);
+  if (hasDiscount) {
+    lineY -= 16;
+    drawText(ops, 'Discount to Client:', 315, lineY, 'F1', 8.5, [0.1, 0.5, 0.25]);
+    drawText(ops, `-Rs. ${discountRupees.toLocaleString('en-IN')}`, 460, lineY, 'F1', 8.5, [0.1, 0.5, 0.25]);
 
-  drawText(ops, 'Total Quotation Value:', 315, summaryTop - 54, 'F2', 10, [0.06, 0.15, 0.35]);
-  drawText(ops, `Rs. ${totalRupees.toLocaleString('en-IN')}`, 460, summaryTop - 54, 'F2', 10, [0.06, 0.15, 0.35]);
+    lineY -= 16;
+    drawText(ops, 'Net Total:', 315, lineY, 'F1', 8.5, [0.3, 0.35, 0.4]);
+    drawText(ops, `Rs. ${netTotalRupees.toLocaleString('en-IN')}`, 460, lineY, 'F1', 8.5, [0.1, 0.15, 0.2]);
+  }
 
-  drawText(ops, `Escrow Advance (${advancePercent}%):`, 315, summaryTop - 72, 'F1', 8.5, [0.1, 0.5, 0.25]);
-  drawText(ops, `Rs. ${advanceRupees.toLocaleString('en-IN')}`, 460, summaryTop - 72, 'F2', 8.5, [0.1, 0.5, 0.25]);
+  lineY -= 18;
+  drawText(ops, 'GST (18%):', 315, lineY, 'F1', 8.5, [0.3, 0.35, 0.4]);
+  drawText(ops, `Rs. ${gstRupees.toLocaleString('en-IN')}`, 460, lineY, 'F1', 8.5, [0.1, 0.15, 0.2]);
+
+  lineY -= 20;
+  drawText(ops, 'Final Quotation Total:', 315, lineY, 'F2', 10, [0.06, 0.15, 0.35]);
+  drawText(ops, `Rs. ${totalRupees.toLocaleString('en-IN')}`, 460, lineY, 'F2', 10, [0.06, 0.15, 0.35]);
+
+  lineY -= 18;
+  drawText(ops, `Escrow Advance (${advancePercent}%):`, 315, lineY, 'F1', 8.5, [0.1, 0.5, 0.25]);
+  drawText(ops, `Rs. ${advanceRupees.toLocaleString('en-IN')}`, 460, lineY, 'F2', 8.5, [0.1, 0.5, 0.25]);
 
   // 7. Terms & Escrow Safe Stamp
   drawText(ops, '100% ESCROW PROTECTED QUOTATION - BUILDGHAR ASSURANCE', 40, 240, 'F2', 8.5, [0.1, 0.4, 0.2]);
