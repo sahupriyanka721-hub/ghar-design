@@ -457,6 +457,31 @@ export const generatePhotoDataUrl = (archName: string, phone: string, regNo?: st
   }
 };
 
+/**
+ * Strictly verifies whether a profile photo string represents an actual user upload
+ * rather than a generated SVG fallback or placeholder.
+ */
+export const isRealUserPhoto = (url?: string | null): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '#' || trimmed === 'null' || trimmed === 'undefined') return false;
+  // Discard generated SVGs and fake dummy SVG URLs
+  if (trimmed.includes('data:image/svg+xml') || trimmed.includes('<svg')) return false;
+  // Real uploaded photos are compressed data URLs or valid external image URLs
+  if (
+    trimmed.startsWith('data:image/jpeg') ||
+    trimmed.startsWith('data:image/jpg') ||
+    trimmed.startsWith('data:image/png') ||
+    trimmed.startsWith('data:image/webp') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('/uploads/')
+  ) {
+    return true;
+  }
+  return false;
+};
+
 export const ARCHITECT_ID_PREFIX = 'BG/Architech';
 
 /**
@@ -543,34 +568,33 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   const compiled: ArchitectKycDocument[] = [];
 
   // (A) Principal Architect Photo
-  const resolvedPhoto =
+  const rawPhoto =
     arch.profilePhoto ||
     (cleanPhone ? localStorage.getItem(`arch_photo_${cleanPhone}`) : '') ||
     (cleanPhone ? localStorage.getItem(`arch_photo_+91${cleanPhone}`) : '') ||
     (cleanPhone ? localStorage.getItem(`profile_photo_${cleanPhone}`) : '') ||
     (cleanPhone ? localStorage.getItem(`user_photo_${cleanPhone}`) : '') ||
     localStorage.getItem('registered_arch_photo') ||
-    localStorage.getItem('arch_photo_guest') ||
     '';
 
-  const validPhotoUrl = (resolvedPhoto && (resolvedPhoto.startsWith('data:') || resolvedPhoto.startsWith('http')))
-    ? resolvedPhoto
-    : generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id);
+  const hasRealPhoto = isRealUserPhoto(rawPhoto);
+  const resolvedPhoto = hasRealPhoto ? rawPhoto : '';
+  arch.profilePhoto = resolvedPhoto;
 
-  arch.profilePhoto = validPhotoUrl;
-
-  compiled.push({
-    id: 'doc-photo',
-    documentType: 'PROFILE_PHOTO' as any,
-    title: `Principal Architect Photo - ${arch.name || 'Principal Architect'}`,
-    fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
-    fileSize: 'Photo Image (JPG/PNG)',
-    fileUrl: validPhotoUrl,
-    storageKey: `arch_photo_${cleanUserPhone}`,
-    isOriginalUpload: Boolean(resolvedPhoto && (resolvedPhoto.startsWith('data:') || resolvedPhoto.startsWith('http'))),
-    status: 'VERIFIED',
-    uploadedAt: now,
-  });
+  if (hasRealPhoto) {
+    compiled.push({
+      id: 'doc-photo',
+      documentType: 'PROFILE_PHOTO' as any,
+      title: `Principal Architect Photo - ${arch.name || 'Principal Architect'}`,
+      fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_photo.jpg`,
+      fileSize: 'Photo Image (JPG/PNG)',
+      fileUrl: resolvedPhoto,
+      storageKey: `arch_photo_${cleanUserPhone}`,
+      isOriginalUpload: true,
+      status: 'VERIFIED',
+      uploadedAt: now,
+    });
+  }
 
   // (B) Director(s) KYC Documents
   if (arch.directorsKyc && arch.directorsKyc.length > 0) {
@@ -972,7 +996,13 @@ export const getArchitectById = (id: string): ArchitectAccount | null => {
           localStorage.getItem(`arch_photo_+91${clean}`) ||
           localStorage.getItem(`profile_photo_${clean}`) ||
           localStorage.getItem(`user_photo_${clean}`);
-        if (stored) found.profilePhoto = stored;
+        if (stored && isRealUserPhoto(stored)) found.profilePhoto = stored;
+        else if (stored && !isRealUserPhoto(stored)) {
+          localStorage.removeItem(`arch_photo_${clean}`);
+          localStorage.removeItem(`arch_photo_+91${clean}`);
+          localStorage.removeItem(`profile_photo_${clean}`);
+          localStorage.removeItem(`user_photo_${clean}`);
+        }
       } catch {}
     }
   }
@@ -992,7 +1022,13 @@ export const getArchitectByPhone = (phone: string): ArchitectAccount | null => {
           localStorage.getItem(`arch_photo_+91${clean}`) ||
           localStorage.getItem(`profile_photo_${clean}`) ||
           localStorage.getItem(`user_photo_${clean}`);
-        if (stored) found.profilePhoto = stored;
+        if (stored && isRealUserPhoto(stored)) found.profilePhoto = stored;
+        else if (stored && !isRealUserPhoto(stored)) {
+          localStorage.removeItem(`arch_photo_${clean}`);
+          localStorage.removeItem(`arch_photo_+91${clean}`);
+          localStorage.removeItem(`profile_photo_${clean}`);
+          localStorage.removeItem(`user_photo_${clean}`);
+        }
       } catch {}
     }
     if (!found.firmName) {

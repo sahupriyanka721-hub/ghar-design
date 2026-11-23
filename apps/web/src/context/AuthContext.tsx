@@ -758,13 +758,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       })() : null;
 
+      const photoCandidates = [
+        arch?.profilePhoto,
+        storedPhonePhoto,
+        (existingPro as any)?.profilePhoto,
+        (existingPro as any)?.personal?.profilePhoto,
+        (existingPro as any)?.avatar,
+      ];
       const proPhoto =
-        arch?.profilePhoto ||
-        storedPhonePhoto ||
-        (existingPro as any)?.profilePhoto ||
-        (existingPro as any)?.personal?.profilePhoto ||
-        (existingPro as any)?.avatar ||
-        null;
+        photoCandidates.find(
+          (p) =>
+            p &&
+            typeof p === 'string' &&
+            !p.includes('data:image/svg+xml') &&
+            !p.includes('<svg') &&
+            (p.startsWith('data:image/') || p.startsWith('http'))
+        ) || null;
 
       const proUser: User = {
         id: arch?.userId || existingPro.userId || existingPro.id,

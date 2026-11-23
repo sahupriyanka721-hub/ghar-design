@@ -64,6 +64,7 @@ import {
   formatArchitectId,
   generateCertificateDataUrl,
   generatePhotoDataUrl,
+  isRealUserPhoto,
   ensureArchitectStatutoryDocuments,
   ArchitectAccount,
   ArchitectAccountStatus,
@@ -228,20 +229,15 @@ export const AdminArchitects: React.FC = () => {
         }
       }
 
-      if (photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http'))) {
+      if (photoUrl && isRealUserPhoto(photoUrl)) {
         resolvedDoc.fileUrl = photoUrl;
         resolvedDoc.isOriginalUpload = true;
+        setActiveReviewDoc(resolvedDoc);
+        success(`Opening photo of ${selectedArchitect.name} in inspection viewer.`);
       } else {
-        // High-definition official Architect Photo ID Card
-        resolvedDoc.fileUrl = generatePhotoDataUrl(
-          selectedArchitect.name,
-          selectedArchitect.phone,
-          selectedArchitect.coaNumber || 'COA/VERIFIED',
-          selectedArchitect.id || selectedArchitect.applicationNumber
-        );
+        error(`${selectedArchitect.name} has not uploaded a profile photo yet.`);
       }
-
-      setActiveReviewDoc(resolvedDoc);
+      return;
       success(`Opening photo of ${selectedArchitect.name} in inspection viewer.`);
       return;
     }
@@ -1001,14 +997,15 @@ export const AdminArchitects: React.FC = () => {
                           className="w-11 h-11 rounded-2xl bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display mx-auto overflow-hidden border border-slate-200 relative group/avatar cursor-pointer"
                           title="Click to view full architect profile dossier"
                         >
-                          <img
-                            src={arch.profilePhoto || generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id)}
-                            alt={arch.name}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = generatePhotoDataUrl(arch.name, arch.phone, arch.coaNumber, arch.id);
-                            }}
-                            className="w-full h-full object-cover rounded-2xl"
-                          />
+                          {arch.profilePhoto && isRealUserPhoto(arch.profilePhoto) ? (
+                            <img
+                              src={arch.profilePhoto}
+                              alt={arch.name}
+                              className="w-full h-full object-cover rounded-2xl"
+                            />
+                          ) : (
+                            <span className="font-bold text-sky-900 text-xs">{(arch.name || arch.firmName || 'AR').slice(0, 2).toUpperCase()}</span>
+                          )}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                             <Eye className="w-3.5 h-3.5 text-white" />
                           </div>
@@ -1270,14 +1267,15 @@ export const AdminArchitects: React.FC = () => {
                     onClick={() => handleViewPhoto(selectedArchitect)}
                     title="Click to view full size photo"
                   >
-                    <img
-                      src={selectedArchitect.profilePhoto || generatePhotoDataUrl(selectedArchitect.name, selectedArchitect.phone, selectedArchitect.coaNumber, selectedArchitect.id)}
-                      alt={selectedArchitect.name}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = generatePhotoDataUrl(selectedArchitect.name, selectedArchitect.phone, selectedArchitect.coaNumber, selectedArchitect.id);
-                      }}
-                      className="w-full h-full object-cover rounded-2xl"
-                    />
+                    {selectedArchitect.profilePhoto && isRealUserPhoto(selectedArchitect.profilePhoto) ? (
+                      <img
+                        src={selectedArchitect.profilePhoto}
+                        alt={selectedArchitect.name}
+                        className="w-full h-full object-cover rounded-2xl"
+                      />
+                    ) : (
+                      <span className="font-black text-amber-300 text-xl">{(selectedArchitect.name || selectedArchitect.firmName || 'AR').slice(0, 2).toUpperCase()}</span>
+                    )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/heroAvatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                       <Eye className="w-5 h-5 text-white" />
                     </div>

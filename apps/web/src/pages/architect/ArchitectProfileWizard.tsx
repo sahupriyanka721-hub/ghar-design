@@ -49,6 +49,7 @@ import {
   generateArchitectId,
   generateArchitectApplicationNumber,
   ArchitectAccount,
+  isRealUserPhoto,
 } from '../../data/architectStore.js';
 import { saveOriginalFile, getOriginalFile } from '../../lib/documentStore.js';
 import { pushToCloud } from '../../data/cloudSync.js';
@@ -280,7 +281,13 @@ export const ArchitectProfileWizard: React.FC = () => {
     name: initialName,
     phone: user?.phone || initialUser?.phone || initialPhone,
     email: user?.email || initialUser?.email || '',
-    profilePhoto: (initialPhone ? localStorage.getItem(`arch_photo_${initialPhone}`) : '') || user?.avatar || initialUser?.avatar || '',
+    profilePhoto: (() => {
+      const stored = initialPhone ? localStorage.getItem(`arch_photo_${initialPhone}`) : '';
+      if (stored && isRealUserPhoto(stored)) return stored;
+      if (isRealUserPhoto(user?.avatar)) return user!.avatar!;
+      if (isRealUserPhoto(initialUser?.avatar)) return initialUser.avatar;
+      return '';
+    })(),
     designation: '',
     experienceYears: '' as any,
     bio: '',
@@ -532,11 +539,36 @@ export const ArchitectProfileWizard: React.FC = () => {
 
     const photoStored = lookupPhone ? (() => {
       try {
-        return localStorage.getItem(`arch_photo_${lookupPhone}`);
+        const stored = localStorage.getItem(`arch_photo_${lookupPhone}`);
+        if (stored && isRealUserPhoto(stored)) return stored;
+        if (stored && !isRealUserPhoto(stored)) {
+          localStorage.removeItem(`arch_photo_${lookupPhone}`);
+        }
+        return null;
       } catch {
         return null;
       }
     })() : null;
+
+    try {
+      if (lookupPhone) {
+        ['arch_photo_', 'profile_photo_', 'user_photo_'].forEach((prefix) => {
+          const val = localStorage.getItem(`${prefix}${lookupPhone}`);
+          if (val && !isRealUserPhoto(val)) {
+            localStorage.removeItem(`${prefix}${lookupPhone}`);
+          }
+        });
+      }
+      const uStored = localStorage.getItem('user');
+      if (uStored) {
+        const u = JSON.parse(uStored);
+        if (u.avatar && !isRealUserPhoto(u.avatar)) {
+          delete u.avatar;
+          delete u.profilePhoto;
+          localStorage.setItem('user', JSON.stringify(u));
+        }
+      }
+    } catch {}
 
     const firmFromStorage = lookupPhone ? (
       localStorage.getItem(`registered_arch_firm_${lookupPhone}`) ||
@@ -567,16 +599,27 @@ export const ArchitectProfileWizard: React.FC = () => {
       return;
     }
 
-    setPersonal((prev) => ({
-      ...prev,
-      name: isNameFirmDuplicate ? '' : (draft?.personal?.name || prev.name || rawName),
-      phone: draft?.personal?.phone || existing?.phone || lookupPhone || user?.phone || initialUser?.phone || prev.phone,
-      email: draft?.personal?.email || existing?.email || user?.email || initialUser?.email || prev.email,
-      profilePhoto: draft?.personal?.profilePhoto || existing?.profilePhoto || photoStored || (user as any)?.avatar || (user as any)?.profilePhoto || prev.profilePhoto,
-      designation: draft?.personal?.designation || existing?.designation || prev.designation,
-      experienceYears: draft?.personal?.experienceYears || existing?.experienceYears || prev.experienceYears || ('' as any),
-      bio: draft?.personal?.bio || existing?.bio || prev.bio,
-    }));
+    setPersonal((prev) => {
+      const candidates = [
+        draft?.personal?.profilePhoto,
+        existing?.profilePhoto,
+        photoStored,
+        (user as any)?.avatar,
+        (user as any)?.profilePhoto,
+        prev.profilePhoto,
+      ];
+      const realPhoto = candidates.find((c) => isRealUserPhoto(c)) || '';
+      return {
+        ...prev,
+        name: isNameFirmDuplicate ? '' : (draft?.personal?.name || prev.name || rawName),
+        phone: draft?.personal?.phone || existing?.phone || lookupPhone || user?.phone || initialUser?.phone || prev.phone,
+        email: draft?.personal?.email || existing?.email || user?.email || initialUser?.email || prev.email,
+        profilePhoto: realPhoto,
+        designation: draft?.personal?.designation || existing?.designation || prev.designation,
+        experienceYears: draft?.personal?.experienceYears || existing?.experienceYears || prev.experienceYears || ('' as any),
+        bio: draft?.personal?.bio || existing?.bio || prev.bio,
+      };
+    });
 
     setBusiness((prev) => ({
       ...prev,
@@ -1350,7 +1393,11 @@ export const ArchitectProfileWizard: React.FC = () => {
         cleanUserPhone = '9876543210';
       }
 
-      const finalPhoto = personal.profilePhoto || (cleanUserPhone ? localStorage.getItem(`arch_photo_${cleanUserPhone}`) : '') || userStored.avatar || user?.avatar || '';
+      const finalPhoto = isRealUserPhoto(personal.profilePhoto)
+        ? personal.profilePhoto
+        : (cleanUserPhone && isRealUserPhoto(localStorage.getItem(`arch_photo_${cleanUserPhone}`)))
+        ? (localStorage.getItem(`arch_photo_${cleanUserPhone}`) || '')
+        : '';
 
       // Sync active session user
       const sessionUser = {
@@ -1371,6 +1418,8 @@ export const ArchitectProfileWizard: React.FC = () => {
         localStorage.setItem(`registered_arch_name_${cleanUserPhone}`, personal.name || '');
         if (finalPhoto) {
           localStorage.setItem(`arch_photo_${cleanUserPhone}`, finalPhoto);
+        } else {
+          localStorage.removeItem(`arch_photo_${cleanUserPhone}`);
         }
       } catch (e) {}
 
@@ -1670,7 +1719,7 @@ export const ArchitectProfileWizard: React.FC = () => {
                   </label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 min-h-[42px]">
-                      {personal.profilePhoto ? (
+                      {personal.profilePhoto && isRealUserPhoto(personal.profilePhoto) ? (
                         <>
                           <img
                             src={personal.profilePhoto}
@@ -1689,9 +1738,9 @@ export const ArchitectProfileWizard: React.FC = () => {
                       className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition cursor-pointer shadow-xs"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      <span>{personal.profilePhoto ? 'Change' : 'Upload Photo'}</span>
+                      <span>{personal.profilePhoto && isRealUserPhoto(personal.profilePhoto) ? 'Change' : 'Upload Photo'}</span>
                     </button>
-                    {personal.profilePhoto && (
+                    {personal.profilePhoto && isRealUserPhoto(personal.profilePhoto) && (
                       <>
                         <button
                           type="button"
@@ -1712,7 +1761,17 @@ export const ArchitectProfileWizard: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setPersonal({ ...personal, profilePhoto: '' })}
+                          onClick={() => {
+                            setPersonal({ ...personal, profilePhoto: '' });
+                            const cleanPh = (personal.phone || user?.phone || '').replace(/\D/g, '').slice(-10);
+                            if (cleanPh) {
+                              try {
+                                localStorage.removeItem(`arch_photo_${cleanPh}`);
+                                localStorage.removeItem(`profile_photo_${cleanPh}`);
+                                localStorage.removeItem(`user_photo_${cleanPh}`);
+                              } catch {}
+                            }
+                          }}
                           className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 transition cursor-pointer shrink-0"
                           title="Remove photo"
                         >
@@ -3375,7 +3434,7 @@ export const ArchitectProfileWizard: React.FC = () => {
                     <div>
                       <span className="text-slate-500 block text-[11px] mb-1">Profile Photo:</span>
                       <div className="flex items-center gap-2">
-                        {personal.profilePhoto ? (
+                        {personal.profilePhoto && isRealUserPhoto(personal.profilePhoto) ? (
                           <div className="flex items-center gap-1.5 p-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                             <img src={personal.profilePhoto} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-emerald-400" />
                             <span className="text-[11px] text-emerald-800 font-bold truncate">Photo Attached</span>
