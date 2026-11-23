@@ -283,21 +283,6 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                   <div className="text-[11px] text-slate-500 mt-1">Estimated 24-48 Hours</div>
                 </div>
               </div>
-
-              <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-navy-950">
-                  <Palette className="w-4 h-4 text-blue-700 shrink-0" />
-                  <span>
-                    Need to modify submitted documents before review? You can update your wizard entries anytime.
-                  </span>
-                </div>
-                <Link
-                  to="/interior-designer/profile-wizard"
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shrink-0"
-                >
-                  Edit Application
-                </Link>
-              </div>
             </div>
           )}
 

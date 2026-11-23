@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Compass,
   Clock,
   CheckCircle2,
   AlertTriangle,
@@ -222,21 +221,6 @@ export const ArchitectApplicationStatus: React.FC = () => {
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">Estimated 24-48 Hours</div>
                 </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-sky-900">
-                  <Compass className="w-4 h-4 text-sky-700 shrink-0" />
-                  <span>
-                    Need to modify submitted documents before review? You can revise your wizard entries anytime.
-                  </span>
-                </div>
-                <Link
-                  to="/architect/profile-wizard"
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold transition shrink-0"
-                >
-                  Edit Application
-                </Link>
               </div>
 
               {/* Notice while waiting for Admin Approval */}
