@@ -255,7 +255,7 @@ export const ArchitectHeader: React.FC = () => {
                 to="/architect/register"
                 className="px-4 py-2 rounded-full text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 transition shadow-sm hover:shadow-sky-500/20 flex items-center gap-1.5"
               >
-                <span>Join as Partner</span>
+                <span>Register</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -345,7 +345,7 @@ export const ArchitectHeader: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                       className="w-full text-xs py-2.5 px-3 rounded-xl bg-sky-600 text-white font-bold flex items-center justify-center gap-1.5 shadow-sm"
                     >
-                      <span>Join as Partner</span>
+                      <span>Register</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </>

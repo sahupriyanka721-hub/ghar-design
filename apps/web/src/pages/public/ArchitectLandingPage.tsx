@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Compass,
-  Building2,
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
@@ -12,7 +11,6 @@ import {
   Layers,
   Award,
   Users,
-  CreditCard,
   HardHat,
   ChevronDown,
   Check,
@@ -151,51 +149,6 @@ export const ArchitectLandingPage: React.FC = () => {
               Connect with high-intent landowners across Delhi NCR, build granular itemized BOQs, upload BIM & CAD working
               drawings, and receive 100% escrow-guaranteed milestone payouts with zero defaults.
             </motion.p>
-
-            {/* Primary Action Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4"
-            >
-              <Link
-                to="/architect/register"
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-extrabold text-sm shadow-lg shadow-sky-600/25 hover:shadow-xl hover:scale-[1.02] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
-              >
-                <span>Register as Architect Partner</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-
-              <Link
-                to="/architect/login"
-                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white hover:bg-sky-50/80 text-navy-950 border-2 border-sky-200 hover:border-sky-400 font-extrabold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-              >
-                <Compass className="w-4 h-4 text-sky-600" />
-                <span>Architect Login</span>
-              </Link>
-            </motion.div>
-
-            {/* Metric Counters Banner */}
-            <div className="pt-10 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
-              {[
-                { label: 'COA Registered Partners', value: '180+', icon: Compass },
-                { label: 'Design Escrow Disbursed', value: '₹14.8 Cr+', icon: CreditCard },
-                { label: 'Delivered Residencies', value: '450+', icon: Building2 },
-                { label: 'Dispute-Free Settlements', value: '99.6%', icon: ShieldCheck },
-              ].map((m, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-2xl bg-white/95 border border-sky-100 shadow-xs hover:border-sky-300 transition-all text-center"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 mx-auto flex items-center justify-center mb-2">
-                    <m.icon className="w-4 h-4" />
-                  </div>
-                  <div className="text-2xl font-black font-display text-navy-950">{m.value}</div>
-                  <div className="text-xs font-semibold text-slate-500 mt-0.5">{m.label}</div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -562,7 +515,7 @@ export const ArchitectLandingPage: React.FC = () => {
             </span>
             <h2 className="text-3xl sm:text-4xl font-black font-display">Ready to Elevate Your Architecture Practice?</h2>
             <p className="text-xs sm:text-sm text-sky-100 font-medium">
-              Join 180+ verified architects across Delhi NCR. Build transparent quotations and secure 100% escrow payouts.
+              Join verified architects across Delhi NCR. Build transparent quotations and secure 100% escrow payouts.
             </p>
           </div>
 

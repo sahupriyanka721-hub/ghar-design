@@ -204,7 +204,7 @@ export const Home: React.FC = () => {
               Are You a Council of Architecture (COA) Licensed Architect?
             </h3>
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-              Join 180+ verified architects and structural engineers across Delhi NCR. Connect with verified landowners, build granular BOQ quotes, and receive 100% escrow-backed milestone payouts.
+              Join verified architects and structural engineers across Delhi NCR. Connect with verified landowners, build granular BOQ quotes, and receive 100% escrow-backed milestone payouts.
             </p>
             <div className="flex flex-wrap items-center gap-3.5 text-xs font-bold text-sky-900 pt-1">
               <span className="flex items-center gap-1.5">
