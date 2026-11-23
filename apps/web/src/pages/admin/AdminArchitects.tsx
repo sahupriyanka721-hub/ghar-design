@@ -49,18 +49,21 @@ import {
   BadgeCheck,
   Briefcase,
   Users,
+  Edit3,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import { pullFromCloud } from '../../data/cloudSync.js';
 import { formatDate } from '../../lib/utils.js';
 import { downloadKycDocumentPdf } from '../../lib/pdfGenerator.js';
 import { getOriginalFile, downloadOriginalDocument } from '../../lib/documentStore.js';
+import { lookupIfscCode } from '../../lib/ifscLookup.js';
 import {
   getArchitectAccounts,
   updateArchitectStatus,
   updateArchitectDocumentStatus,
   saveArchitectAccount,
   saveArchitectBankDetails,
+  resolveArchitectBankDetails,
   deleteArchitectAccount,
   clearAllArchitects,
   formatArchitectId,
@@ -153,31 +156,56 @@ export const AdminArchitects: React.FC = () => {
 
   const handleStartEditBank = () => {
     if (!selectedArchitect) return;
+    const resolved = resolveArchitectBankDetails(selectedArchitect);
     setBankFormData({
-      bankName: selectedArchitect.bankDetails?.bankName || '',
-      accountHolderName: selectedArchitect.bankDetails?.accountHolderName || selectedArchitect.name || '',
-      accountNumber: selectedArchitect.bankDetails?.accountNumber || '',
-      ifscCode: selectedArchitect.bankDetails?.ifscCode || '',
-      accountType: (selectedArchitect.bankDetails?.accountType as any) || 'CURRENT',
-      branch: selectedArchitect.bankDetails?.branch || selectedArchitect.city || '',
+      bankName: resolved.bankName || '',
+      accountHolderName: resolved.accountHolderName || selectedArchitect.name || '',
+      accountNumber: resolved.accountNumber || '',
+      ifscCode: resolved.ifscCode || '',
+      accountType: (resolved.accountType as any) || 'CURRENT',
+      branch: resolved.branch || selectedArchitect.city || '',
     });
     setEditingBank(true);
+  };
+
+  const handleIfscChange = async (val: string) => {
+    const clean = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    setBankFormData((prev) => ({ ...prev, ifscCode: clean }));
+    if (clean.length === 11) {
+      try {
+        const res = await lookupIfscCode(clean);
+        if (res.isSuccess) {
+          setBankFormData((prev) => ({
+            ...prev,
+            ifscCode: clean,
+            bankName: res.bankName || prev.bankName,
+            branch: res.fullBranchText || prev.branch,
+          }));
+        } else if (res.source === 'prefix' && res.bankName) {
+          setBankFormData((prev) => ({
+            ...prev,
+            ifscCode: clean,
+            bankName: res.bankName || prev.bankName,
+          }));
+        }
+      } catch (e) {}
+    }
   };
 
   const handleSaveBankForm = () => {
     if (!selectedArchitect) return;
     const cleanIfsc = (bankFormData.ifscCode || '').trim().toUpperCase();
+    const resolved = resolveArchitectBankDetails(selectedArchitect);
     const updatedArch = saveArchitectBankDetails(selectedArchitect.id, {
+      ...resolved,
       ...bankFormData,
       ifscCode: cleanIfsc,
-      cancelledChequeUrl: selectedArchitect.bankDetails?.cancelledChequeUrl,
-      cancelledChequeFileName: selectedArchitect.bankDetails?.cancelledChequeFileName,
-      isChequeAccepted: selectedArchitect.bankDetails?.isChequeAccepted,
-      isVerified: selectedArchitect.bankDetails?.isVerified,
     });
     if (updatedArch) {
-      setSelectedArchitect({ ...updatedArch });
-      setArchitects((prev) => prev.map((a) => (a.id === updatedArch.id ? updatedArch : a)));
+      const fresh = ensureArchitectStatutoryDocuments(updatedArch);
+      selectedArchitectRef.current = fresh;
+      setSelectedArchitect({ ...fresh });
+      setArchitects((prev) => prev.map((a) => (a.id === fresh.id ? fresh : a)));
       setEditingBank(false);
       success('Bank details saved successfully!');
     } else {
@@ -187,30 +215,24 @@ export const AdminArchitects: React.FC = () => {
 
   const handleVerifyBankAndCheque = () => {
     if (!selectedArchitect) return;
-    const currentBank = selectedArchitect.bankDetails || {
-      bankName: '',
-      accountHolderName: selectedArchitect.name || '',
-      accountNumber: '',
-      ifscCode: '',
-      accountType: 'CURRENT',
-      branch: selectedArchitect.city || '',
-    };
+    const resolved = resolveArchitectBankDetails(selectedArchitect);
     const updatedArch = saveArchitectBankDetails(selectedArchitect.id, {
-      ...currentBank,
+      ...resolved,
       isChequeAccepted: true,
       isVerified: true,
     });
     if (updatedArch) {
       const chequeDoc = updatedArch.documents?.find(
-        (d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+        (d) => d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
       );
       if (chequeDoc) {
         updateArchitectDocumentStatus(updatedArch.id, chequeDoc.id, 'VERIFIED');
       }
       const fresh = ensureArchitectStatutoryDocuments(updatedArch);
+      selectedArchitectRef.current = fresh;
       setSelectedArchitect({ ...fresh });
       setArchitects((prev) => prev.map((a) => (a.id === fresh.id ? fresh : a)));
-      success('Bank details and cancelled cheque verified successfully!');
+      success('Bank details and escrow account verified successfully! ✓');
     }
   };
 
@@ -1264,42 +1286,83 @@ export const AdminArchitects: React.FC = () => {
                         <div className="flex flex-col gap-1.5 min-w-[135px]">
                           {/* 1. Business */}
                           <div>
-                            {isApproved || (arch.businessVerification?.coaNumber && (arch.businessVerification?.coaFileUrl || arch.businessVerification?.coaDocUrl)) ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                <span>1. Business: Verified</span>
-                              </span>
-                            ) : (arch.coaNumber && arch.coaNumber !== 'COA Verified') || (arch.documents && arch.documents.length > 0) ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                                <FileCheck2 className="w-3 h-3 text-sky-600 shrink-0" />
-                                <span>1. Business: Submitted</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                                <span>1. Business: Pending</span>
-                              </span>
-                            )}
+                            {(() => {
+                              const coaDoc = arch.documents?.find(
+                                (d) => d.id === 'doc-coa' || (d as any).documentType === 'COA_CERTIFICATE'
+                              );
+                              const isBizVerified = Boolean(
+                                (isApproved && arch.isVerified && arch.adminReviewedBy) ||
+                                (coaDoc && coaDoc.status === 'VERIFIED')
+                              );
+                              const hasBizDocs = Boolean(
+                                (arch.documents && arch.documents.length > 0) ||
+                                (arch.coaNumber && arch.coaNumber !== 'COA Verified') ||
+                                arch.businessVerification?.coaNumber ||
+                                arch.businessVerification?.panNumber ||
+                                arch.businessVerification?.gstin
+                              );
+
+                              if (isBizVerified) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>1. Business: Verified</span>
+                                  </span>
+                                );
+                              }
+                              if (hasBizDocs) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                    <FileCheck2 className="w-3 h-3 text-sky-600 shrink-0" />
+                                    <span>1. Business: Submitted</span>
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>1. Business: Pending</span>
+                                </span>
+                              );
+                            })()}
                           </div>
 
                           {/* 2. Bank */}
                           <div>
-                            {isApproved || arch.bankDetails?.isChequeAccepted ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                <span>2. Bank: Verified</span>
-                              </span>
-                            ) : (arch.bankDetails?.accountNumber || arch.bankDetails?.cancelledChequeUrl || arch.bankDetails?.cancelledChequeStorageKey) ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                                <CreditCard className="w-3 h-3 text-sky-600 shrink-0" />
-                                <span>2. Bank: Details Added</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span>2. Bank: Pending</span>
-                              </span>
-                            )}
+                            {(() => {
+                              const resolvedBank = resolveArchitectBankDetails(arch);
+                              const hasBankData = Boolean(
+                                resolvedBank &&
+                                (resolvedBank.accountNumber ||
+                                 resolvedBank.bankName ||
+                                 resolvedBank.ifscCode ||
+                                 resolvedBank.cancelledChequeUrl)
+                              );
+                              const isBankVerified = Boolean(resolvedBank?.isVerified);
+
+                              if (isBankVerified) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>2. Bank: Verified</span>
+                                  </span>
+                                );
+                              }
+                              if (hasBankData) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                    <CreditCard className="w-3 h-3 text-sky-600 shrink-0" />
+                                    <span>2. Bank: Details Added</span>
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                  <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span>2. Bank: Pending</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -1937,9 +2000,9 @@ export const AdminArchitects: React.FC = () => {
                   {/* Step 6: Bank Account & Cheque Acceptance */}
                   <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-xs space-y-4">
                     {(() => {
-                      const bankInfo = selectedArchitect.bankDetails;
+                      const bankInfo = resolveArchitectBankDetails(selectedArchitect);
                       const chequeDoc = selectedArchitect.documents?.find(
-                        (d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+                        (d) => d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
                       );
                       const hasBankInfo = Boolean(
                         bankInfo &&
@@ -1950,7 +2013,7 @@ export const AdminArchitects: React.FC = () => {
                          bankInfo.cancelledChequeUrl ||
                          chequeDoc?.fileUrl)
                       );
-                      const isBankVerified = Boolean(bankInfo?.isVerified || bankInfo?.isChequeAccepted || chequeDoc?.status === 'VERIFIED');
+                      const isBankVerified = Boolean(bankInfo?.isVerified);
                       const chequeFileUrl = bankInfo?.cancelledChequeUrl || chequeDoc?.fileUrl;
 
                       return (
@@ -1958,7 +2021,7 @@ export const AdminArchitects: React.FC = () => {
                           <div className="font-extrabold text-navy-950 text-sm font-display flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-3">
                             <div className="flex items-center gap-2">
                               <CreditCard className="w-4 h-4 text-emerald-600" />
-                              <span>Bank Details & Cheque Verification</span>
+                              <span>Bank Details &amp; Cheque Verification</span>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                               {isBankVerified ? (
@@ -1967,15 +2030,10 @@ export const AdminArchitects: React.FC = () => {
                                   <span>Verified ✓</span>
                                 </span>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={handleVerifyBankAndCheque}
-                                  className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-98"
-                                  title="Verify bank details and cancelled cheque"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Verify Bank Details ✓</span>
-                                </button>
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Pending Review</span>
+                                </span>
                               )}
                               {!editingBank ? (
                                 <button
@@ -2030,9 +2088,10 @@ export const AdminArchitects: React.FC = () => {
                                   <input
                                     type="text"
                                     value={bankFormData.ifscCode}
-                                    onChange={(e) => setBankFormData({ ...bankFormData, ifscCode: e.target.value.toUpperCase() })}
+                                    onChange={(e) => handleIfscChange(e.target.value)}
                                     placeholder="e.g. SBIN0001234"
-                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-emerald-500"
+                                    maxLength={11}
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-emerald-500 uppercase"
                                   />
                                 </div>
                                 <div>
@@ -2047,12 +2106,12 @@ export const AdminArchitects: React.FC = () => {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Branch Name & City</label>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Branch Name &amp; City</label>
                                   <input
                                     type="text"
                                     value={bankFormData.branch}
                                     onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
-                                    placeholder="Branch Name & City"
+                                    placeholder="Branch Name &amp; City"
                                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                                   />
                                 </div>
@@ -2075,7 +2134,7 @@ export const AdminArchitects: React.FC = () => {
                               </div>
                             </div>
                           ) : hasBankInfo ? (
-                            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-3 text-xs">
+                            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-4 text-xs">
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 <div>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
@@ -2088,7 +2147,7 @@ export const AdminArchitects: React.FC = () => {
                                 <div>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
                                   <span className="font-bold text-slate-800 font-mono">
-                                    {bankInfo?.accountNumber ? `•••• ${bankInfo.accountNumber.slice(-4)}` : 'Pending entry'}
+                                    {bankInfo?.accountNumber ? `•••• ${bankInfo.accountNumber.slice(-4)} (${bankInfo.accountNumber})` : 'Pending entry'}
                                   </span>
                                 </div>
                                 <div>
@@ -2105,7 +2164,7 @@ export const AdminArchitects: React.FC = () => {
                                 </div>
                               </div>
 
-                              <div className="pt-3 border-t border-emerald-200 flex items-center justify-between">
+                              <div className="pt-3 border-t border-emerald-200 flex items-center justify-between flex-wrap gap-2">
                                 <div>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase block">Cheque Document</span>
                                   <span className="font-bold text-navy-950">{bankInfo?.cancelledChequeFileName || chequeDoc?.fileName || 'Attached Cheque'}</span>
@@ -2122,6 +2181,45 @@ export const AdminArchitects: React.FC = () => {
                                 ) : (
                                   <span className="text-xs text-slate-400 italic">No cheque file attached</span>
                                 )}
+                              </div>
+
+                              {/* Action / Verification Footer at Bottom */}
+                              <div className="pt-3 border-t border-emerald-200/80 flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                                <div className="flex items-center gap-2">
+                                  {isBankVerified ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      <span>Escrow Bank Account Verified ✓</span>
+                                    </span>
+                                  ) : (
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
+                                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>Bank Details Pending Verification</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {!isBankVerified && (
+                                    <button
+                                      type="button"
+                                      onClick={handleVerifyBankAndCheque}
+                                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm inline-flex items-center gap-2 cursor-pointer active:scale-98"
+                                      title="Verify this bank account and escrow details"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      <span>Verify Bank Details ✓</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={handleStartEditBank}
+                                    className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer active:scale-98"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Edit Bank Details</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ) : (

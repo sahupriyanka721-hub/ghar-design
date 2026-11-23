@@ -524,6 +524,129 @@ export const formatArchitectId = (idOrNum?: string, fallbackSeq = 1): string => 
   return `BG/Architech/${String(fallbackSeq).padStart(6, '0')}`;
 };
 
+export const resolveArchitectBankDetails = (
+  arch?: Partial<ArchitectAccount> | null
+): NonNullable<ArchitectAccount['bankDetails']> => {
+  const cleanPhone = (arch?.phone || '').replace(/\D/g, '').slice(-10);
+  const existing = arch?.bankDetails;
+
+  const candidates: any[] = [];
+
+  // 1. Existing bankDetails on arch
+  if (existing) {
+    candidates.push(existing);
+  }
+
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    // 2. Specific phone keys in localStorage & sessionStorage
+    if (cleanPhone) {
+      try {
+        const raw = localStorage.getItem(`arch_bank_${cleanPhone}`);
+        if (raw) candidates.push(JSON.parse(raw));
+      } catch {}
+      try {
+        const raw = sessionStorage.getItem(`arch_bank_${cleanPhone}`);
+        if (raw) candidates.push(JSON.parse(raw));
+      } catch {}
+      try {
+        const raw = localStorage.getItem(`arch_bank_+91${cleanPhone}`);
+        if (raw) candidates.push(JSON.parse(raw));
+      } catch {}
+      try {
+        const raw = localStorage.getItem(`arch_wizard_draft_${cleanPhone}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.bank) candidates.push(parsed.bank);
+          if (parsed?.bankDetails) candidates.push(parsed.bankDetails);
+        }
+      } catch {}
+      try {
+        const raw = sessionStorage.getItem(`arch_wizard_draft_${cleanPhone}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.bank) candidates.push(parsed.bank);
+          if (parsed?.bankDetails) candidates.push(parsed.bankDetails);
+        }
+      } catch {}
+      try {
+        const raw = localStorage.getItem(`arch_draft_${cleanPhone}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.bank) candidates.push(parsed.bank);
+        }
+      } catch {}
+    }
+
+    // 3. Fallback generic / current draft keys
+    try {
+      const raw = localStorage.getItem('arch_bank_current');
+      if (raw) candidates.push(JSON.parse(raw));
+    } catch {}
+    try {
+      const raw = sessionStorage.getItem('arch_bank_current');
+      if (raw) candidates.push(JSON.parse(raw));
+    } catch {}
+    try {
+      const raw = localStorage.getItem('arch_wizard_draft_current');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.bank) candidates.push(parsed.bank);
+        if (parsed?.bankDetails) candidates.push(parsed.bankDetails);
+      }
+    } catch {}
+    try {
+      const raw = sessionStorage.getItem('arch_wizard_draft_current');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.bank) candidates.push(parsed.bank);
+        if (parsed?.bankDetails) candidates.push(parsed.bankDetails);
+      }
+    } catch {}
+
+    // 4. Fallback search across platform professionals & stored accounts
+    if (cleanPhone) {
+      try {
+        const pros = JSON.parse(localStorage.getItem('platform_professionals') || '[]');
+        const matched = pros.find((p: any) => (p?.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone);
+        if (matched?.bankDetails) candidates.push(matched.bankDetails);
+      } catch {}
+      try {
+        const accs = JSON.parse(localStorage.getItem('gd_architect_accounts_v2') || '[]');
+        const matched = accs.find((a: any) => (a?.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone);
+        if (matched?.bankDetails) candidates.push(matched.bankDetails);
+      } catch {}
+      try {
+        const accs = JSON.parse(localStorage.getItem('gd_architect_accounts') || '[]');
+        const matched = accs.find((a: any) => (a?.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone);
+        if (matched?.bankDetails) candidates.push(matched.bankDetails);
+      } catch {}
+    }
+  }
+
+  // Find candidate with actual data
+  const bestWithAccount = candidates.find((c) => c && (c.accountNumber || c.bankName || c.ifscCode));
+  const fallbackAny = candidates.find((c) => c && (c.cancelledChequeUrl || c.cancelledChequeFileName));
+  const chosen = bestWithAccount || fallbackAny || existing || {};
+
+  const chequeDoc = arch?.documents?.find(
+    (d) => d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE'
+  );
+
+  return {
+    bankName: chosen.bankName || existing?.bankName || '',
+    accountHolderName: chosen.accountHolderName || existing?.accountHolderName || arch?.name || '',
+    accountNumber: chosen.accountNumber || existing?.accountNumber || '',
+    ifscCode: (chosen.ifscCode || existing?.ifscCode || '').toUpperCase(),
+    accountType: chosen.accountType || existing?.accountType || 'CURRENT',
+    branch: chosen.branch || existing?.branch || arch?.city || '',
+    cancelledChequeUrl: chosen.cancelledChequeUrl || existing?.cancelledChequeUrl || chequeDoc?.fileUrl || '',
+    cancelledChequeFileName: chosen.cancelledChequeFileName || existing?.cancelledChequeFileName || chequeDoc?.fileName || '',
+    cancelledChequeStorageKey: (chosen as any).cancelledChequeStorageKey || (existing as any)?.cancelledChequeStorageKey || chequeDoc?.storageKey || '',
+    isChequeAccepted: Boolean(chosen.isChequeAccepted ?? existing?.isChequeAccepted ?? (chequeDoc?.status === 'VERIFIED')),
+    isVerified: Boolean(chosen.isVerified ?? existing?.isVerified ?? false),
+  };
+};
+
 export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallbackSeq = 1): ArchitectAccount => {
   const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
   
@@ -548,54 +671,11 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
     delete (arch as any).bankDetails;
   }
 
-  if (!arch.bankDetails || (!arch.bankDetails.accountNumber && !arch.bankDetails.bankName && !arch.bankDetails.ifscCode)) {
+  arch.bankDetails = resolveArchitectBankDetails(arch);
+  if (cleanPhone && (arch.bankDetails.accountNumber || arch.bankDetails.bankName || arch.bankDetails.ifscCode)) {
     try {
-      const draftRaw =
-        (cleanPhone ? localStorage.getItem(`arch_wizard_draft_${cleanPhone}`) : null) ||
-        (cleanPhone ? localStorage.getItem(`arch_draft_${cleanPhone}`) : null) ||
-        localStorage.getItem('arch_wizard_draft_current');
-      if (draftRaw) {
-        const draft = JSON.parse(draftRaw);
-        const b = draft?.bank || draft?.bankDetails;
-        if (b && (b.accountNumber || b.bankName || b.ifscCode || b.cancelledChequeUrl)) {
-          arch.bankDetails = {
-            bankName: b.bankName || '',
-            accountHolderName: b.accountHolderName || arch.name || '',
-            accountNumber: b.accountNumber || '',
-            ifscCode: (b.ifscCode || '').toUpperCase(),
-            accountType: b.accountType || 'CURRENT',
-            branch: b.branch || '',
-            cancelledChequeUrl: b.cancelledChequeUrl || '',
-            cancelledChequeFileName: b.cancelledChequeFileName || '',
-            cancelledChequeStorageKey: b.cancelledChequeStorageKey || '',
-            isChequeAccepted: Boolean(b.isChequeAccepted),
-            isVerified: Boolean(b.isVerified),
-          };
-        }
-      }
-      if ((!arch.bankDetails || !arch.bankDetails.accountNumber) && cleanPhone) {
-        const bankRaw = localStorage.getItem(`arch_bank_${cleanPhone}`);
-        if (bankRaw) {
-          const b = JSON.parse(bankRaw);
-          if (b && (b.accountNumber || b.bankName || b.ifscCode || b.cancelledChequeUrl)) {
-            arch.bankDetails = {
-              ...(arch.bankDetails || {}),
-              bankName: b.bankName || arch.bankDetails?.bankName || '',
-              accountHolderName: b.accountHolderName || arch.bankDetails?.accountHolderName || arch.name || '',
-              accountNumber: b.accountNumber || arch.bankDetails?.accountNumber || '',
-              ifscCode: (b.ifscCode || arch.bankDetails?.ifscCode || '').toUpperCase(),
-              accountType: b.accountType || arch.bankDetails?.accountType || 'CURRENT',
-              branch: b.branch || arch.bankDetails?.branch || '',
-              cancelledChequeUrl: b.cancelledChequeUrl || arch.bankDetails?.cancelledChequeUrl || '',
-              cancelledChequeFileName: b.cancelledChequeFileName || arch.bankDetails?.cancelledChequeFileName || '',
-              cancelledChequeStorageKey: b.cancelledChequeStorageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
-              isChequeAccepted: Boolean(b.isChequeAccepted ?? arch.bankDetails?.isChequeAccepted),
-              isVerified: Boolean(b.isVerified ?? arch.bankDetails?.isVerified),
-            };
-          }
-        }
-      }
-    } catch (e) {}
+      localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(arch.bankDetails));
+    } catch {}
   }
 
   // 4. Ensure Statutory Documents
@@ -791,22 +871,15 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   if (docPhoto && docPhoto.fileUrl && (docPhoto.fileUrl.startsWith('data:') || docPhoto.fileUrl.startsWith('http'))) {
     arch.profilePhoto = docPhoto.fileUrl;
   }
-  const chequeDoc = finalDocs.find((d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE');
+  const chequeDoc = finalDocs.find((d) => d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE');
   if (chequeDoc && (!arch.bankDetails || !arch.bankDetails.cancelledChequeUrl)) {
     arch.bankDetails = {
-      ...(arch.bankDetails || {
-        bankName: '',
-        accountHolderName: arch.name || '',
-        accountNumber: '',
-        ifscCode: '',
-        accountType: 'CURRENT',
-        branch: arch.city || '',
-      }),
+      ...(arch.bankDetails || resolveArchitectBankDetails(arch)),
       cancelledChequeUrl: chequeDoc.fileUrl || arch.bankDetails?.cancelledChequeUrl || '',
       cancelledChequeFileName: chequeDoc.fileName || arch.bankDetails?.cancelledChequeFileName || 'Bank_Cancelled_Cheque.jpg',
       cancelledChequeStorageKey: chequeDoc.storageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
       isChequeAccepted: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isChequeAccepted),
-      isVerified: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isVerified),
+      isVerified: Boolean(arch.bankDetails?.isVerified),
     };
   }
   arch.documents = finalDocs;
@@ -830,7 +903,16 @@ export const saveArchitectBankDetails = (
   }
 ): ArchitectAccount | null => {
   const current = getArchitectAccounts();
-  const idx = current.findIndex((a) => a.id === architectId || a.applicationNumber === architectId);
+  const cleanId = (architectId || '').trim();
+  const cleanPhone = cleanId.replace(/\D/g, '').slice(-10);
+
+  const idx = current.findIndex(
+    (a) =>
+      a.id === cleanId ||
+      a.applicationNumber === cleanId ||
+      (cleanPhone && cleanPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone) ||
+      (a.name && cleanId.toLowerCase().includes(a.name.toLowerCase()))
+  );
   if (idx === -1) return null;
 
   const arch = ensureArchitectStatutoryDocuments(current[idx]);
@@ -851,10 +933,10 @@ export const saveArchitectBankDetails = (
   current[idx] = arch;
   safePersistArchitects(current);
 
-  const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
-  if (cleanPhone) {
+  const archPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
+  if (archPhone) {
     try {
-      localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(arch.bankDetails));
+      localStorage.setItem(`arch_bank_${archPhone}`, JSON.stringify(arch.bankDetails));
     } catch (e) {}
   }
 
