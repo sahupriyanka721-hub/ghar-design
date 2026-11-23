@@ -1,14 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import { apiRequest } from '../../lib/api.js';
-import { syncChannel, getPlatformRequests, purgeDummyData } from '../../data/customerStore.js';
+import { Badge } from '../../components/common/Badge.js';
+import { useToast } from '../../context/ToastContext.js';
+import {
+  syncChannel,
+  getPlatformRequests,
+  purgeDummyData,
+  PlatformProjectRequest,
+  getRegisteredCustomers,
+} from '../../data/customerStore.js';
 import { cleanRecords } from '../../data/cloudSync.js';
 import { formatINR, formatDate } from '../../lib/utils.js';
+import { downloadInquiryReceiptPdf } from '../../lib/pdfGenerator.js';
 import {
   FileCheck2,
   Check,
   ArrowRight,
+  ArrowLeft,
   Download,
   Building,
   Search,
@@ -17,16 +27,69 @@ import {
   CheckCircle2,
   Calendar,
   Sparkles,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  X,
+  Layers,
+  ShieldCheck,
+  Receipt,
+  FileText,
+  ExternalLink,
+  PlusCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { Quotation } from '@ghar-design/shared';
 
 export const MyQuotations: React.FC = () => {
   const { user } = useAuth();
+  const { success } = useToast();
+  const navigate = useNavigate();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [requests, setRequests] = useState<PlatformProjectRequest[]>([]);
+  const [selectedProjectRequest, setSelectedProjectRequest] = useState<PlatformProjectRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'amount-asc' | 'amount-desc' | 'date'>('date');
+
+  const activeProjectRequest = useMemo(() => {
+    if (!requests || requests.length === 0) return null;
+    const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
+    if (user?.id) {
+      const match = requests.find((r) => r.customerId === user.id);
+      if (match) return match;
+    }
+    if (rawPhone) {
+      const match = requests.find((r) => (r.customerPhone || '').replace(/\D/g, '').slice(-10) === rawPhone);
+      if (match) return match;
+    }
+    if (quotations.length > 0 && quotations[0].requestId) {
+      const match = requests.find((r) => r.id === quotations[0].requestId || r.requestCode === quotations[0].requestCode);
+      if (match) return match;
+    }
+    return requests[0] || null;
+  }, [requests, user, quotations]);
+
+  const matchedCustomer = useMemo(() => {
+    if (!selectedProjectRequest) return null;
+    const custs = getRegisteredCustomers();
+    const rawTargetPhone = (selectedProjectRequest.customerPhone || '').replace(/\D/g, '').slice(-10);
+    return (
+      custs.find((c) => {
+        if (selectedProjectRequest.customerId && c.id === selectedProjectRequest.customerId) return true;
+        if (rawTargetPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === rawTargetPhone) return true;
+        if (
+          c.name &&
+          selectedProjectRequest.customerName &&
+          c.name.trim().toLowerCase() === selectedProjectRequest.customerName.trim().toLowerCase()
+        )
+          return true;
+        return false;
+      }) || null
+    );
+  }, [selectedProjectRequest]);
 
   useEffect(() => {
     const loadAllQuotes = () => {
@@ -44,9 +107,12 @@ export const MyQuotations: React.FC = () => {
         console.error(e);
       }
 
+      const allPlatformReqs = getPlatformRequests();
+      setRequests(allPlatformReqs);
+
       // Filter for current logged-in customer if phone/id matches
       const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
-      const userRequests = getPlatformRequests();
+      const userRequests = allPlatformReqs;
       const userReqIds = new Set(
         userRequests
           .filter((r) => {
@@ -188,13 +254,40 @@ export const MyQuotations: React.FC = () => {
           <div className="text-[10px] text-slate-400 mt-0.5">Includes 18% GST & Supervision</div>
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] text-slate-400 font-bold uppercase">Active Associated Project</span>
-          <div className="text-sm font-bold text-slate-900 truncate mt-0.5">
-            {getPlatformRequests()[0]?.requestCode || quotations[0]?.requestCode || 'No Active Project'}
+        <div
+          onClick={() => {
+            if (activeProjectRequest) {
+              setSelectedProjectRequest(activeProjectRequest);
+            }
+          }}
+          className={`p-4 bg-white rounded-xl border border-slate-200 shadow-2xs transition-all relative overflow-hidden ${
+            activeProjectRequest
+              ? 'cursor-pointer hover:border-blue-500 hover:shadow-md hover:bg-gradient-to-br hover:from-white hover:to-blue-50/40 active:scale-[0.99] group'
+              : ''
+          }`}
+          title={activeProjectRequest ? "Click to view full customer and architectural project specifications dossier" : undefined}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Active Associated Project</span>
+            {activeProjectRequest && (
+              <span className="text-[10px] font-bold text-blue-600 group-hover:text-blue-700 group-hover:underline flex items-center gap-0.5">
+                <span>View Details</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </span>
+            )}
           </div>
-          <div className="text-[10px] text-gold-700 font-semibold mt-0.5">
-            {getPlatformRequests()[0]?.plotArea ? `${getPlatformRequests()[0].plotArea} sq ft (${getPlatformRequests()[0].city})` : 'Submit RFQ to request proposals'}
+          <div className="text-sm font-black text-slate-900 group-hover:text-blue-700 transition truncate mt-0.5 font-mono">
+            {activeProjectRequest?.requestCode || quotations[0]?.requestCode || 'No Active Project'}
+          </div>
+          <div className="text-[10px] text-gold-700 font-semibold mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <span>
+              {activeProjectRequest?.plotArea ? `${activeProjectRequest.plotArea} sq ft (${activeProjectRequest.city})` : 'Submit RFQ to request proposals'}
+            </span>
+            {activeProjectRequest?.customerName && (
+              <span className="text-slate-500 font-medium truncate max-w-[150px]">
+                • {activeProjectRequest.customerName}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -280,9 +373,17 @@ export const MyQuotations: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-slate-800 text-sm">{quote.quotationCode}</span>
-                      <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const matched = requests.find((r) => r.id === quote.requestId || r.requestCode === quote.requestId);
+                          if (matched) setSelectedProjectRequest(matched);
+                        }}
+                        className="text-[10px] text-slate-500 hover:text-blue-700 bg-slate-100 hover:bg-blue-50 px-2 py-0.5 rounded font-mono font-medium transition cursor-pointer"
+                        title="Click to view full customer and project specifications"
+                      >
                         Ref: {quote.requestId}
-                      </span>
+                      </button>
                     </div>
 
                     <span
@@ -373,6 +474,422 @@ export const MyQuotations: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FULL-SCREEN EXECUTIVE CUSTOMER & PROJECT SPECIFICATIONS DOSSIER           */}
+      {/* ========================================================================= */}
+      {selectedProjectRequest && (
+        <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150">
+          <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
+
+          {/* Sticky Top Bar */}
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSelectedProjectRequest(null)}
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="hidden sm:inline">Back to Quotations</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-base font-display shrink-0">
+                  <Building className="w-5 h-5 text-blue-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                      {selectedProjectRequest.requestCode || selectedProjectRequest.id}
+                    </h2>
+                    <Badge status={selectedProjectRequest.status} />
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono truncate">
+                    Homeowner: {selectedProjectRequest.customerName || 'Registered Homeowner'} • Submitted {formatDate(selectedProjectRequest.createdAt)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                to={`/professional/quotation-builder?requestId=${selectedProjectRequest.id || selectedProjectRequest.requestCode}`}
+                className="px-3.5 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                title="Prepare and publish itemized BOQ quotation"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Prepare BOQ Quote</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  const filename = downloadInquiryReceiptPdf(selectedProjectRequest);
+                  success(`Inquiry receipt downloaded: ${filename}`);
+                }}
+                className="px-3 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                title="Download official receipt & specification PDF"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Receipt PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProjectRequest(null)}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">Close</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dossier Content Body */}
+          <div className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            {/* Top Metric Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Homeowner / Client</span>
+                <div className="text-lg sm:text-xl font-black font-display text-navy-950 mt-1 truncate">
+                  {selectedProjectRequest.customerName || 'Registered Homeowner'}
+                </div>
+                <div className="text-[11px] text-emerald-600 font-medium mt-0.5">Verified Contact Record</div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Target Budget</span>
+                <div className="text-lg sm:text-xl font-black font-display text-amber-700 mt-1">
+                  {selectedProjectRequest.budgetRange || 'Flexible Market Rate'}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Client Financial Expectation</div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Plot Footprint</span>
+                <div className="text-lg sm:text-xl font-black font-display text-blue-700 mt-1">
+                  {selectedProjectRequest.plotArea ? `${selectedProjectRequest.plotArea} ${selectedProjectRequest.measurementUnit === 'METRES' ? 'sq.m' : 'sq.ft'}` : 'Dimensions Specified'}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  {selectedProjectRequest.plotWidth && selectedProjectRequest.plotLength ? `${selectedProjectRequest.plotWidth} × ${selectedProjectRequest.plotLength} ft` : 'Site Footprint'}
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Project City / State</span>
+                <div className="text-lg sm:text-xl font-black font-display text-slate-900 mt-1 truncate">
+                  {selectedProjectRequest.city || 'India'}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5 truncate">{selectedProjectRequest.state || 'Local Municipal Jurisdiction'}</div>
+              </div>
+            </div>
+
+            {/* 2-Column Main Dossier */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Left Column: Homeowner Details & Address */}
+              <div className="space-y-6">
+                {/* 1. Customer Profile */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-600" />
+                      <span>Homeowner & Client Profile</span>
+                    </h3>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      Verified Client
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-700 to-navy-950 text-white font-bold flex items-center justify-center text-xl font-display shadow-md shrink-0">
+                      {(selectedProjectRequest.customerName || 'CU').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-lg font-black text-navy-950 truncate">
+                        {selectedProjectRequest.customerName || 'Registered Homeowner'}
+                      </div>
+                      <div className="text-xs text-slate-500 font-mono mt-0.5">
+                        Client ID: {matchedCustomer?.id || `BG/${(selectedProjectRequest.customerName || 'CUS').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()}/0001`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    {/* Phone */}
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Contact Phone</span>
+                      <div className="font-bold text-slate-900 font-mono text-sm">
+                        {selectedProjectRequest.customerPhone || '—'}
+                      </div>
+                      {selectedProjectRequest.customerPhone && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <a
+                            href={`tel:${selectedProjectRequest.customerPhone.replace(/\D/g, '')}`}
+                            className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Phone className="w-3 h-3" />
+                            <span>Call Now</span>
+                          </a>
+                          <span className="text-slate-300">•</span>
+                          <a
+                            href={`https://wa.me/91${selectedProjectRequest.customerPhone.replace(/\D/g, '').slice(-10)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>WhatsApp</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Email */}
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Email Address</span>
+                      <div className="font-semibold text-slate-800 text-xs truncate" title={selectedProjectRequest.customerEmail || matchedCustomer?.email}>
+                        {selectedProjectRequest.customerEmail || matchedCustomer?.email || 'None on file'}
+                      </div>
+                      {(selectedProjectRequest.customerEmail || matchedCustomer?.email) && (
+                        <a
+                          href={`mailto:${selectedProjectRequest.customerEmail || matchedCustomer?.email}`}
+                          className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1 pt-1"
+                        >
+                          <Mail className="w-3 h-3" />
+                          <span>Send Email</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Site Address & Road Access */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-rose-500" />
+                      <span>Property Site Location & Delivery Address</span>
+                    </h3>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">House / Plot Address:</span>
+                      <span className="font-bold text-slate-900 text-right">
+                        {matchedCustomer?.housePlotNumber || selectedProjectRequest.address || 'Plot Specified'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Locality / Sector:</span>
+                      <span className="font-semibold text-slate-800 text-right">
+                        {matchedCustomer?.streetLocality || selectedProjectRequest.locality || selectedProjectRequest.city}
+                      </span>
+                    </div>
+                    {matchedCustomer?.landmark && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Nearby Landmark:</span>
+                        <span className="font-semibold text-slate-800 text-right">{matchedCustomer.landmark}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-slate-200/60 pt-2">
+                      <span className="text-slate-500">City, State & PIN:</span>
+                      <span className="font-bold text-navy-950 text-right">
+                        {selectedProjectRequest.city}, {matchedCustomer?.state || selectedProjectRequest.state || 'India'} {matchedCustomer?.pinCode ? `- ${matchedCustomer.pinCode}` : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedProjectRequest.siteAccessibilityNotes && (
+                    <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 text-xs">
+                      <span className="text-[10px] text-blue-900 font-bold uppercase block mb-0.5">Approach Road & Site Logistics:</span>
+                      <p className="text-slate-700">{selectedProjectRequest.siteAccessibilityNotes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Inquiry Fee Payment Receipt */}
+                <div className="bg-gradient-to-br from-slate-900 to-navy-950 text-white p-5 rounded-3xl shadow-sm border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-amber-400" />
+                      <span>Inquiry Registration & Vetting Receipt</span>
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>PAID ₹499</span>
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-[11px] text-slate-400">Receipt Voucher:</span>
+                      <span className="font-mono font-bold text-amber-300">
+                        BG/REC/{(selectedProjectRequest.requestCode || selectedProjectRequest.id || '').replace(/[^a-zA-Z0-9]/g, '')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-[11px] text-slate-400">Scope Covered:</span>
+                      <span className="text-slate-200">Civil & Architectural Feasibility Dispatch</span>
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filename = downloadInquiryReceiptPdf(selectedProjectRequest);
+                          success(`Receipt downloaded: ${filename}`);
+                        }}
+                        className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download Spec & Inquiry Receipt PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Property Dimensions & Engineering Specifications */}
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-blue-600" />
+                      <span>Property Dimensions & Civil Parameters</span>
+                    </h3>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                      IS 456 Standards
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Plot Dimensions</span>
+                      <span className="font-bold text-slate-900 text-sm">
+                        {selectedProjectRequest.plotWidth && selectedProjectRequest.plotLength
+                          ? `${selectedProjectRequest.plotWidth} × ${selectedProjectRequest.plotLength} ${selectedProjectRequest.measurementUnit?.toLowerCase() || 'ft'}`
+                          : selectedProjectRequest.plotArea
+                          ? `${selectedProjectRequest.plotArea} ${selectedProjectRequest.measurementUnit?.toLowerCase() || 'sq.ft'}`
+                          : 'Not Specified'}
+                      </span>
+                      {selectedProjectRequest.plotArea && (
+                        <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">
+                          ({selectedProjectRequest.plotArea} {selectedProjectRequest.measurementUnit === 'METRES' ? 'sq.m' : 'sq.ft'})
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Floors / Height</span>
+                      <span className="font-bold text-slate-900 text-sm">
+                        {selectedProjectRequest.floors !== undefined && selectedProjectRequest.floors !== null
+                          ? `${selectedProjectRequest.floors} Floor${selectedProjectRequest.floors > 1 ? 's' : ''} (G+${Math.max(0, selectedProjectRequest.floors - 1)})`
+                          : 'Not Specified'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Room Configuration</span>
+                      <span className="font-semibold text-slate-900">
+                        {selectedProjectRequest.bedrooms !== undefined || selectedProjectRequest.bathrooms !== undefined
+                          ? `${selectedProjectRequest.bedrooms ?? 0} Beds • ${selectedProjectRequest.bathrooms ?? 0} Baths • ${selectedProjectRequest.kitchens ?? 0} Kitchens`
+                          : 'Not Specified'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Property Type</span>
+                      <span className="font-bold text-slate-900">{selectedProjectRequest.propertyType || 'Residential Plot'}</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Built-Up Area</span>
+                      <span className="font-bold text-slate-900">
+                        {selectedProjectRequest.builtUpArea ? `${selectedProjectRequest.builtUpArea} sq.ft` : 'As per FSI & Guidelines'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Current Site State</span>
+                      <span className="font-bold text-slate-900">{selectedProjectRequest.currentCondition || 'Vacant / Ready for Planning'}</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Architectural Style</span>
+                      <span className="font-semibold text-slate-900">{selectedProjectRequest.designStyle || 'Modern & Contemporary'}</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Preferred Start</span>
+                      <span className="font-bold text-slate-900">{selectedProjectRequest.preferredStartDate || 'Immediate'}</span>
+                    </div>
+                  </div>
+
+                  {/* Required Deliverables */}
+                  {selectedProjectRequest.requiredServices && selectedProjectRequest.requiredServices.length > 0 && (
+                    <div className="pt-2">
+                      <span className="text-xs font-bold text-slate-700 block mb-2">
+                        Required Drawings & Technical Deliverables:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedProjectRequest.requiredServices.map((srv: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-3 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-medium flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{srv}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Vision */}
+                  <div className="pt-2">
+                    <span className="text-xs font-bold text-slate-700 block mb-1">Customer Scope & Vision:</span>
+                    <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                      {selectedProjectRequest.description || 'Full architectural design and civil engineering drawings required as per local municipal bylaws.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Professional Architect Call to Action Box */}
+                <div className="p-6 bg-gradient-to-r from-blue-900 via-navy-950 to-slate-900 text-white rounded-3xl shadow-lg space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gold-500/20 text-gold-400 border border-gold-400/30 flex items-center justify-center font-bold">
+                      <Compass className="w-5 h-5 text-gold-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm font-display text-white">
+                        Architect & Engineering Partner Workspace
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        Review this homeowner's site brief and submit an itemized BOQ quotation.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                    <Link
+                      to={`/professional/quotation-builder?requestId=${selectedProjectRequest.id || selectedProjectRequest.requestCode}`}
+                      className="flex-1 py-3 px-4 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Prepare Itemized BOQ Quotation Now</span>
+                    </Link>
+                    <Link
+                      to={`/dashboard/requests/${selectedProjectRequest.id}`}
+                      className="py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition flex items-center justify-center gap-1.5"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Open Dedicated Page</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
