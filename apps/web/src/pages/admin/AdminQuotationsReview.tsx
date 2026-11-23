@@ -44,17 +44,7 @@ import { safeSetStorage, safeGetStorage } from '../../lib/safeStorage.js';
 
 export const AdminQuotationsReview: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'requests' ? 'REQUESTS' : 'QUOTATIONS';
-  const [activeTab, setActiveTab] = useState<'REQUESTS' | 'QUOTATIONS'>(initialTab);
-
-  useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'requests') {
-      setActiveTab('REQUESTS');
-    } else if (tabParam === 'quotations') {
-      setActiveTab('QUOTATIONS');
-    }
-  }, [searchParams]);
+  const [activeTab, setActiveTab] = useState<'QUOTATIONS'>('QUOTATIONS');
   const [requests, setRequests] = useState<PlatformProjectRequest[]>([]);
   const [quotations, setQuotations] = useState<any[]>([]);
   const { success, error } = useToast();
@@ -339,43 +329,15 @@ export const AdminQuotationsReview: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Tab Switcher */}
-      <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-2xl w-fit border border-slate-200">
-        <button
-          onClick={() => {
-            setActiveTab('QUOTATIONS');
-            setSearchParams({ tab: 'quotations' });
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-            activeTab === 'QUOTATIONS'
-              ? 'bg-white text-navy-950 shadow-xs'
-              : 'text-slate-600 hover:text-navy-950'
-          }`}
-        >
+      {/* Quotations Metric Badge */}
+      <div className="flex items-center gap-2">
+        <div className="px-4 py-2 rounded-xl text-xs font-bold bg-white text-navy-950 border border-slate-200 shadow-2xs flex items-center gap-2">
           <FileCheck2 className="w-4 h-4 text-gold-600" />
           <span>Professional Quotations & Publish</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
             {quotations.length}
           </span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('REQUESTS');
-            setSearchParams({ tab: 'requests' });
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-            activeTab === 'REQUESTS'
-              ? 'bg-white text-navy-950 shadow-xs'
-              : 'text-slate-600 hover:text-navy-950'
-          }`}
-        >
-          <FileText className="w-4 h-4 text-blue-600" />
-          <span>Customer Inquiries Awaiting Quotes</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800">
-            {requests.length}
-          </span>
-        </button>
+        </div>
       </div>
 
       {/* ================= TAB 2: GENERATED QUOTATIONS ================= */}
@@ -559,103 +521,7 @@ export const AdminQuotationsReview: React.FC = () => {
         </div>
       )}
 
-      {/* ================= TAB 1: CUSTOMER REQUESTS AWAITING QUOTES ================= */}
-      {activeTab === 'REQUESTS' && (
-        <div className="space-y-4">
-          {requests.length === 0 ? (
-            <div className="card p-12 text-center space-y-3 bg-white border border-slate-200">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center">
-                <FileText className="w-6 h-6" />
-              </div>
-              <h3 className="font-bold text-navy-950 text-base font-display">No Customer Requests Found</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                When customers submit project inquiries on <code>/create-request</code>, they will appear here immediately for quotation creation and professional matching.
-              </p>
-            </div>
-          ) : (
-            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-              <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-700">
-                  Incoming Customer Quotation Inquiries ({requests.length})
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Assign certified professionals or create an immediate verified quote for the customer.
-                </span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {requests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/50 transition"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <Link
-                          to={`/admin/requests/${req.id}`}
-                          className="font-mono text-xs font-bold text-navy-950 hover:text-blue-600 hover:underline transition"
-                          title="Click to inspect and assign"
-                        >
-                          {req.requestCode}
-                        </Link>
-                        <Badge status={req.status} />
-                        <Link
-                          to={`/admin/requests/${req.id}`}
-                          className="text-xs font-bold text-navy-950 hover:text-blue-600 hover:underline transition"
-                          title="Click to inspect and assign"
-                        >
-                          {req.customerName}
-                        </Link>
-                        <span className="text-xs text-slate-400 font-mono">({req.customerPhone})</span>
-                      </div>
-                      <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
-                        <span>City: <strong>{req.city}</strong></span>
-                        <span>•</span>
-                        <span>Category: <strong>{req.categorySlug || 'Civil & Architectural'}</strong></span>
-                        <span>•</span>
-                        <span>Plot Area: <strong>{req.plotArea ? `${req.plotArea} sq ft` : 'Custom'}</strong></span>
-                        {req.budgetRange && (
-                          <>
-                            <span>•</span>
-                            <span>Budget: <strong className="text-emerald-700">{req.budgetRange}</strong></span>
-                          </>
-                        )}
-                        <span>•</span>
-                        <span className="text-slate-400 font-mono">Submitted: {formatDate(req.createdAt)}</span>
-                      </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {((req.quotationsCount || 0) > 0 || req.status === 'QUOTATIONS_AVAILABLE') && (
-                        <button
-                          onClick={() => setActiveTab('QUOTATIONS')}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 transition flex items-center gap-1 cursor-pointer shadow-2xs"
-                        >
-                          <Share2 className="w-3.5 h-3.5 text-blue-600" />
-                          <span>View & Publish Quotes</span>
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openQuoteModalForRequest(req)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Create Direct Quote</span>
-                      </button>
-                      <Link
-                        to={`/admin/requests/${req.id}`}
-                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-navy-950 hover:bg-navy-900 text-white transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <span>Inspect & Assign Pros</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-gold-400" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ================= MODAL: DIRECT QUOTATION CREATION ================= */}
       {isAddModalOpen && (
