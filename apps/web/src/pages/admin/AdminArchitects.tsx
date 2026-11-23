@@ -59,6 +59,7 @@ import {
   getArchitectAccounts,
   updateArchitectStatus,
   updateArchitectDocumentStatus,
+  saveArchitectAccount,
   saveArchitectBankDetails,
   deleteArchitectAccount,
   clearAllArchitects,
@@ -496,34 +497,119 @@ export const AdminArchitects: React.FC = () => {
     success(`Opening ${chequeName} in viewer.`);
   };
 
-  const handleDocumentApprove = (docId: string) => {
+  const handleDocumentApprove = (docId: string, docItem?: ArchitectKycDocument) => {
     if (!selectedArchitect) return;
+
+    // 1. Optimistic instant state update on selectedArchitect so the UI changes immediately
+    const updatedDocs = (selectedArchitect.documents || []).map((d) => {
+      const isMatch =
+        d.id === docId ||
+        (docItem && d.id === docItem.id) ||
+        (docItem && d.documentType && d.documentType === docItem.documentType) ||
+        (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+        (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+        (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
+        (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN'));
+
+      if (isMatch) {
+        return { ...d, status: 'VERIFIED' as const, rejectionReason: undefined };
+      }
+      return d;
+    });
+
+    const isCheque =
+      docId === 'doc-cheque' ||
+      docId === 'doc-cancelled-cheque' ||
+      docItem?.id === 'doc-cheque' ||
+      docItem?.documentType === 'CANCELLED_CHEQUE';
+
+    const optimisticArch: ArchitectAccount = {
+      ...selectedArchitect,
+      documents: updatedDocs,
+      kycDocuments: updatedDocs,
+      bankDetails: isCheque && selectedArchitect.bankDetails
+        ? { ...selectedArchitect.bankDetails, isChequeAccepted: true, isVerified: true }
+        : selectedArchitect.bankDetails,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update in-memory state IMMEDIATELY so button becomes "Verified ✓" instantly
+    selectedArchitectRef.current = optimisticArch;
+    setSelectedArchitect({ ...optimisticArch });
+    setArchitects((prev) =>
+      prev.map((a) => (a.id === optimisticArch.id || a.phone === optimisticArch.phone ? optimisticArch : a))
+    );
+
+    // 2. Persist to storage
     const updated = updateArchitectDocumentStatus(selectedArchitect.id, docId, 'VERIFIED');
     if (updated) {
       const enriched = ensureArchitectStatutoryDocuments(updated);
+      selectedArchitectRef.current = enriched;
       setSelectedArchitect({ ...enriched });
-      loadData();
-      if (activeReviewDoc?.id === docId) {
-        setActiveReviewDoc({ ...activeReviewDoc, status: 'VERIFIED' });
+      setArchitects((prev) =>
+        prev.map((a) => (a.id === enriched.id || a.phone === enriched.phone ? enriched : a))
+      );
+    } else {
+      const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
+      if (cleanPhone) {
+        try {
+          localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(updatedDocs));
+        } catch (e) {}
       }
-      success('Document verified and confirmed successfully!');
+      saveArchitectAccount(optimisticArch);
     }
+
+    if (activeReviewDoc) {
+      setActiveReviewDoc({ ...activeReviewDoc, status: 'VERIFIED' });
+    }
+    success('Document verified successfully! (सत्यापित हो गया)');
   };
 
-  const handleDocumentReject = (docId: string, reason?: string) => {
+  const handleDocumentReject = (docId: string, reason?: string, docItem?: ArchitectKycDocument) => {
     if (!selectedArchitect) return;
     const finalReason = reason || docRejectReason || 'Cancelled by admin';
+
+    const updatedDocs = (selectedArchitect.documents || []).map((d) => {
+      const isMatch =
+        d.id === docId ||
+        (docItem && d.id === docItem.id) ||
+        (docItem && d.documentType && d.documentType === docItem.documentType) ||
+        (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+        (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+        (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
+        (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN'));
+
+      if (isMatch) {
+        return { ...d, status: 'REJECTED' as const, rejectionReason: finalReason };
+      }
+      return d;
+    });
+
+    const optimisticArch: ArchitectAccount = {
+      ...selectedArchitect,
+      documents: updatedDocs,
+      kycDocuments: updatedDocs,
+      updatedAt: new Date().toISOString(),
+    };
+
+    selectedArchitectRef.current = optimisticArch;
+    setSelectedArchitect({ ...optimisticArch });
+    setArchitects((prev) =>
+      prev.map((a) => (a.id === optimisticArch.id || a.phone === optimisticArch.phone ? optimisticArch : a))
+    );
+
     const updated = updateArchitectDocumentStatus(selectedArchitect.id, docId, 'REJECTED', finalReason);
     if (updated) {
       const enriched = ensureArchitectStatutoryDocuments(updated);
+      selectedArchitectRef.current = enriched;
       setSelectedArchitect({ ...enriched });
-      loadData();
-      if (activeReviewDoc?.id === docId) {
-        setActiveReviewDoc({ ...activeReviewDoc, status: 'REJECTED', rejectionReason: finalReason });
-      }
-      setShowDocRejectModal(null);
-      success('Document marked as cancelled / rejected.');
     }
+
+    if (activeReviewDoc) {
+      setActiveReviewDoc({ ...activeReviewDoc, status: 'REJECTED', rejectionReason: finalReason });
+    }
+    setShowDocRejectModal(null);
+    success('Document marked as cancelled / rejected.');
   };
 
   const loadData = () => {
@@ -1808,7 +1894,7 @@ export const AdminArchitects: React.FC = () => {
                                 disabled={doc.status === 'VERIFIED'}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDocumentApprove(doc.id);
+                                  handleDocumentApprove(doc.id, doc);
                                 }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs ${
                                   doc.status === 'VERIFIED'
@@ -2926,7 +3012,7 @@ export const AdminArchitects: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  handleDocumentApprove(activeReviewDoc.id);
+                  handleDocumentApprove(activeReviewDoc.id, activeReviewDoc);
                   setActiveReviewDoc(null);
                 }}
                 className="px-7 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-2 shadow-lg transition cursor-pointer active:scale-98"
@@ -3002,7 +3088,7 @@ export const AdminArchitects: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleDocumentReject(showDocRejectModal.id, docRejectReason)}
+                onClick={() => handleDocumentReject(showDocRejectModal.id, docRejectReason, showDocRejectModal)}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition cursor-pointer shadow-sm"
               >
                 Confirm Cancellation

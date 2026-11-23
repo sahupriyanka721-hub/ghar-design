@@ -1725,12 +1725,29 @@ export const updateArchitectDocumentStatus = (
   remarks?: string
 ): ArchitectAccount | null => {
   const current = getArchitectAccounts();
-  const idx = current.findIndex((a) => a.id === architectId || a.applicationNumber === architectId);
+  const cleanArchPhone = (architectId || '').replace(/\D/g, '').slice(-10);
+  const idx = current.findIndex(
+    (a) =>
+      a.id === architectId ||
+      a.applicationNumber === architectId ||
+      (cleanArchPhone && cleanArchPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanArchPhone) ||
+      (a.name && architectId.toLowerCase().includes(a.name.toLowerCase()))
+  );
   if (idx === -1) return null;
 
   const arch = ensureArchitectStatutoryDocuments(current[idx]);
   const docs = arch.documents || [];
-  const docIdx = docs.findIndex((d) => d.id === docId || (docId === 'doc-cheque-review' && d.id === 'doc-cheque'));
+  const docIdx = docs.findIndex(
+    (d) =>
+      d.id === docId ||
+      (docId === 'doc-cheque-review' && (d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque')) ||
+      (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+      (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
+      (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
+      (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN')) ||
+      (d as any).documentType === docId ||
+      (d.id && docId && d.id.toLowerCase() === docId.toLowerCase())
+  );
 
   if (docIdx !== -1) {
     docs[docIdx] = {
@@ -1738,11 +1755,31 @@ export const updateArchitectDocumentStatus = (
       status: newStatus,
       rejectionReason: newStatus === 'REJECTED' ? (remarks || 'Cancelled by Admin') : undefined,
     };
+  } else {
+    const fuzzyIdx = docs.findIndex(
+      (d) =>
+        (d.title && docId && d.title.toLowerCase().includes(docId.toLowerCase())) ||
+        (docId && d.id && docId.toLowerCase().includes(d.id.toLowerCase()))
+    );
+    if (fuzzyIdx !== -1) {
+      docs[fuzzyIdx] = {
+        ...docs[fuzzyIdx],
+        status: newStatus,
+        rejectionReason: newStatus === 'REJECTED' ? (remarks || 'Cancelled by Admin') : undefined,
+      };
+    }
   }
 
-  if (docId === 'doc-cheque' || docId === 'doc-cheque-review') {
+  const isCheque =
+    docId === 'doc-cheque' ||
+    docId === 'doc-cheque-review' ||
+    docId === 'doc-cancelled-cheque' ||
+    (docIdx !== -1 && (docs[docIdx].documentType === 'CANCELLED_CHEQUE' || docs[docIdx].id === 'doc-cheque'));
+
+  if (isCheque) {
     if (arch.bankDetails) {
-      arch.bankDetails.isChequeAccepted = (newStatus === 'VERIFIED');
+      arch.bankDetails.isChequeAccepted = newStatus === 'VERIFIED';
+      arch.bankDetails.isVerified = newStatus === 'VERIFIED';
     }
   }
 
@@ -1756,6 +1793,9 @@ export const updateArchitectDocumentStatus = (
   if (cleanPhone) {
     try {
       localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(docs));
+      if (isCheque && arch.bankDetails) {
+        localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(arch.bankDetails));
+      }
     } catch (e) {}
   }
 
