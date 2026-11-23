@@ -71,17 +71,21 @@ export const AcceptedQuotations: React.FC = () => {
       console.error(e);
     }
 
-    // Identify user's submitted request IDs
+    // Identify user's submitted request IDs and codes
     const userRequests = getPlatformRequests();
-    const userReqIds = new Set(
-      userRequests
-        .filter((r) => {
-          if (user?.id && r.customerId === user.id) return true;
-          if (rawUserPhone && r.customerPhone?.includes(rawUserPhone)) return true;
-          return false;
-        })
-        .map((r) => r.id)
-    );
+    const userReqIds = new Set<string>();
+    userRequests
+      .filter((r) => {
+        if (user?.id && r.customerId === user.id) return true;
+        const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
+        if (rawUserPhone && rPhone && rPhone === rawUserPhone) return true;
+        if (user?.name && r.customerName && r.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+        return false;
+      })
+      .forEach((r) => {
+        if (r.id) userReqIds.add(r.id);
+        if (r.requestCode) userReqIds.add(r.requestCode);
+      });
 
     // 1. Get execution projects directly with comprehensive identity matching
     const allStoredProjects = getExecutionProjects();
@@ -96,8 +100,9 @@ export const AcceptedQuotations: React.FC = () => {
           (q: any) =>
             q.id === p.quotationId &&
             (q.customerId === user?.id ||
-              (rawUserPhone && q.customerPhone?.includes(rawUserPhone)) ||
-              userReqIds.has(q.requestId))
+              (rawUserPhone && (q.customerPhone || '').replace(/\D/g, '').slice(-10) === rawUserPhone) ||
+              (q.requestId && userReqIds.has(q.requestId)) ||
+              (q.requestCode && userReqIds.has(q.requestCode)))
         )
       ) {
         return true;
@@ -113,8 +118,10 @@ export const AcceptedQuotations: React.FC = () => {
       if (!isPublished) return false;
 
       if (user?.id && q.customerId === user.id) return true;
-      if (rawUserPhone && q.customerPhone?.replace(/\D/g, '').slice(-10) === rawUserPhone) return true;
+      if (rawUserPhone && (q.customerPhone || '').replace(/\D/g, '').slice(-10) === rawUserPhone) return true;
+      if (user?.name && q.customerName && q.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
       if (q.requestId && userReqIds.has(q.requestId)) return true;
+      if (q.requestCode && userReqIds.has(q.requestCode)) return true;
       // If single customer testing without specific phone, include
       if (!user?.id && !rawUserPhone) return true;
       return false;
@@ -127,8 +134,10 @@ export const AcceptedQuotations: React.FC = () => {
       if (!isAccepted) return false;
 
       if (user?.id && q.customerId === user.id) return true;
-      if (rawUserPhone && q.customerPhone?.replace(/\D/g, '').slice(-10) === rawUserPhone) return true;
+      if (rawUserPhone && (q.customerPhone || '').replace(/\D/g, '').slice(-10) === rawUserPhone) return true;
+      if (user?.name && q.customerName && q.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
       if (q.requestId && userReqIds.has(q.requestId)) return true;
+      if (q.requestCode && userReqIds.has(q.requestCode)) return true;
       if (!user?.id && !rawUserPhone) return true;
       return false;
     });

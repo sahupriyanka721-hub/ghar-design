@@ -206,38 +206,81 @@ export const MyQuotations: React.FC = () => {
 
       // Filter for current logged-in customer if phone/id matches
       const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
-      const userRequests = allPlatformReqs;
-      const userReqIds = new Set(
-        userRequests
-          .filter((r) => {
-            if (user?.id && r.customerId === user.id) return true;
-            if (rawPhone && r.customerPhone?.includes(rawPhone)) return true;
-            return false;
-          })
-          .map((r) => r.id)
-      );
+      const userRequests = allPlatformReqs.filter((r) => {
+        if (user?.id && r.customerId === user.id) return true;
+        const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
+        if (rawPhone && rPhone && rPhone === rawPhone) return true;
+        if (user?.name && r.customerName && r.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+        return false;
+      });
+
+      const userReqKeys = new Set<string>();
+      userRequests.forEach((r) => {
+        if (r.id) userReqKeys.add(r.id.trim().toLowerCase());
+        if (r.requestCode) userReqKeys.add(r.requestCode.trim().toLowerCase());
+      });
+
+      // If no explicit matches but only one customer session exists, add its keys
+      if (userReqKeys.size === 0 && allPlatformReqs.length > 0) {
+        for (const r of allPlatformReqs) {
+          const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
+          if (rawPhone && rPhone === rawPhone) {
+            if (r.id) userReqKeys.add(r.id.trim().toLowerCase());
+            if (r.requestCode) userReqKeys.add(r.requestCode.trim().toLowerCase());
+          }
+        }
+      }
 
       const customerQuotes = localQuotes.filter((q: any) => {
+        // Direct customer ID match
         if (user?.id && q.customerId === user.id) return true;
-        if (rawPhone && q.customerPhone?.includes(rawPhone)) return true;
-        if (q.requestId && userReqIds.has(q.requestId)) return true;
-        // If single user testing without explicit customer ID, show all real quotes
+
+        // Customer phone match (clean digits)
+        const qPhone = (q.customerPhone || '').replace(/\D/g, '').slice(-10);
+        if (rawPhone && qPhone && qPhone === rawPhone) return true;
+
+        // Customer name match
+        if (user?.name && q.customerName && q.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+
+        // Request ID / code match
+        if (q.requestId && userReqKeys.has(q.requestId.trim().toLowerCase())) return true;
+        if (q.requestCode && userReqKeys.has(q.requestCode.trim().toLowerCase())) return true;
+
+        // If single user testing without explicit customer ID or phone, show all real quotes
         if (!rawPhone && !user?.id) return true;
+
         return false;
       });
 
       const displayQuotes = customerQuotes;
 
+      // Safe merge with API: never wipe out local quotes
+      const mergedMap = new Map<string, any>();
+      for (const dq of displayQuotes) {
+        const key = dq.id || dq.quotationCode;
+        if (key) mergedMap.set(key, dq);
+      }
+
       apiRequest('/quotations')
         .then((res) => {
-          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-            setQuotations(res.data);
-          } else {
-            setQuotations(displayQuotes);
+          if (res.data && Array.isArray(res.data)) {
+            for (const bq of res.data) {
+              const bqPhone = (bq.customerPhone || '').replace(/\D/g, '').slice(-10);
+              const matchesCust =
+                (user?.id && bq.customerId === user.id) ||
+                (rawPhone && bqPhone === rawPhone) ||
+                (bq.requestId && userReqKeys.has(bq.requestId.trim().toLowerCase())) ||
+                (bq.requestCode && userReqKeys.has(bq.requestCode.trim().toLowerCase()));
+              if (matchesCust) {
+                const key = bq.id || bq.quotationCode;
+                if (key) mergedMap.set(key, { ...mergedMap.get(key), ...bq });
+              }
+            }
           }
+          setQuotations(Array.from(mergedMap.values()));
         })
         .catch(() => {
-          setQuotations(displayQuotes);
+          setQuotations(Array.from(mergedMap.values()));
         })
         .finally(() => setLoading(false));
     };
@@ -272,16 +315,25 @@ export const MyQuotations: React.FC = () => {
       if (filterStatus !== 'ALL') {
         if (filterStatus === 'PUBLISHED') {
           if (q.status !== 'PUBLISHED' && q.status !== 'PUBLISHED_TO_CUSTOMER' && q.status !== 'APPROVED') return false;
+        } else if (filterStatus === 'SELECTED') {
+          if (q.status !== 'SELECTED' && q.status !== 'ACCEPTED' && q.status !== 'CONFIRMED') return false;
+        } else if (filterStatus === 'UNDER_ADMIN_REVIEW') {
+          if (q.status !== 'UNDER_ADMIN_REVIEW' && q.status !== 'SUBMITTED_BY_PRO') return false;
         } else if (q.status !== filterStatus) {
           return false;
         }
       }
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
+        const code = (q.quotationCode || q.id || '').toLowerCase();
+        const firm = (q.firmName || q.professional?.firmName || '').toLowerCase();
+        const scope = (q.scopeOfWork || '').toLowerCase();
+        const arch = (q.architectName || q.professionalName || q.professional?.name || '').toLowerCase();
         return (
-          q.quotationCode.toLowerCase().includes(query) ||
-          q.professional?.firmName.toLowerCase().includes(query) ||
-          q.scopeOfWork.toLowerCase().includes(query)
+          code.includes(query) ||
+          firm.includes(query) ||
+          scope.includes(query) ||
+          arch.includes(query)
         );
       }
       return true;
@@ -482,21 +534,28 @@ export const MyQuotations: React.FC = () => {
 
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        quote.status === 'SELECTED'
+                        quote.status === 'SELECTED' || quote.status === 'ACCEPTED' || quote.status === 'CONFIRMED'
                           ? 'bg-emerald-100 text-emerald-800'
-                          : quote.status === 'PUBLISHED'
+                          : quote.status === 'PUBLISHED' || quote.status === 'PUBLISHED_TO_CUSTOMER' || quote.status === 'APPROVED'
                           ? 'bg-blue-100 text-blue-800'
-                          : 'bg-slate-100 text-slate-700'
+                          : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {quote.status}
+                      {quote.status === 'PUBLISHED_TO_CUSTOMER' ? 'PUBLISHED' : quote.status}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-base text-slate-900">{quote.professional?.firmName}</h3>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {quote.professional?.qualifications} • {quote.professional?.experienceYears} Yrs Experience
+                    <h3 className="font-bold text-base text-slate-900">
+                      {(quote as any).firmName || quote.professional?.firmName || 'BuildGhar Verified Partner'}
+                    </h3>
+                    <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                      <span>{(quote as any).architectName || (quote as any).professionalName || quote.professional?.name || 'Project Architect'}</span>
+                      {((quote as any).architectId || quote.professional?.architectId) && (
+                        <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold">
+                          {(quote as any).architectId || quote.professional?.architectId}
+                        </span>
+                      )}
                     </div>
                   </div>
 

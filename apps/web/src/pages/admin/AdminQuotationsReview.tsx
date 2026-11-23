@@ -26,6 +26,8 @@ import {
   Phone,
   MapPin,
   Building,
+  Building2,
+  HardHat,
   ShieldCheck,
   Calendar,
   Eye,
@@ -44,6 +46,7 @@ import {
 import { pushToCloud, cleanRecords } from '../../data/cloudSync.js';
 import { purgeDummyData } from '../../data/customerStore.js';
 import { safeSetStorage, safeGetStorage } from '../../lib/safeStorage.js';
+import { getArchitectById, getArchitectByPhone } from '../../data/architectStore.js';
 
 export const AdminQuotationsReview: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,6 +61,44 @@ export const AdminQuotationsReview: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | string>('ALL');
 
+  const resolveArchitectInfo = (q: any) => {
+    const cleanPhone = (q.professionalPhone || q.phone || q.professional?.phone || '').replace(/\D/g, '').slice(-10);
+    const matchedArch = cleanPhone
+      ? getArchitectByPhone(cleanPhone)
+      : (q.architectId || q.professionalId)
+      ? getArchitectById(q.architectId || q.professionalId)
+      : null;
+
+    const archId =
+      q.architectId ||
+      matchedArch?.id ||
+      q.professional?.architectId ||
+      (typeof q.professionalId === 'string' && q.professionalId.startsWith('ARC') ? q.professionalId : null) ||
+      (q.professionalName?.toLowerCase().includes('platform') || q.professional?.name?.toLowerCase().includes('platform')
+        ? 'ARC-HQ-ADMIN'
+        : (q.professionalId || 'ARC-PENDING'));
+
+    const firmName =
+      q.firmName ||
+      matchedArch?.firmName ||
+      q.professional?.firmName ||
+      (q.professionalName?.toLowerCase().includes('platform') || q.professional?.name?.toLowerCase().includes('platform')
+        ? 'BuildGhar Platform Engineering'
+        : 'Architect Partner Firm');
+
+    const architectName =
+      q.architectName ||
+      matchedArch?.name ||
+      q.professionalName ||
+      q.professional?.name ||
+      'Architect Partner';
+
+    const coaNumber = q.coaNumber || matchedArch?.coaNumber || q.professional?.coaNumber || '';
+    const archPhone = q.professionalPhone || matchedArch?.phone || q.professional?.phone || '';
+
+    return { archId, firmName, architectName, coaNumber, archPhone };
+  };
+
   const filteredQuotations = useMemo(() => {
     return quotations.filter((q) => {
       if (statusFilter !== 'ALL' && q.status !== statusFilter) {
@@ -71,13 +112,17 @@ export const AdminQuotationsReview: React.FC = () => {
       const city = (q.city || '').toLowerCase();
       const scope = (q.scopeOfWork || '').toLowerCase();
       const pro = (q.professionalName || '').toLowerCase();
+      const { archId, firmName, architectName } = resolveArchitectInfo(q);
       return (
         code.includes(term) ||
         reqCode.includes(term) ||
         cust.includes(term) ||
         city.includes(term) ||
         scope.includes(term) ||
-        pro.includes(term)
+        pro.includes(term) ||
+        archId.toLowerCase().includes(term) ||
+        firmName.toLowerCase().includes(term) ||
+        architectName.toLowerCase().includes(term)
       );
     });
   }, [quotations, statusFilter, searchTerm]);
@@ -98,7 +143,7 @@ export const AdminQuotationsReview: React.FC = () => {
     const allReqs = getPlatformRequests();
     setRequests(allReqs);
 
-    // 2. Load generated quotations
+    // 2. Load all generated quotations (both architect & platform)
     let localQuotes: any[] = [];
     try {
       const stored = localStorage.getItem('platform_quotations');
@@ -110,6 +155,18 @@ export const AdminQuotationsReview: React.FC = () => {
               q.quotationCode !== 'QT-2026-001' &&
               q.requestCode !== 'GHR-REQ-2026-1001'
           );
+        }
+      }
+      // Also merge interior designer quotations if present
+      const storedInterior = localStorage.getItem('gd_interior_quotations_v1');
+      if (storedInterior) {
+        const parsedInterior = JSON.parse(storedInterior);
+        if (Array.isArray(parsedInterior)) {
+          for (const iq of parsedInterior) {
+            if (!localQuotes.some((lq) => (lq.id && lq.id === iq.id) || (lq.quotationCode && lq.quotationCode === iq.quotationCode))) {
+              localQuotes.push(iq);
+            }
+          }
         }
       }
     } catch (e) {
@@ -149,11 +206,22 @@ export const AdminQuotationsReview: React.FC = () => {
     }
     window.addEventListener('storage', loadData);
 
-    // Try fetching from API if backend is active
+    // Try fetching from API if backend is active, but merge safely without overwriting local submissions
     apiRequest('/admin/quotations')
       .then((res) => {
         if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-          setQuotations(res.data);
+          setQuotations((prev) => {
+            const map = new Map<string, any>();
+            for (const item of res.data) {
+              const key = item.id || item.quotationCode;
+              if (key) map.set(key, item);
+            }
+            for (const item of prev) {
+              const key = item.id || item.quotationCode;
+              if (key) map.set(key, { ...map.get(key), ...item });
+            }
+            return Array.from(map.values());
+          });
         }
       })
       .catch(() => {});
@@ -424,8 +492,9 @@ export const AdminQuotationsReview: React.FC = () => {
                 <th className="py-3.5 px-4">Quotation Code</th>
                 <th className="py-3.5 px-4">Request Ref</th>
                 <th className="py-3.5 px-4">Customer & City</th>
-                <th className="py-3.5 px-4 min-w-[220px]">Scope & BOQ Schedule</th>
-                <th className="py-3.5 px-4">Submitted By</th>
+                <th className="py-3.5 px-4">Architect Firm Name</th>
+                <th className="py-3.5 px-4">Architect ID</th>
+                <th className="py-3.5 px-4 min-w-[200px]">Scope & BOQ Schedule</th>
                 <th className="py-3.5 px-4 text-right">Amount (₹)</th>
                 <th className="py-3.5 px-4 text-center">Status</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
@@ -434,7 +503,7 @@ export const AdminQuotationsReview: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredQuotations.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 px-4 text-center space-y-2">
+                  <td colSpan={9} className="py-12 px-4 text-center space-y-2">
                     <FileCheck2 className="w-8 h-8 text-slate-300 mx-auto" />
                     <div className="text-sm font-bold text-slate-700">No Quotations Found</div>
                     <div className="text-xs text-slate-400">
@@ -445,8 +514,10 @@ export const AdminQuotationsReview: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredQuotations.map((q) => (
-                  <React.Fragment key={q.id}>
+                filteredQuotations.map((q) => {
+                  const { archId, firmName, architectName, archPhone, coaNumber } = resolveArchitectInfo(q);
+                  return (
+                  <React.Fragment key={q.id || q.quotationCode}>
                     <tr className="hover:bg-sky-50/40 transition group">
                       {/* Quotation Code */}
                       <td className="py-3.5 px-4 align-top">
@@ -492,8 +563,41 @@ export const AdminQuotationsReview: React.FC = () => {
                         </div>
                       </td>
 
+                      {/* Architect Firm Name */}
+                      <td className="py-3.5 px-4 align-top max-w-[200px]">
+                        <div className="flex items-start gap-1.5">
+                          <Building2 className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 block leading-tight truncate max-w-[170px]" title={firmName}>
+                              {firmName}
+                            </span>
+                            <span className="text-[11px] text-slate-500 block truncate max-w-[170px] mt-0.5">
+                              {architectName}
+                            </span>
+                            {archPhone && (
+                              <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                                {archPhone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Architect ID */}
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 font-mono text-xs font-bold shadow-2xs">
+                          <HardHat className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                          <span>{archId}</span>
+                        </div>
+                        {coaNumber && (
+                          <span className="text-[10px] text-slate-400 block font-mono mt-1">
+                            COA: {coaNumber}
+                          </span>
+                        )}
+                      </td>
+
                       {/* Scope & BOQ */}
-                      <td className="py-3.5 px-4 align-top max-w-[280px]">
+                      <td className="py-3.5 px-4 align-top max-w-[240px]">
                         <p className="line-clamp-2 text-slate-600 leading-snug" title={q.scopeOfWork}>
                           {q.scopeOfWork || 'General Architectural Planning & Turnkey Construction Scope'}
                         </p>
@@ -512,16 +616,6 @@ export const AdminQuotationsReview: React.FC = () => {
                             <strong>Log:</strong> {q.adminFeedback}
                           </div>
                         )}
-                      </td>
-
-                      {/* Submitted By */}
-                      <td className="py-3.5 px-4 align-top max-w-[180px]">
-                        <span className="font-bold text-slate-800 block truncate" title={q.professionalName}>
-                          {q.professionalName || 'BuildGhar Platform'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block truncate">
-                          {q.professional?.firmName || 'Platform Technical Advisory'}
-                        </span>
                       </td>
 
                       {/* Amount */}
@@ -635,9 +729,10 @@ export const AdminQuotationsReview: React.FC = () => {
                       </tr>
                     )}
                   </React.Fragment>
-                ))
-              )}
-            </tbody>
+                );
+              })
+            )}
+          </tbody>
           </table>
         </div>
       </div>
@@ -1130,46 +1225,52 @@ export const AdminQuotationsReview: React.FC = () => {
               </div>
 
               {/* Submitting Professional Firm Profile */}
-              <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
-                    <Building className="w-4 h-4 text-amber-600" />
-                    <span>Certified Submitting Professional</span>
-                  </h3>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    Verified Partner
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block mb-0.5">Firm / Studio Name:</span>
-                    <span className="font-bold text-slate-900 text-sm">{inspectingQuote.professional?.firmName || inspectingQuote.professionalName || 'Architecture Practice'}</span>
+              {(() => {
+                const insArch = resolveArchitectInfo(inspectingQuote);
+                return (
+                  <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-sky-700" />
+                        <span>Architect & Practice Details</span>
+                      </h3>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                        <HardHat className="w-3.5 h-3.5 text-sky-600" />
+                        <span>ID: {insArch.archId}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 block mb-0.5">Architect Firm Name:</span>
+                        <span className="font-bold text-slate-900 text-sm">{insArch.firmName}</span>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 block mb-0.5">Lead Architect:</span>
+                        <span className="font-bold text-slate-900 text-sm">{insArch.architectName}</span>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 block mb-0.5">Office Phone:</span>
+                        <span className="font-bold text-slate-900 font-mono text-sm">{insArch.archPhone || inspectingQuote.professional?.phone || '—'}</span>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-xl">
+                        <span className="text-slate-400 block mb-0.5">COA Registration / City:</span>
+                        <span className="font-bold text-slate-900">{insArch.coaNumber || inspectingQuote.city || '—'}</span>
+                      </div>
+                    </div>
+                    <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-blue-900 font-bold uppercase block">Technical Rating & Track Record</span>
+                        <span className="font-semibold text-slate-800">
+                          ★ {inspectingQuote.professional?.rating || 4.9} • {inspectingQuote.professional?.completedProjects || 15}+ Projects Delivered
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200">
+                        IS 456 Compliant
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block mb-0.5">Lead Architect / Professional:</span>
-                    <span className="font-bold text-slate-900 text-sm">{inspectingQuote.professionalName || inspectingQuote.professional?.name || 'Principal Architect'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block mb-0.5">Office Phone:</span>
-                    <span className="font-bold text-slate-900 font-mono text-sm">{inspectingQuote.professional?.phone || '—'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-slate-400 block mb-0.5">Registered Office City:</span>
-                    <span className="font-bold text-slate-900">{inspectingQuote.professional?.city || inspectingQuote.city || '—'}</span>
-                  </div>
-                </div>
-                <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-blue-900 font-bold uppercase block">Technical Rating & Track Record</span>
-                    <span className="font-semibold text-slate-800">
-                      ★ {inspectingQuote.professional?.rating || 4.9} • {inspectingQuote.professional?.completedProjects || 15}+ Projects Delivered
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200">
-                    IS 456 Compliant
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Complete Itemized BOQ Schedule Table */}

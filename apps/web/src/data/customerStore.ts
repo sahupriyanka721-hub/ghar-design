@@ -545,9 +545,9 @@ export const purgeDummyData = (): void => {
       'req-301', 'req-302', 'req-303', 'req-304', 'req-1001',
       'bk-5501', 'bk-5502',
     ]);
-        const dummyFirmKeywords = [
+    const dummyFirmKeywords = [
       'rathore heritage', 'apex civil engineering', 'buildcraft turnkey',
-      'apex architecture', 'apex architectural', 'independent architecture', 'sharma designs', 'sharma engineering', 'singhania architectural',
+      'apex architecture', 'apex architectural', 'sharma designs', 'sharma engineering', 'singhania architectural',
       'studio kulkarni', 'yadav civil', 'apex turnkey build', 'luxe spaces',
     ];
     const dummyProKeywords = [

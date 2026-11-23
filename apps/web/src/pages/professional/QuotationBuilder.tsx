@@ -26,7 +26,7 @@ import {
 } from '../../data/customerStore.js';
 import { pushToCloud } from '../../data/cloudSync.js';
 import { safeSetStorage, safeGetStorage } from '../../lib/safeStorage.js';
-import { getArchitectByPhone } from '../../data/architectStore.js';
+import { getArchitectByPhone, getArchitectById } from '../../data/architectStore.js';
 
 interface LineItem {
   description: string;
@@ -153,6 +153,13 @@ export const QuotationBuilder: React.FC = () => {
     setIsSubmitting(true);
     try {
       const quoteCode = generateQuotationCode();
+      const cleanUserPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+      const matchedArch = cleanUserPhone ? getArchitectByPhone(cleanUserPhone) : (user?.id ? getArchitectById(user.id) : null);
+      const resolvedArchId = matchedArch?.id || (user as any)?.architectId || (user as any)?.coaNumber || user?.id || '';
+      const resolvedFirmName = matchedArch?.firmName || (user as any)?.firmName || '';
+      const resolvedArchName = matchedArch?.name || user?.name || '';
+      const resolvedCoa = matchedArch?.coaNumber || (user as any)?.coaNumber || '';
+
       const payload = {
         requestId: matchedReq?.id || requestId,
         requestCode: matchedReq?.requestCode || requestId,
@@ -163,32 +170,19 @@ export const QuotationBuilder: React.FC = () => {
         city: matchedReq?.city || '',
         locality: matchedReq?.locality || '',
         propertyType: matchedReq?.propertyType || '',
-        professionalId: user?.id || '',
-        professionalName: (() => {
-          const cleanPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
-          const arch = cleanPhone ? getArchitectByPhone(cleanPhone) : null;
-          return arch?.name || user?.name || '';
-        })(),
-        firmName: (() => {
-          const cleanPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
-          const arch = cleanPhone ? getArchitectByPhone(cleanPhone) : null;
-          return arch?.firmName || (user as any)?.firmName || '';
-        })(),
+        architectId: resolvedArchId,
+        firmName: resolvedFirmName,
+        architectName: resolvedArchName,
+        professionalId: resolvedArchId || user?.id || '',
+        professionalName: resolvedArchName,
         professional: {
-          id: user?.id || '',
-          name: (() => {
-            const cleanPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
-            const arch = cleanPhone ? getArchitectByPhone(cleanPhone) : null;
-            return arch?.name || user?.name || '';
-          })(),
-          firmName: (() => {
-            const cleanPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
-            const arch = cleanPhone ? getArchitectByPhone(cleanPhone) : null;
-            return arch?.firmName || (user as any)?.firmName || '';
-          })(),
-          coaNumber: (user as any)?.coaNumber || '',
+          id: resolvedArchId || user?.id || '',
+          architectId: resolvedArchId,
+          name: resolvedArchName,
+          firmName: resolvedFirmName,
+          coaNumber: resolvedCoa,
           qualifications: (user as any)?.qualifications || '',
-          phone: user?.phone || '',
+          phone: user?.phone || matchedArch?.phone || '',
         },
         scopeOfWork,
         lineItems,
@@ -232,6 +226,8 @@ export const QuotationBuilder: React.FC = () => {
         id: `quote-${Date.now()}`,
         quotationCode: quoteCode,
         ...payload,
+        architectId: resolvedArchId,
+        firmName: resolvedFirmName,
         status: 'SUBMITTED_BY_PRO',
         createdAt: new Date().toISOString(),
       };
