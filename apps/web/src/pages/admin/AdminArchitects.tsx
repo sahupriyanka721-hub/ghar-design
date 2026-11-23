@@ -963,13 +963,12 @@ export const AdminArchitects: React.FC = () => {
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">KYC Status</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     No architect records found matching current criteria.
                   </td>
                 </tr>
@@ -1172,23 +1171,6 @@ export const AdminArchitects: React.FC = () => {
                             </button>
                           )}
                         </div>
-                      </td>
-
-                      {/* 8. Action: View Profile */}
-                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const enriched = ensureArchitectStatutoryDocuments(arch);
-                            setSelectedArchitect({ ...enriched });
-                            setActiveDossierTab('CREDENTIALS');
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95 shrink-0"
-                          title="Open full architect profile & KYC verification"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View Profile</span>
-                        </button>
                       </td>
                     </tr>
                   );
