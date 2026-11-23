@@ -632,7 +632,7 @@ export const AdminPayments: React.FC = () => {
                 <div className="text-lg font-bold font-display text-navy-950 mt-1">
                   {selectedPayment.gateway}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5 font-mono">{selectedPayment.referenceId || 'BANK-IMPS-DIRECT'}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5 font-mono">{selectedPayment.referenceId || '—'}</div>
               </div>
             </div>
 
@@ -707,7 +707,7 @@ export const AdminPayments: React.FC = () => {
                       <span>Official Transaction Audit Receipt</span>
                     </h3>
                     <span className="font-mono text-xs font-bold text-slate-400">
-                      REF: {selectedPayment.referenceId || 'ESCROW-SYS-TXN'}
+                      REF: {selectedPayment.referenceId || selectedPayment.paymentCode || '—'}
                     </span>
                   </div>
 
@@ -734,7 +734,7 @@ export const AdminPayments: React.FC = () => {
                     </div>
                     <div className="flex justify-between text-xs text-slate-600">
                       <span>Gateway Reference Hash:</span>
-                      <span className="font-mono text-[11px] text-slate-500">{selectedPayment.referenceId || 'TXN-BANK-GATEWAY-2026'}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{selectedPayment.referenceId || '—'}</span>
                     </div>
 
                     <div className="pt-3 border-t border-slate-200 flex justify-between items-center">

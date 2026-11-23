@@ -22,6 +22,12 @@ import {
   Clock,
   Sparkles,
   RotateCcw,
+  User,
+  Phone,
+  MapPin,
+  Building,
+  ShieldCheck,
+  Calendar,
 } from 'lucide-react';
 import { Quotation } from '@ghar-design/shared';
 import {
@@ -54,6 +60,7 @@ export const AdminQuotationsReview: React.FC = () => {
   const { success, error } = useToast();
   const [reviewNote, setReviewNote] = useState('');
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
+  const [inspectingQuote, setInspectingQuote] = useState<any | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Modal for admin direct quotation creation
@@ -61,9 +68,9 @@ export const AdminQuotationsReview: React.FC = () => {
   const [quoteStep, setQuoteStep] = useState<1 | 2 | 3>(1);
   const [newQuote, setNewQuote] = useState({
     requestCode: '',
-    scopeOfWork: 'Complete Engineering & Structural Design Package',
-    totalAmountRupees: '185000',
-    city: 'Gurugram',
+    scopeOfWork: '',
+    totalAmountRupees: '',
+    city: '',
     timelineDays: '45',
   });
 
@@ -289,6 +296,15 @@ export const AdminQuotationsReview: React.FC = () => {
       );
 
       setQuotations(updated);
+      setInspectingQuote((prev: any) =>
+        prev && prev.id === quoteId
+          ? {
+              ...prev,
+              status: res?.data?.status || newStatus,
+              adminFeedback: reviewNote || `Quotation ${action.toLowerCase()}ed by administrator.`,
+            }
+          : prev
+      );
       safeSetStorage('platform_quotations', updated);
       broadcastStoreUpdate('QUOTATIONS_UPDATED', updated);
       pushToCloud().catch(() => {});
@@ -381,13 +397,14 @@ export const AdminQuotationsReview: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-3">
-                      <Link
-                        to={`/admin/requests/${q.requestId}`}
-                        className="font-mono text-sm font-bold text-navy-950 hover:text-blue-600 hover:underline transition"
-                        title="Click to inspect and assign"
+                      <button
+                        type="button"
+                        onClick={() => setInspectingQuote(q)}
+                        className="font-mono text-sm font-bold text-navy-950 hover:text-blue-600 hover:underline transition text-left cursor-pointer"
+                        title="Click to inspect complete quotation and BOQ schedule"
                       >
                         {q.quotationCode}
-                      </Link>
+                      </button>
                       <span className="text-xs text-slate-500">
                         For Request:{' '}
                         <Link
@@ -401,12 +418,13 @@ export const AdminQuotationsReview: React.FC = () => {
                     </div>
                     <div className="text-xs text-slate-400">
                       Customer:{' '}
-                      <Link
-                        to={`/admin/requests/${q.requestId}`}
-                        className="font-bold text-slate-700 hover:text-blue-600 hover:underline"
+                      <button
+                        type="button"
+                        onClick={() => setInspectingQuote(q)}
+                        className="font-bold text-slate-700 hover:text-blue-600 hover:underline cursor-pointer"
                       >
                         {q.customerName || 'Registered Homeowner'}
-                      </Link>{' '}
+                      </button>{' '}
                       • Location: {q.city} • Submitted {formatDate(q.createdAt)}
                     </div>
                   </div>
@@ -435,17 +453,29 @@ export const AdminQuotationsReview: React.FC = () => {
                 {/* Line Items if available */}
                 {q.items && q.items.length > 0 && (
                   <div className="border border-slate-100 rounded-xl overflow-hidden text-xs">
-                    <div className="bg-slate-50 p-2 font-bold text-slate-700">Itemized BOQ Schedule ({q.items.length} items)</div>
+                    <div className="bg-slate-50 p-2 font-bold text-slate-700 flex items-center justify-between">
+                      <span>Itemized BOQ Schedule ({q.items.length} items)</span>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingQuote(q)}
+                        className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        View Full BOQ →
+                      </button>
+                    </div>
                     <div className="divide-y divide-slate-100">
                       {q.items.slice(0, 3).map((it: any, idx: number) => (
                         <div key={idx} className="p-2 flex justify-between text-slate-600">
-                          <span>{it.title}</span>
-                          <span className="font-mono font-bold">{formatINR(it.ratePaise)}</span>
+                          <span>{it.title || it.description}</span>
+                          <span className="font-mono font-bold">{formatINR(it.ratePaise || it.totalPaise)}</span>
                         </div>
                       ))}
                       {q.items.length > 3 && (
-                        <div className="p-1.5 text-center text-[11px] text-slate-400 bg-slate-50/50">
-                          + {q.items.length - 3} more schedule items
+                        <div
+                          onClick={() => setInspectingQuote(q)}
+                          className="p-1.5 text-center text-[11px] text-blue-600 hover:text-blue-700 bg-blue-50/50 cursor-pointer font-semibold"
+                        >
+                          + {q.items.length - 3} more schedule items (Click to inspect all)
                         </div>
                       )}
                     </div>
@@ -456,6 +486,15 @@ export const AdminQuotationsReview: React.FC = () => {
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
                     <button
+                      type="button"
+                      onClick={() => setInspectingQuote(q)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-navy-950 hover:bg-navy-900 text-white flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-blue-300" />
+                      <span>Inspect Full BOQ & Scope</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleAction(q.id, 'APPROVE')}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-1 cursor-pointer"
                     >
@@ -463,6 +502,7 @@ export const AdminQuotationsReview: React.FC = () => {
                       <span>Approve</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleAction(q.id, 'PUBLISH')}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 cursor-pointer"
                     >
@@ -470,6 +510,15 @@ export const AdminQuotationsReview: React.FC = () => {
                       <span>Publish to Customer</span>
                     </button>
                     <button
+                      type="button"
+                      onClick={() => handleAction(q.id, 'REJECT')}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center gap-1 cursor-pointer"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Reject</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveQuoteId(activeQuoteId === q.id ? null : q.id)}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1 cursor-pointer"
                     >
@@ -933,6 +982,418 @@ export const AdminQuotationsReview: React.FC = () => {
                   </div>
                 )}
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FULL-SCREEN EXECUTIVE QUOTATION DOSSIER MODAL                             */}
+      {/* ========================================================================= */}
+      {inspectingQuote && (
+        <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150">
+          <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
+
+          {/* Sticky Top Bar */}
+          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={() => setInspectingQuote(null)}
+                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="hidden sm:inline">Back to Quotations Review</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-base font-display shrink-0">
+                  <FileCheck2 className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                      {inspectingQuote.quotationCode || 'Quotation Dossier'}
+                    </h2>
+                    <Badge status={inspectingQuote.status} />
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono truncate">
+                    Request Ref: {inspectingQuote.requestCode || inspectingQuote.requestId} • Submitted {formatDate(inspectingQuote.createdAt)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {inspectingQuote.status !== 'APPROVED' && (
+                <button
+                  type="button"
+                  onClick={() => handleAction(inspectingQuote.id, 'APPROVE')}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Approve Quotation</span>
+                </button>
+              )}
+              {inspectingQuote.status !== 'PUBLISHED_TO_CUSTOMER' && (
+                <button
+                  type="button"
+                  onClick={() => handleAction(inspectingQuote.id, 'PUBLISH')}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Publish to Customer</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleAction(inspectingQuote.id, 'REJECT')}
+                className="px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reject</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectingQuote(null)}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">Close</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dossier Content Body */}
+          <div className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            {/* Top Metric Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Total Quotation Value</span>
+                <div className="text-2xl font-black font-display text-navy-950 mt-1">
+                  {formatINR(inspectingQuote.finalAmountPaise || inspectingQuote.totalAmountPaise || 0)}
+                </div>
+                <div className="text-[11px] text-emerald-600 font-medium mt-0.5">Includes GST & Technical Supervision</div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Timeline</span>
+                <div className="text-2xl font-black font-display text-blue-700 mt-1">
+                  {inspectingQuote.timelineDays || inspectingQuote.estimatedDurationDays || 30} Days
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Phased Milestone Execution</div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Offer Validity</span>
+                <div className="text-base font-bold text-slate-900 mt-1 font-mono">
+                  {inspectingQuote.validUntil ? formatDate(inspectingQuote.validUntil) : '30 Days from Submission'}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Guaranteed Rate Commitment</div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Advance Tranche</span>
+                <div className="text-2xl font-black font-display text-amber-600 mt-1">
+                  {inspectingQuote.advancePercentage || 15}%
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Mobilization Escrow Deposit</div>
+              </div>
+            </div>
+
+            {/* Homeowner & Professional Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Homeowner & Site Details */}
+              <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span>Homeowner & Project Scope</span>
+                  </h3>
+                  <Link
+                    to={`/admin/requests/${inspectingQuote.requestId}`}
+                    className="text-xs text-blue-600 hover:underline font-bold"
+                  >
+                    View Original Request →
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Customer Name:</span>
+                    <span className="font-bold text-slate-900 text-sm">{inspectingQuote.customerName || 'Registered Homeowner'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Phone Number:</span>
+                    <span className="font-bold text-slate-900 font-mono text-sm">{inspectingQuote.customerPhone || '—'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Project City:</span>
+                    <span className="font-bold text-slate-900">{inspectingQuote.city || '—'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Inquiry Code:</span>
+                    <span className="font-bold text-blue-700 font-mono">{inspectingQuote.requestCode || inspectingQuote.requestId}</span>
+                  </div>
+                </div>
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+                  <span className="text-slate-400 block mb-1 font-bold">Scope Summary:</span>
+                  <p className="text-slate-700 leading-relaxed">{inspectingQuote.scopeOfWork}</p>
+                </div>
+              </div>
+
+              {/* Submitting Professional Firm Profile */}
+              <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                    <Building className="w-4 h-4 text-amber-600" />
+                    <span>Certified Submitting Professional</span>
+                  </h3>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Verified Partner
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Firm / Studio Name:</span>
+                    <span className="font-bold text-slate-900 text-sm">{inspectingQuote.professional?.firmName || inspectingQuote.professionalName || 'Architecture Practice'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Lead Architect / Professional:</span>
+                    <span className="font-bold text-slate-900 text-sm">{inspectingQuote.professionalName || inspectingQuote.professional?.name || 'Principal Architect'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Office Phone:</span>
+                    <span className="font-bold text-slate-900 font-mono text-sm">{inspectingQuote.professional?.phone || '—'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-400 block mb-0.5">Registered Office City:</span>
+                    <span className="font-bold text-slate-900">{inspectingQuote.professional?.city || inspectingQuote.city || '—'}</span>
+                  </div>
+                </div>
+                <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-blue-900 font-bold uppercase block">Technical Rating & Track Record</span>
+                    <span className="font-semibold text-slate-800">
+                      ★ {inspectingQuote.professional?.rating || 4.9} • {inspectingQuote.professional?.completedProjects || 15}+ Projects Delivered
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200">
+                    IS 456 Compliant
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Complete Itemized BOQ Schedule Table */}
+            <div className="bg-white rounded-2xl border border-blue-200/80 shadow-xs overflow-hidden">
+              <div className="p-5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+                <div>
+                  <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-blue-600" />
+                    <span>Complete Itemized Bill of Quantities (BOQ Schedule)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Full line-item breakdown of engineering deliverables, materials, and labor rates.
+                  </p>
+                </div>
+                <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                  {(inspectingQuote.items || inspectingQuote.lineItems || []).length} Line Items
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="p-4 w-12">#</th>
+                      <th className="p-4">Item Scope & Technical Specification</th>
+                      <th className="p-4">Category</th>
+                      <th className="p-4 text-center">Unit</th>
+                      <th className="p-4 text-center">Qty</th>
+                      <th className="p-4 text-right">Unit Rate (₹)</th>
+                      <th className="p-4 text-right">Amount (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(inspectingQuote.items && inspectingQuote.items.length > 0) ? (
+                      inspectingQuote.items.map((item: any, idx: number) => {
+                        const rate = item.ratePaise ? item.ratePaise : (item.unitPricePaise || 0);
+                        const total = item.totalPaise ? item.totalPaise : (rate * (item.quantity || 1));
+                        return (
+                          <tr key={item.id || idx} className="hover:bg-slate-50/80 transition">
+                            <td className="p-4 font-mono text-slate-400 font-bold">{idx + 1}</td>
+                            <td className="p-4">
+                              <div className="font-bold text-slate-900 text-xs">{item.title || item.description}</div>
+                              {item.description && item.title && item.description !== item.title && (
+                                <div className="text-[11px] text-slate-500 mt-0.5">{item.description}</div>
+                              )}
+                            </td>
+                            <td className="p-4 text-slate-600">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
+                                {item.category || 'Civil & Architectural'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center font-mono text-slate-600 capitalize">{item.unit || 'lumpsum'}</td>
+                            <td className="p-4 text-center font-mono font-bold text-slate-800">{item.quantity || 1}</td>
+                            <td className="p-4 text-right font-mono font-bold text-slate-700">{formatINR(rate)}</td>
+                            <td className="p-4 text-right font-mono font-bold text-navy-950 text-sm">{formatINR(total)}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (inspectingQuote.lineItems && inspectingQuote.lineItems.length > 0) ? (
+                      inspectingQuote.lineItems.map((item: any, idx: number) => (
+                        <tr key={item.id || idx} className="hover:bg-slate-50/80 transition">
+                          <td className="p-4 font-mono text-slate-400 font-bold">{idx + 1}</td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-900 text-xs">{item.description}</div>
+                          </td>
+                          <td className="p-4 text-slate-600">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-medium">
+                              Civil Scope
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-mono text-slate-600 capitalize">{item.unit || 'lumpsum'}</td>
+                          <td className="p-4 text-center font-mono font-bold text-slate-800">{item.quantity || 1}</td>
+                          <td className="p-4 text-right font-mono font-bold text-slate-700">{formatINR(item.unitPricePaise || 0)}</td>
+                          <td className="p-4 text-right font-mono font-bold text-navy-950 text-sm">{formatINR(item.totalPaise || 0)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-500">
+                          <p className="font-bold text-slate-700">Turnkey Scope of Work</p>
+                          <p className="text-xs text-slate-500 mt-1">{inspectingQuote.scopeOfWork}</p>
+                          <p className="text-base font-bold font-mono text-navy-950 mt-2">{formatINR(inspectingQuote.finalAmountPaise || 0)}</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                    <tr>
+                      <td colSpan={6} className="p-4 text-right text-slate-700 text-xs">Total Quotation Value (inclusive of taxes):</td>
+                      <td className="p-4 text-right font-display font-black text-navy-950 text-base">
+                        {formatINR(inspectingQuote.finalAmountPaise || inspectingQuote.totalAmountPaise || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Milestones & Escrow Tranches */}
+            {inspectingQuote.milestones && inspectingQuote.milestones.length > 0 && (
+              <div className="bg-white rounded-2xl border border-blue-200/80 shadow-xs p-6 space-y-4">
+                <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Staged Escrow Milestone Disbursals</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {inspectingQuote.milestones.map((m: any, idx: number) => (
+                    <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                          Stage {idx + 1}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900 font-mono">{m.percentage}%</span>
+                      </div>
+                      <div className="font-bold text-slate-900 text-xs">{m.title || m.name}</div>
+                      <div className="text-sm font-bold text-navy-950 font-mono">{formatINR(m.amountPaise || 0)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Inclusions & Exclusions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {inspectingQuote.includedDeliverables && inspectingQuote.includedDeliverables.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-3">
+                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Included Engineering Deliverables</span>
+                  </h4>
+                  <ul className="space-y-2 text-xs text-slate-700">
+                    {inspectingQuote.includedDeliverables.map((inc: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-emerald-600 font-bold">✓</span>
+                        <span>{inc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {inspectingQuote.excludedWork && inspectingQuote.excludedWork.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-3">
+                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>Exclusions & Regulatory Clarifications</span>
+                  </h4>
+                  <ul className="space-y-2 text-xs text-slate-600">
+                    {inspectingQuote.excludedWork.map((exc: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-500 font-bold">•</span>
+                        <span>{exc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Admin Audit & Feedback Desk */}
+            <div className="bg-white p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-4">
+              <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span>Platform Technical Audit Remarks & Feedback</span>
+              </h3>
+              {inspectingQuote.adminFeedback && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-950">
+                  <strong>Current Administrator Remark:</strong> {inspectingQuote.adminFeedback}
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Update Technical Audit Note / Request Modification Instructions:
+                </label>
+                <textarea
+                  value={reviewNote}
+                  onChange={(e) => setReviewNote(e.target.value)}
+                  placeholder="Enter structural notes, requested rate adjustments, or approval comments..."
+                  rows={3}
+                  className="w-full text-xs p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="text-xs text-slate-500">
+                  Status changes are recorded on the security audit log.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAction(inspectingQuote.id, 'REQUEST_CHANGES')}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                  >
+                    Save & Request Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAction(inspectingQuote.id, 'APPROVE')}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                  >
+                    Approve Quotation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAction(inspectingQuote.id, 'PUBLISH')}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                  >
+                    Publish to Customer
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

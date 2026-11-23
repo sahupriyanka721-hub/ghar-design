@@ -345,7 +345,7 @@ export const AdminProjects: React.FC = () => {
                   const budget = p.contractValuePaise || p.budgetPaise || p.originalContractPaise || 0;
                   const progress = p.overallVerifiedProgress ?? p.progressPercentage ?? p.overallReportedProgress ?? 0;
                   const projectCode = p.code || p.id || p.requestCode || 'PRJ-2026';
-                  const siteCity = p.city || p.siteLocation?.city || 'Delhi NCR';
+                  const siteCity = p.city || p.siteLocation?.city || '—';
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition">
@@ -641,16 +641,16 @@ export const AdminProjects: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Site Location</p>
                     <p className="font-bold text-slate-900 mt-0.5">
-                      {selectedProject.city || selectedProject.siteLocation?.city || 'Delhi NCR'}
+                      {selectedProject.city || selectedProject.siteLocation?.city || '—'}
                     </p>
                     <p className="text-[11px] text-slate-500 truncate">
-                      {selectedProject.propertyAddress || selectedProject.siteLocation?.addressLine1 || 'Verified Construction Site'}
+                      {selectedProject.propertyAddress || selectedProject.siteLocation?.addressLine1 || '—'}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Service Category</p>
                     <p className="font-bold text-slate-900 mt-0.5">{selectedProject.category || 'CONSTRUCTION'}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{selectedProject.serviceType || 'Turnkey Civil Work'}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{selectedProject.serviceType || 'Civil Execution'}</p>
                   </div>
                 </div>
 
@@ -714,14 +714,14 @@ export const AdminProjects: React.FC = () => {
                   <div className="flex justify-between items-center mb-1.5">
                     <h4 className="font-bold text-slate-800 text-xs">Work Progress & Verification</h4>
                     <span className="font-mono font-bold text-blue-700">
-                      {selectedProject.overallVerifiedProgress ?? selectedProject.progressPercentage ?? 45}% Verified
+                      {selectedProject.overallVerifiedProgress ?? selectedProject.progressPercentage ?? 0}% Verified
                     </span>
                   </div>
                   <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
                     <div
                       className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full"
                       style={{
-                        width: `${selectedProject.overallVerifiedProgress ?? selectedProject.progressPercentage ?? 45}%`,
+                        width: `${selectedProject.overallVerifiedProgress ?? selectedProject.progressPercentage ?? 0}%`,
                       }}
                     />
                   </div>

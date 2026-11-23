@@ -511,13 +511,13 @@ export const AdminContractors: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-slate-600">Contractor License:</span>
                     <span className="font-mono font-bold text-slate-900">
-                      {selectedContractor.licenseNumber || 'HR/CIVIL/Verified'}
+                      {selectedContractor.licenseNumber || 'Not Specified'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">GST Registration:</span>
                     <span className="font-mono font-bold text-slate-900">
-                      {selectedContractor.gstNumber || '06AACCP1234K1Z2'}
+                      {selectedContractor.gstNumber || 'Not Specified'}
                     </span>
                   </div>
                 </div>

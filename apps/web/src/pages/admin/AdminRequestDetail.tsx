@@ -43,8 +43,12 @@ export const AdminRequestDetail: React.FC = () => {
   const [selectedProIds, setSelectedProIds] = useState<string[]>([]);
   const [proFilter, setProFilter] = useState<'ALL' | 'ARCHITECT' | 'INTERIOR_DESIGNER' | 'CIVIL_ENGINEER'>('ALL');
   const [proSearch, setProSearch] = useState('');
-  const [responseDeadline, setResponseDeadline] = useState('2026-11-15');
-  const [internalNotes, setInternalNotes] = useState('Scope verified by in-house structural engineer. Ready for competitive BOQ bidding.');
+  const [responseDeadline, setResponseDeadline] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [internalNotes, setInternalNotes] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const { success, error } = useToast();
 
@@ -355,7 +359,7 @@ export const AdminRequestDetail: React.FC = () => {
 
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-slate-400 block mb-0.5">Client Budget Range:</span>
-            <span className="font-bold text-amber-700">{request.budgetRange || '₹50 Lakhs - ₹1 Crore'}</span>
+            <span className="font-bold text-amber-700">{request.budgetRange || 'Not Specified'}</span>
           </div>
         </div>
 
@@ -378,30 +382,71 @@ export const AdminRequestDetail: React.FC = () => {
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-slate-400 block mb-1">Plot Dimensions:</span>
             <span className="font-bold text-slate-900">
-              {request.plotWidth || 30} × {request.plotLength || 60} {request.measurementUnit?.toLowerCase() || 'ft'}
+              {request.plotWidth && request.plotLength
+                ? `${request.plotWidth} × ${request.plotLength} ${request.measurementUnit?.toLowerCase() || 'ft'}`
+                : request.plotArea
+                ? `${request.plotArea} ${request.measurementUnit?.toLowerCase() || 'sq.ft'}`
+                : 'Not Specified'}
             </span>
-            <span className="text-[10px] text-blue-700 block mt-0.5 font-semibold">
-              ({request.plotArea || 1800} {request.measurementUnit === 'METRES' ? 'sq.m' : 'sq.ft'})
-            </span>
+            {request.plotArea && (
+              <span className="text-[10px] text-blue-700 block mt-0.5 font-semibold">
+                ({request.plotArea} {request.measurementUnit === 'METRES' ? 'sq.m' : 'sq.ft'})
+              </span>
+            )}
           </div>
 
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-slate-400 block mb-1">Floors / Height:</span>
-            <span className="font-bold text-slate-900">{request.floors || 3} Floors (G+{Math.max(1, (request.floors || 3) - 1)})</span>
+            <span className="font-bold text-slate-900">
+              {request.floors !== undefined && request.floors !== null
+                ? `${request.floors} Floor${request.floors > 1 ? 's' : ''} ${request.floors > 1 ? `(G+${request.floors - 1})` : '(Ground)'}`
+                : 'Not Specified'}
+            </span>
           </div>
 
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-slate-400 block mb-1">Rooms Breakdown:</span>
             <span className="font-semibold text-slate-900">
-              {request.bedrooms || 4} Beds • {request.bathrooms || 4} Baths • {request.kitchens || 2} Kitchens
+              {request.bedrooms !== undefined || request.bathrooms !== undefined || request.kitchens !== undefined
+                ? `${request.bedrooms ?? 0} Beds • ${request.bathrooms ?? 0} Baths • ${request.kitchens ?? 0} Kitchens`
+                : 'Not Specified'}
             </span>
           </div>
 
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-slate-400 block mb-1">Engineering Style:</span>
-            <span className="font-semibold text-slate-900">{request.designStyle || 'Modern & Minimalist'}</span>
+            <span className="font-semibold text-slate-900">{request.designStyle || 'Standard Residential'}</span>
           </div>
         </div>
+
+        {/* Additional Real Project Specifications */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs pt-1">
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <span className="text-slate-400 block mb-1">Property Type:</span>
+            <span className="font-bold text-slate-900">{request.propertyType || 'Residential Plot'}</span>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <span className="text-slate-400 block mb-1">Built-Up Area:</span>
+            <span className="font-bold text-slate-900">
+              {request.builtUpArea ? `${request.builtUpArea} sq.ft` : 'As per FSI & Guidelines'}
+            </span>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <span className="text-slate-400 block mb-1">Current Site State:</span>
+            <span className="font-bold text-slate-900">{request.currentCondition || 'Vacant / Ready for Planning'}</span>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <span className="text-slate-400 block mb-1">Preferred Start Date:</span>
+            <span className="font-bold text-slate-900">{request.preferredStartDate || 'Immediate'}</span>
+          </div>
+        </div>
+
+        {request.siteAccessibilityNotes && (
+          <div className="p-3 bg-slate-50 rounded-xl text-xs">
+            <span className="text-slate-400 block mb-0.5">Site Access & Approach Road:</span>
+            <span className="font-medium text-slate-800">{request.siteAccessibilityNotes}</span>
+          </div>
+        )}
 
         {request.requiredServices && request.requiredServices.length > 0 && (
           <div className="pt-2">

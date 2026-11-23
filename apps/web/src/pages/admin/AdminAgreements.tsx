@@ -25,6 +25,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { BrandLogo } from '../../components/common/BrandLogo.js';
+import { getPlatformBookings } from '../../data/customerStore.js';
+import { formatINR } from '../../lib/utils.js';
 
 interface MilestoneTranche {
   stage: number;
@@ -40,6 +42,8 @@ export const AdminAgreements: React.FC = () => {
   const [leaveStampSpace, setLeaveStampSpace] = useState<boolean>(false);
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [selectedBookingId, setSelectedBookingId] = useState<string>('');
+  const platformBookings = React.useMemo(() => getPlatformBookings(), []);
 
   // Dynamic Editable Contract Parameters
   const [contractData, setContractData] = useState({
@@ -309,6 +313,44 @@ Signature: _____________________________________________
     });
   };
 
+  const handleSelectBooking = (bookingId: string) => {
+    setSelectedBookingId(bookingId);
+    if (!bookingId) {
+      resetToSample();
+      return;
+    }
+    const b = platformBookings.find((item) => item.id === bookingId || item.bookingCode === bookingId);
+    if (!b) return;
+    const totalRupees = Math.round((b.totalAmountPaise || 0) / 100);
+    setContractData({
+      agreementNumber: `BG-AGR-${b.bookingCode || b.id || '2026'}`,
+      dateOfExecution: new Date().toISOString().split('T')[0],
+      cityOfJurisdiction: b.projectCity ? `${b.projectCity} Legal Jurisdiction` : 'Regional Legal Jurisdiction',
+      clientName: b.customerName || '[Homeowner Name]',
+      clientFatherName: '[Legal Guardian / Spouse]',
+      clientPhone: b.customerPhone ? `+91 ${b.customerPhone.replace(/\D/g, '').slice(-10)}` : '+91 [Client Phone]',
+      clientEmail: b.customerEmail || '[Client Email]',
+      clientAadhar: 'XXXX-XXXX-[Aadhaar Ref]',
+      plotAddress: b.siteAddress || `${b.projectCity || 'Project Site Address'}`,
+      plotDimensions: b.plotArea ? `${b.plotArea} sq.ft` : '[Plot Dimensions]',
+      builtUpArea: b.builtUpArea ? `${b.builtUpArea} sq.ft` : '[Built-Up Area]',
+      professionalName: b.assignedProfessionalName || '[Assigned Professional]',
+      professionalCOA: '[COA / Statutory License]',
+      firmName: b.assignedProfessionalFirm || '[Engineering & Architecture Firm]',
+      professionalPhone: b.assignedProfessionalPhone || '+91 [Professional Phone]',
+      professionalEmail: '[pro.contact@buildghar.com]',
+      contractorLicense: '[Certified IEI / Civil Engineering License]',
+      ratePerSqFt: b.plotArea && totalRupees ? Math.round(totalRupees / b.plotArea) : 1650,
+      totalContractValue: totalRupees || 3500000,
+      totalValueInWords: `${formatINR(b.totalAmountPaise || 0)} Only`,
+      projectDurationDays: 270,
+      defectLiabilityPeriodMonths: 12,
+      rccStructuralWarrantyYears: 10,
+      arbitrationSeat: b.projectCity || 'Regional Legal Jurisdiction',
+      specialConditions: 'All reinforcement bars must strictly be IS 1786 Fe 550D compliant. Concrete grade must conform to structural drawings with batch testing certificates.',
+    });
+  };
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* ---------------- SCREEN CONTROLS & TOOLBAR (HIDDEN ON PRINT) ---------------- */}
@@ -426,6 +468,30 @@ Signature: _____________________________________________
             </label>
           </div>
         </div>
+
+        {/* Real Platform Booking Auto-Populate Bar */}
+        {platformBookings.length > 0 && (
+          <div className="bg-blue-50/90 p-3.5 rounded-2xl border border-blue-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs text-navy-950 font-bold">
+              <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Auto-Fill Real Platform Booking Data:</span>
+            </div>
+            <div className="flex-1 w-full sm:w-auto max-w-md">
+              <select
+                value={selectedBookingId}
+                onChange={(e) => handleSelectBooking(e.target.value)}
+                className="w-full text-xs font-semibold py-1.5 px-3 rounded-xl bg-white border border-blue-300 text-slate-800 shadow-2xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="">-- Select Real Confirmed Booking ({platformBookings.length} Available) --</option>
+                {platformBookings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.bookingCode || b.id} • {b.customerName} • {formatINR(b.totalAmountPaise || 0)} ({b.projectCity || 'Site'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* Live Edit Active Notification Banner */}
         {isLiveEditMode && (
