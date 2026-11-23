@@ -32,7 +32,9 @@ import {
   Sliders,
   Download,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
+import { lookupIfscCode } from '../../lib/ifscLookup.js';
 import { BrandLogo } from '../../components/common/BrandLogo.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
@@ -204,6 +206,80 @@ export const ArchitectProfileWizard: React.FC = () => {
     cancelledChequeStorageKey: '',
     isChequeAccepted: false,
   });
+  const [ifscLoading, setIfscLoading] = useState(false);
+  const [ifscStatus, setIfscStatus] = useState<{
+    state: 'idle' | 'loading' | 'success' | 'not_found' | 'error';
+    message?: string;
+    bank?: string;
+    branch?: string;
+  }>({ state: 'idle' });
+  const lastLookedUpIfscRef = React.useRef<string>('');
+
+  const handleIfscLookup = async (rawCode: string, force = false) => {
+    const clean = (rawCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    if (clean.length !== 11) {
+      if (ifscStatus.state !== 'idle') {
+        setIfscStatus({ state: 'idle' });
+      }
+      return;
+    }
+
+    if (!force && lastLookedUpIfscRef.current === clean && ifscStatus.state === 'success') {
+      return;
+    }
+    lastLookedUpIfscRef.current = clean;
+
+    setIfscLoading(true);
+    setIfscStatus({ state: 'loading', message: `Verifying IFSC ${clean} & fetching branch details...` });
+
+    try {
+      const res = await lookupIfscCode(clean);
+      if (res.isSuccess) {
+        setBank((prev) => ({
+          ...prev,
+          ifscCode: clean,
+          branch: res.fullBranchText || prev.branch,
+          bankName: res.bankName || prev.bankName,
+        }));
+        setIfscStatus({
+          state: 'success',
+          message: `Verified: ${res.bankName}${res.fullBranchText ? ' • ' + res.fullBranchText : ''}`,
+          bank: res.bankName,
+          branch: res.fullBranchText,
+        });
+      } else if (res.source === 'prefix' && res.bankName) {
+        setBank((prev) => ({
+          ...prev,
+          ifscCode: clean,
+          bankName: res.bankName || prev.bankName,
+        }));
+        setIfscStatus({
+          state: 'success',
+          message: `Bank identified: ${res.bankName}. Please enter branch name & city.`,
+          bank: res.bankName,
+        });
+      } else {
+        setIfscStatus({
+          state: 'not_found',
+          message: res.errorMessage || 'IFSC not recognized automatically. Please enter branch name & city manually.',
+        });
+      }
+    } catch {
+      setIfscStatus({
+        state: 'error',
+        message: 'Could not auto-fetch branch. Please enter Branch Name & City manually.',
+      });
+    } finally {
+      setIfscLoading(false);
+    }
+  };
+
+  // Auto-fetch branch & bank if IFSC is 11-digits but branch is not filled yet
+  useEffect(() => {
+    if (bank.ifscCode && bank.ifscCode.length === 11 && !bank.branch && !ifscLoading && lastLookedUpIfscRef.current !== bank.ifscCode) {
+      handleIfscLookup(bank.ifscCode);
+    }
+  }, [bank.ifscCode, bank.branch]);
   const chequeInputRef = React.useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = React.useRef<HTMLInputElement | null>(null);
   const firmBrochureInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -3066,32 +3142,107 @@ export const ArchitectProfileWizard: React.FC = () => {
 
                 {/* IFSC Code */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    IFSC Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={11}
-                    value={bank.ifscCode}
-                    onChange={(e) => setBank({ ...bank, ifscCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11) })}
-                    placeholder="Enter 11-digit IFSC code (e.g. HDFC0000123)"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:border-sky-500 focus:bg-white"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-1">11-character alphanumeric code from cheque or passbook</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      IFSC Code <span className="text-rose-500">*</span>
+                    </label>
+                    {bank.ifscCode.length === 11 && (
+                      <button
+                        type="button"
+                        onClick={() => handleIfscLookup(bank.ifscCode, true)}
+                        className="text-[10px] text-sky-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        title="Re-fetch Branch & City from IFSC"
+                      >
+                        {ifscLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                        <span>Auto-Fetch</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      maxLength={11}
+                      value={bank.ifscCode}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                        setBank((prev) => ({ ...prev, ifscCode: val }));
+                        if (val.length === 11) {
+                          handleIfscLookup(val);
+                        } else if (ifscStatus.state !== 'idle') {
+                          setIfscStatus({ state: 'idle' });
+                        }
+                      }}
+                      placeholder="Enter 11-digit IFSC code (e.g. HDFC0000123)"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:bg-white transition pr-10 ${
+                        ifscStatus.state === 'success'
+                          ? 'border-emerald-400 focus:border-emerald-500'
+                          : ifscStatus.state === 'not_found'
+                          ? 'border-amber-400 focus:border-amber-500'
+                          : 'border-slate-200 focus:border-sky-500'
+                      }`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                      {ifscLoading ? (
+                        <Loader2 className="w-4 h-4 text-sky-600 animate-spin" />
+                      ) : ifscStatus.state === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ) : ifscStatus.state === 'not_found' ? (
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {ifscLoading && (
+                    <span className="text-[11px] text-sky-700 font-semibold flex items-center gap-1.5 mt-1.5">
+                      <Loader2 className="w-3 h-3 text-sky-600 animate-spin shrink-0" />
+                      <span>Fetching Branch Name & City from IFSC...</span>
+                    </span>
+                  )}
+                  {!ifscLoading && ifscStatus.state === 'success' && ifscStatus.message && (
+                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1.5 mt-1.5 bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{ifscStatus.message}</span>
+                    </span>
+                  )}
+                  {!ifscLoading && ifscStatus.state === 'not_found' && (
+                    <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1.5 mt-1.5 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>{ifscStatus.message}</span>
+                    </span>
+                  )}
+                  {!ifscLoading && ifscStatus.state === 'idle' && (
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      11-character code from cheque or passbook (Branch Name & City auto-fills)
+                    </span>
+                  )}
                 </div>
 
                 {/* Branch / City */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Branch Name & City
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Branch Name & City
+                    </label>
+                    {bank.branch && ifscStatus.state === 'success' && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" /> Auto-populated
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={bank.branch}
                     onChange={(e) => setBank({ ...bank, branch: e.target.value })}
-                    placeholder="Enter branch name / location"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                    placeholder={ifscLoading ? 'Auto-fetching branch from IFSC...' : 'Enter branch name / location'}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-none transition ${
+                      bank.branch && ifscStatus.state === 'success'
+                        ? 'bg-emerald-50/30 border-emerald-300 focus:border-emerald-500 focus:bg-white'
+                        : 'bg-slate-50 border-slate-200 focus:border-sky-500 focus:bg-white'
+                    }`}
                   />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Auto-filled upon entering IFSC. You can also adjust manually if needed.
+                  </span>
                 </div>
 
                 {/* Cheque Document Proof with Side Upload Button */}
@@ -4194,12 +4345,23 @@ export const ArchitectProfileWizard: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-slate-600 block text-[11px] font-bold mb-1">IFSC Code *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-slate-600 block text-[11px] font-bold">IFSC Code *</label>
+                        {ifscLoading && <Loader2 className="w-3 h-3 animate-spin text-sky-600" />}
+                      </div>
                       <input
                         type="text"
                         maxLength={11}
                         value={bank.ifscCode}
-                        onChange={(e) => setBank({ ...bank, ifscCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11) })}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                          setBank((prev) => ({ ...prev, ifscCode: val }));
+                          if (val.length === 11) {
+                            handleIfscLookup(val);
+                          } else if (ifscStatus.state !== 'idle') {
+                            setIfscStatus({ state: 'idle' });
+                          }
+                        }}
                         placeholder="11-char IFSC (e.g. HDFC0000452)"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:border-sky-500 focus:bg-white"
                       />
@@ -4216,12 +4378,19 @@ export const ArchitectProfileWizard: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="text-slate-600 block text-[11px] font-bold mb-1">Branch / Location</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-slate-600 block text-[11px] font-bold">Branch Name & City</label>
+                        {bank.branch && ifscStatus.state === 'success' && (
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Auto-filled
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={bank.branch}
                         onChange={(e) => setBank({ ...bank, branch: e.target.value })}
-                        placeholder="Branch (e.g. MI Road, Jaipur)"
+                        placeholder="Branch Name & City (e.g. MI Road, Jaipur)"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
                       />
                     </div>
