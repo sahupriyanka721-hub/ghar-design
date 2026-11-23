@@ -561,9 +561,24 @@ export const createProjectFromAcceptedQuotation = (params: {
     bookingCode,
     workOrderNumber,
     name: `${params.request.serviceType || 'Civil Construction'} - ${params.request.locality || params.request.city}`,
-    customerId: params.customer.id,
-    customerName: params.customer.name,
-    customerPhone: params.customer.phone,
+    customerId: params.customer.id || (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.id || '';
+      } catch { return ''; }
+    })(),
+    customerName: params.customer.name || (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.name || 'Registered Homeowner';
+      } catch { return 'Registered Homeowner'; }
+    })(),
+    customerPhone: params.customer.phone || (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.phone || '';
+      } catch { return ''; }
+    })(),
     propertyAddress: `${params.request.locality || ''}, ${params.request.city}, ${params.request.state}`,
     city: params.request.city,
     state: params.request.state,

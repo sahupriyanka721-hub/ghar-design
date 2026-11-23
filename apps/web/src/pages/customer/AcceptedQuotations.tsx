@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
+import { useToast } from '../../context/ToastContext.js';
+import { apiRequest } from '../../lib/api.js';
 import {
   getExecutionProjects,
   ExecutionProject,
@@ -11,6 +13,10 @@ import {
   getPlatformBookings,
   syncChannel,
   getPlatformRequestById,
+  updatePlatformQuotationStatus,
+  updatePlatformRequestStatus,
+  savePlatformBooking,
+  PlatformBooking,
 } from '../../data/customerStore.js';
 import { cleanRecords } from '../../data/cloudSync.js';
 import {
@@ -28,6 +34,8 @@ import {
   FileText,
   AlertCircle,
   ExternalLink,
+  Check,
+  Loader2,
 } from 'lucide-react';
 
 const formatINR = (paise: number) => {
@@ -40,17 +48,16 @@ const formatINR = (paise: number) => {
 
 export const AcceptedQuotations: React.FC = () => {
   const { user } = useAuth();
+  const { success, error } = useToast();
   const [projects, setProjects] = useState<ExecutionProject[]>([]);
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acceptingQuoteId, setAcceptingQuoteId] = useState<string | null>(null);
 
   const loadAcceptedEngagements = useCallback(() => {
     const rawUserPhone = user?.phone?.replace(/\D/g, '').slice(-10);
 
-    // 1. Get execution projects directly
-    let projectList = getExecutionProjects(user?.id, user?.phone);
-
-    // 2. Read stored quotations
+    // Read stored quotations
     let localQuotes: any[] = [];
     try {
       const stored = localStorage.getItem('platform_quotations');
@@ -75,6 +82,29 @@ export const AcceptedQuotations: React.FC = () => {
         })
         .map((r) => r.id)
     );
+
+    // 1. Get execution projects directly with comprehensive identity matching
+    const allStoredProjects = getExecutionProjects();
+    let projectList = allStoredProjects.filter((p) => {
+      if (user?.id && p.customerId === user.id) return true;
+      const pPhone = p.customerPhone?.replace(/\D/g, '').slice(-10);
+      if (rawUserPhone && pPhone && pPhone === rawUserPhone) return true;
+      if (p.requestCode && userReqIds.has(p.requestCode)) return true;
+      if (
+        p.quotationId &&
+        localQuotes.some(
+          (q: any) =>
+            q.id === p.quotationId &&
+            (q.customerId === user?.id ||
+              (rawUserPhone && q.customerPhone?.includes(rawUserPhone)) ||
+              userReqIds.has(q.requestId))
+        )
+      ) {
+        return true;
+      }
+      if (!user?.id && !rawUserPhone) return true;
+      return false;
+    });
 
     // Match pending quotations (published to customer, but not yet accepted)
     const pending = localQuotes.filter((q: any) => {
@@ -145,6 +175,91 @@ export const AcceptedQuotations: React.FC = () => {
     setLoading(false);
   }, [user]);
 
+  const handleAcceptQuotation = async (quote: any) => {
+    const qId = quote.id || quote.quotationCode;
+    setAcceptingQuoteId(qId);
+    try {
+      const projSeq = Math.floor(1000 + Math.random() * 9000);
+      const bookingCode = quote.bookingCode || `GHR-BK-2026-${projSeq}`;
+      const existingReq = quote.requestId ? getPlatformRequestById(quote.requestId) : undefined;
+      const totalPaise = quote.finalAmountPaise || quote.totalAmountPaise || 15000000;
+      const advPct = quote.advancePercentage || 15;
+      const advancePaise = Math.round((totalPaise * advPct) / 100);
+
+      const newBooking: PlatformBooking = {
+        id: `bk-${Date.now()}`,
+        bookingCode,
+        customerId: user?.id || quote.customerId || `usr-cust-${Date.now()}`,
+        customerName: user?.name || quote.customerName || 'Registered Homeowner',
+        customerPhone: user?.phone || quote.customerPhone || '',
+        customerEmail: user?.email || '',
+        serviceTitle: `${quote.professional?.firmName || 'Partner'} - Construction Contract`,
+        serviceType: existingReq?.serviceType || quote.serviceType || 'Civil House Construction',
+        firmName: quote.professional?.firmName || 'Partner Firm',
+        totalAmountPaise: totalPaise,
+        advancePaise,
+        status: 'CONFIRMED',
+        confirmedAt: new Date().toISOString(),
+        requestId: quote.requestId || '',
+        quoteCode: quote.quotationCode || qId,
+        notes: `Contract value: ${formatINR(totalPaise)}. Advance Commitment: ${advPct}% (${formatINR(advancePaise)})`,
+      };
+      savePlatformBooking(newBooking);
+
+      const newProj = createProjectFromAcceptedQuotation({
+        customer: {
+          id: user?.id || quote.customerId || `usr-cust-${Date.now()}`,
+          name: user?.name || quote.customerName || 'Registered Homeowner',
+          phone: user?.phone || quote.customerPhone || '',
+        },
+        request: {
+          id: quote.requestId || `req-${Date.now()}`,
+          requestCode: existingReq?.requestCode || quote.requestCode || `REQ-${projSeq}`,
+          city: existingReq?.city || quote.city || 'Indore',
+          state: existingReq?.state || quote.state || 'Madhya Pradesh',
+          locality: existingReq?.locality || quote.locality || 'Site Address',
+          serviceType: existingReq?.serviceType || quote.serviceType || 'Civil House Construction',
+        },
+        quotation: {
+          id: quote.id || qId,
+          quotationCode: quote.quotationCode || qId,
+          finalAmountPaise: totalPaise,
+          advancePercentage: advPct,
+          scopeOfWork: quote.scopeOfWork,
+          professional: quote.professional,
+        },
+        bookingCode,
+      });
+
+      updatePlatformQuotationStatus(quote.id || qId, 'ACCEPTED', {
+        bookingCode,
+        projectId: newProj.id,
+        workOrderNumber: newProj.workOrderNumber,
+        acceptedAt: new Date().toISOString(),
+      });
+
+      if (quote.requestId) {
+        updatePlatformRequestStatus(quote.requestId, 'BOOKING_CONFIRMED');
+      }
+
+      try {
+        if (quote.id) {
+          await apiRequest(`/quotations/${quote.id}/select`, {
+            method: 'POST',
+            body: JSON.stringify({ requestId: quote.requestId }),
+          });
+        }
+      } catch (e) {}
+
+      success(`Quotation ${quote.quotationCode || qId} accepted! Work Order ${newProj.workOrderNumber} generated.`);
+      loadAcceptedEngagements();
+    } catch (err: any) {
+      error(err?.message || 'Failed to accept quotation');
+    } finally {
+      setAcceptingQuoteId(null);
+    }
+  };
+
   useEffect(() => {
     loadAcceptedEngagements();
 
@@ -201,41 +316,104 @@ export const AcceptedQuotations: React.FC = () => {
         </Link>
       </div>
 
-      {/* Pending Quotation Alert Banner */}
+      {/* Pending Quotations & Action Panel */}
       {pendingQuotes.length > 0 && (
-        <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-amber-700" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-amber-950">
-                  {pendingQuotes.length === 1
-                    ? '1 Quotation Waiting for Your Acceptance'
-                    : `${pendingQuotes.length} Quotations Waiting for Your Acceptance`}
-                </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
-                  Action Required
-                </span>
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-100/50 to-orange-50 border border-amber-300 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <FileText className="w-5 h-5" />
               </div>
-              <p className="text-xs text-amber-800/90 mt-0.5">
-                Our verified architect/contractor submitted a competitive quotation for your project. Review and accept it to generate your Work Order and start site execution.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-amber-950 font-display">
+                    {pendingQuotes.length === 1
+                      ? '1 Quotation Waiting for Your Acceptance'
+                      : `${pendingQuotes.length} Quotations Waiting for Your Acceptance`}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white">
+                    Action Required
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900 mt-0.5">
+                  Architect / Partner dwara quotation submit ho chuka hai. Niche diye gaye quotation ko accept karke aap turant apna <strong>Work Order</strong> generate kar sakte hain aur kaam start karwa sakte hain.
+                </p>
+              </div>
             </div>
           </div>
 
-          <Link
-            to={
-              pendingQuotes.length === 1
-                ? `/dashboard/quotations/${pendingQuotes[0].id}`
-                : '/dashboard/quotations'
-            }
-            className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition shrink-0 self-start sm:self-auto"
-          >
-            <span>Review Quotation</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          {/* Pending Quotation Cards */}
+          {pendingQuotes.map((pq) => (
+            <div
+              key={pq.id || pq.quotationCode}
+              className="bg-white rounded-2xl border-2 border-amber-300 p-5 shadow-sm space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-navy-900 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
+                    Quote: {pq.quotationCode || pq.id}
+                  </span>
+                  {pq.requestId && (
+                    <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      Ref: {pq.requestId}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    Pending Customer Sign-Off
+                  </span>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Quotation Value</span>
+                  <span className="text-lg font-bold font-mono text-navy-950">
+                    {formatINR(pq.finalAmountPaise || pq.totalAmountPaise || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Architect / Partner Firm</span>
+                  <div className="font-bold text-slate-900">{pq.professional?.firmName || 'Certified Engineering Associate'}</div>
+                  <div className="text-slate-600 text-[11px]">{pq.professional?.name || 'Project Architect'}</div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Scope & Terms</span>
+                  <div className="font-semibold text-slate-800">{pq.scopeOfWork || 'Full Architectural & Structural Drawing Set'}</div>
+                  <div className="text-emerald-700 font-bold text-[11px] mt-1">✓ Advance: {pq.advancePercentage || 15}% (Escrow Protected)</div>
+                </div>
+
+                <div className="flex flex-col justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptQuotation(pq)}
+                    disabled={acceptingQuoteId === (pq.id || pq.quotationCode)}
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 active:scale-98"
+                  >
+                    {acceptingQuoteId === (pq.id || pq.quotationCode) ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Generating Work Order...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Accept & Generate Work Order</span>
+                      </>
+                    )}
+                  </button>
+
+                  <Link
+                    to={`/dashboard/quotations/${pq.id}`}
+                    className="w-full py-2 px-4 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>View Itemized BOQ Details</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

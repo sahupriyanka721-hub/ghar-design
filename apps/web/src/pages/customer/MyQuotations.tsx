@@ -10,7 +10,13 @@ import {
   purgeDummyData,
   PlatformProjectRequest,
   getRegisteredCustomers,
+  getPlatformRequestById,
+  updatePlatformQuotationStatus,
+  updatePlatformRequestStatus,
+  savePlatformBooking,
+  PlatformBooking,
 } from '../../data/customerStore.js';
+import { createProjectFromAcceptedQuotation } from '../../data/projectExecutionStore.js';
 import { cleanRecords } from '../../data/cloudSync.js';
 import { formatINR, formatDate } from '../../lib/utils.js';
 import { downloadInquiryReceiptPdf } from '../../lib/pdfGenerator.js';
@@ -40,6 +46,7 @@ import {
   PlusCircle,
   MessageSquare,
   Compass,
+  Loader2,
 } from 'lucide-react';
 import { Quotation } from '@ghar-design/shared';
 
@@ -54,6 +61,92 @@ export const MyQuotations: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'amount-asc' | 'amount-desc' | 'date'>('date');
+  const [acceptingQuoteId, setAcceptingQuoteId] = useState<string | null>(null);
+
+  const handleAcceptDirect = async (quote: any) => {
+    const qId = quote.id || quote.quotationCode;
+    setAcceptingQuoteId(qId);
+    try {
+      const projSeq = Math.floor(1000 + Math.random() * 9000);
+      const bookingCode = quote.bookingCode || `GHR-BK-2026-${projSeq}`;
+      const existingReq = quote.requestId ? getPlatformRequestById(quote.requestId) : undefined;
+      const totalPaise = quote.finalAmountPaise || quote.totalAmountPaise || 15000000;
+      const advPct = quote.advancePercentage || 15;
+      const advancePaise = Math.round((totalPaise * advPct) / 100);
+
+      const newBooking: PlatformBooking = {
+        id: `bk-${Date.now()}`,
+        bookingCode,
+        customerId: user?.id || quote.customerId || `usr-cust-${Date.now()}`,
+        customerName: user?.name || quote.customerName || 'Registered Homeowner',
+        customerPhone: user?.phone || quote.customerPhone || '',
+        customerEmail: user?.email || '',
+        serviceTitle: `${quote.professional?.firmName || 'Partner'} - Construction Contract`,
+        serviceType: existingReq?.serviceType || quote.serviceType || 'Civil House Construction',
+        firmName: quote.professional?.firmName || 'Partner Firm',
+        totalAmountPaise: totalPaise,
+        advancePaise,
+        status: 'CONFIRMED',
+        confirmedAt: new Date().toISOString(),
+        requestId: quote.requestId || '',
+        quoteCode: quote.quotationCode || qId,
+        notes: `Contract value: ${formatINR(totalPaise)}. Advance Commitment: ${advPct}% (${formatINR(advancePaise)})`,
+      };
+      savePlatformBooking(newBooking);
+
+      const newProj = createProjectFromAcceptedQuotation({
+        customer: {
+          id: user?.id || quote.customerId || `usr-cust-${Date.now()}`,
+          name: user?.name || quote.customerName || 'Registered Homeowner',
+          phone: user?.phone || quote.customerPhone || '',
+        },
+        request: {
+          id: quote.requestId || `req-${Date.now()}`,
+          requestCode: existingReq?.requestCode || quote.requestCode || `REQ-${projSeq}`,
+          city: existingReq?.city || quote.city || 'Indore',
+          state: existingReq?.state || quote.state || 'Madhya Pradesh',
+          locality: existingReq?.locality || quote.locality || 'Site Address',
+          serviceType: existingReq?.serviceType || quote.serviceType || 'Civil House Construction',
+        },
+        quotation: {
+          id: quote.id || qId,
+          quotationCode: quote.quotationCode || qId,
+          finalAmountPaise: totalPaise,
+          advancePercentage: advPct,
+          scopeOfWork: quote.scopeOfWork,
+          professional: quote.professional,
+        },
+        bookingCode,
+      });
+
+      updatePlatformQuotationStatus(quote.id || qId, 'ACCEPTED', {
+        bookingCode,
+        projectId: newProj.id,
+        workOrderNumber: newProj.workOrderNumber,
+        acceptedAt: new Date().toISOString(),
+      });
+
+      if (quote.requestId) {
+        updatePlatformRequestStatus(quote.requestId, 'BOOKING_CONFIRMED');
+      }
+
+      try {
+        if (quote.id) {
+          await apiRequest(`/quotations/${quote.id}/select`, {
+            method: 'POST',
+            body: JSON.stringify({ requestId: quote.requestId }),
+          });
+        }
+      } catch (e) {}
+
+      success(`Quotation accepted! Work Order ${newProj.workOrderNumber} generated.`);
+      navigate('/dashboard/accepted-quotations');
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setAcceptingQuoteId(null);
+    }
+  };
 
   const activeProjectRequest = useMemo(() => {
     if (!requests || requests.length === 0) return null;
@@ -463,13 +556,34 @@ export const MyQuotations: React.FC = () => {
                       Compare
                     </Link>
 
-                    <Link
-                      to={`/dashboard/requests/${quote.requestId}/quotations`}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs transition flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Accept & Book</span>
-                    </Link>
+                    {quote.status === 'ACCEPTED' || quote.status === 'SELECTED' || quote.status === 'CONFIRMED' ? (
+                      <Link
+                        to="/dashboard/accepted-quotations"
+                        className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg shadow-2xs transition flex items-center gap-1.5 border border-emerald-300"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Accepted (View WO)</span>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptDirect(quote)}
+                        disabled={acceptingQuoteId === (quote.id || quote.quotationCode)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-98"
+                      >
+                        {acceptingQuoteId === (quote.id || quote.quotationCode) ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Accepting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Accept & Book</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
