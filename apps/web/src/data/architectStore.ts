@@ -543,9 +543,59 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
     arch.portfolioProjects = [];
   }
 
-  // 3. Ensure Bank Details - do not inject fake HDFC Bank
+  // 3. Ensure Bank Details - recover real details from drafts if missing on arch
   if (arch.bankDetails?.accountNumber === '50200091827364') {
     delete (arch as any).bankDetails;
+  }
+
+  if (!arch.bankDetails || (!arch.bankDetails.accountNumber && !arch.bankDetails.bankName && !arch.bankDetails.ifscCode)) {
+    try {
+      const draftRaw =
+        (cleanPhone ? localStorage.getItem(`arch_wizard_draft_${cleanPhone}`) : null) ||
+        (cleanPhone ? localStorage.getItem(`arch_draft_${cleanPhone}`) : null) ||
+        localStorage.getItem('arch_wizard_draft_current');
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw);
+        const b = draft?.bank || draft?.bankDetails;
+        if (b && (b.accountNumber || b.bankName || b.ifscCode || b.cancelledChequeUrl)) {
+          arch.bankDetails = {
+            bankName: b.bankName || '',
+            accountHolderName: b.accountHolderName || arch.name || '',
+            accountNumber: b.accountNumber || '',
+            ifscCode: (b.ifscCode || '').toUpperCase(),
+            accountType: b.accountType || 'CURRENT',
+            branch: b.branch || '',
+            cancelledChequeUrl: b.cancelledChequeUrl || '',
+            cancelledChequeFileName: b.cancelledChequeFileName || '',
+            cancelledChequeStorageKey: b.cancelledChequeStorageKey || '',
+            isChequeAccepted: Boolean(b.isChequeAccepted),
+            isVerified: Boolean(b.isVerified),
+          };
+        }
+      }
+      if ((!arch.bankDetails || !arch.bankDetails.accountNumber) && cleanPhone) {
+        const bankRaw = localStorage.getItem(`arch_bank_${cleanPhone}`);
+        if (bankRaw) {
+          const b = JSON.parse(bankRaw);
+          if (b && (b.accountNumber || b.bankName || b.ifscCode || b.cancelledChequeUrl)) {
+            arch.bankDetails = {
+              ...(arch.bankDetails || {}),
+              bankName: b.bankName || arch.bankDetails?.bankName || '',
+              accountHolderName: b.accountHolderName || arch.bankDetails?.accountHolderName || arch.name || '',
+              accountNumber: b.accountNumber || arch.bankDetails?.accountNumber || '',
+              ifscCode: (b.ifscCode || arch.bankDetails?.ifscCode || '').toUpperCase(),
+              accountType: b.accountType || arch.bankDetails?.accountType || 'CURRENT',
+              branch: b.branch || arch.bankDetails?.branch || '',
+              cancelledChequeUrl: b.cancelledChequeUrl || arch.bankDetails?.cancelledChequeUrl || '',
+              cancelledChequeFileName: b.cancelledChequeFileName || arch.bankDetails?.cancelledChequeFileName || '',
+              cancelledChequeStorageKey: b.cancelledChequeStorageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
+              isChequeAccepted: Boolean(b.isChequeAccepted ?? arch.bankDetails?.isChequeAccepted),
+              isVerified: Boolean(b.isVerified ?? arch.bankDetails?.isVerified),
+            };
+          }
+        }
+      }
+    } catch (e) {}
   }
 
   // 4. Ensure Statutory Documents
@@ -741,10 +791,85 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   if (docPhoto && docPhoto.fileUrl && (docPhoto.fileUrl.startsWith('data:') || docPhoto.fileUrl.startsWith('http'))) {
     arch.profilePhoto = docPhoto.fileUrl;
   }
+  const chequeDoc = finalDocs.find((d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE');
+  if (chequeDoc && (!arch.bankDetails || !arch.bankDetails.cancelledChequeUrl)) {
+    arch.bankDetails = {
+      ...(arch.bankDetails || {
+        bankName: '',
+        accountHolderName: arch.name || '',
+        accountNumber: '',
+        ifscCode: '',
+        accountType: 'CURRENT',
+        branch: arch.city || '',
+      }),
+      cancelledChequeUrl: chequeDoc.fileUrl || arch.bankDetails?.cancelledChequeUrl || '',
+      cancelledChequeFileName: chequeDoc.fileName || arch.bankDetails?.cancelledChequeFileName || 'Bank_Cancelled_Cheque.jpg',
+      cancelledChequeStorageKey: chequeDoc.storageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
+      isChequeAccepted: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isChequeAccepted),
+      isVerified: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isVerified),
+    };
+  }
   arch.documents = finalDocs;
   arch.kycDocuments = finalDocs;
   return arch;
 };
+
+export const saveArchitectBankDetails = (
+  architectId: string,
+  bank: {
+    bankName: string;
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    accountType?: 'CURRENT' | 'SAVINGS';
+    branch?: string;
+    cancelledChequeUrl?: string;
+    cancelledChequeFileName?: string;
+    isChequeAccepted?: boolean;
+    isVerified?: boolean;
+  }
+): ArchitectAccount | null => {
+  const current = getArchitectAccounts();
+  const idx = current.findIndex((a) => a.id === architectId || a.applicationNumber === architectId);
+  if (idx === -1) return null;
+
+  const arch = ensureArchitectStatutoryDocuments(current[idx]);
+  arch.bankDetails = {
+    ...(arch.bankDetails || {}),
+    bankName: bank.bankName || arch.bankDetails?.bankName || '',
+    accountHolderName: bank.accountHolderName || arch.bankDetails?.accountHolderName || arch.name || '',
+    accountNumber: bank.accountNumber || arch.bankDetails?.accountNumber || '',
+    ifscCode: (bank.ifscCode || arch.bankDetails?.ifscCode || '').toUpperCase(),
+    accountType: bank.accountType || arch.bankDetails?.accountType || 'CURRENT',
+    branch: bank.branch || arch.bankDetails?.branch || '',
+    cancelledChequeUrl: bank.cancelledChequeUrl || arch.bankDetails?.cancelledChequeUrl || '',
+    cancelledChequeFileName: bank.cancelledChequeFileName || arch.bankDetails?.cancelledChequeFileName || '',
+    isChequeAccepted: bank.isChequeAccepted ?? arch.bankDetails?.isChequeAccepted ?? false,
+    isVerified: bank.isVerified ?? arch.bankDetails?.isVerified ?? false,
+  };
+  arch.updatedAt = new Date().toISOString();
+  current[idx] = arch;
+  safePersistArchitects(current);
+
+  const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
+  if (cleanPhone) {
+    try {
+      localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(arch.bankDetails));
+    } catch (e) {}
+  }
+
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('architect_store_updated', { detail: arch }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return arch;
+};
+
+
 
 export const getArchitectAccounts = (): ArchitectAccount[] => {
   try {
@@ -1644,4 +1769,5 @@ export const updateArchitectDocumentStatus = (
 
   return arch;
 };
+
 

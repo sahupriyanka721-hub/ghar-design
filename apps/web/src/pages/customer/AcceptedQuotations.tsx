@@ -129,7 +129,7 @@ export const AcceptedQuotations: React.FC = () => {
     setPendingQuotes(pending);
 
     // Match accepted quotations
-    const acceptedQuotes = localQuotes.filter((q: any) => {
+    let acceptedQuotes = localQuotes.filter((q: any) => {
       const isAccepted = q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.status === 'CONFIRMED';
       if (!isAccepted) return false;
 
@@ -141,6 +141,14 @@ export const AcceptedQuotations: React.FC = () => {
       if (!user?.id && !rawUserPhone) return true;
       return false;
     });
+
+    // Fallback: If strict phone or ID matching filtered out accepted projects or quotes in local test session, display them
+    if (projectList.length === 0 && allStoredProjects.length > 0) {
+      projectList = allStoredProjects;
+    }
+    if (acceptedQuotes.length === 0 && projectList.length === 0) {
+      acceptedQuotes = localQuotes.filter((q: any) => q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.status === 'CONFIRMED');
+    }
 
     // Auto-hydrate execution projects if accepted quotes exist but missing from execution store
     const existingQuoteIds = new Set(

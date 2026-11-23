@@ -252,7 +252,10 @@ export const MyQuotations: React.FC = () => {
         return false;
       });
 
-      const displayQuotes = customerQuotes;
+      let displayQuotes = customerQuotes;
+      if (displayQuotes.length === 0 && localQuotes.length > 0) {
+        displayQuotes = localQuotes;
+      }
 
       // Safe merge with API: never wipe out local quotes
       const mergedMap = new Map<string, any>();

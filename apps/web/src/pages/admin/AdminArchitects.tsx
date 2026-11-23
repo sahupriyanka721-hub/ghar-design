@@ -59,6 +59,7 @@ import {
   getArchitectAccounts,
   updateArchitectStatus,
   updateArchitectDocumentStatus,
+  saveArchitectBankDetails,
   deleteArchitectAccount,
   clearAllArchitects,
   formatArchitectId,
@@ -137,6 +138,81 @@ export const AdminArchitects: React.FC = () => {
     customNote: 'Recommended by BuildGhar Central Engineering Desk for verified architectural execution & timely structural drawings.',
     channel: 'ALL' as 'WHATSAPP' | 'SMS' | 'PORTAL' | 'ALL',
   });
+
+  // Bank Details Editing & Form State
+  const [editingBank, setEditingBank] = useState(false);
+  const [bankFormData, setBankFormData] = useState({
+    bankName: '',
+    accountHolderName: '',
+    accountNumber: '',
+    ifscCode: '',
+    accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS',
+    branch: '',
+  });
+
+  const handleStartEditBank = () => {
+    if (!selectedArchitect) return;
+    setBankFormData({
+      bankName: selectedArchitect.bankDetails?.bankName || '',
+      accountHolderName: selectedArchitect.bankDetails?.accountHolderName || selectedArchitect.name || '',
+      accountNumber: selectedArchitect.bankDetails?.accountNumber || '',
+      ifscCode: selectedArchitect.bankDetails?.ifscCode || '',
+      accountType: (selectedArchitect.bankDetails?.accountType as any) || 'CURRENT',
+      branch: selectedArchitect.bankDetails?.branch || selectedArchitect.city || '',
+    });
+    setEditingBank(true);
+  };
+
+  const handleSaveBankForm = () => {
+    if (!selectedArchitect) return;
+    const cleanIfsc = (bankFormData.ifscCode || '').trim().toUpperCase();
+    const updatedArch = saveArchitectBankDetails(selectedArchitect.id, {
+      ...bankFormData,
+      ifscCode: cleanIfsc,
+      cancelledChequeUrl: selectedArchitect.bankDetails?.cancelledChequeUrl,
+      cancelledChequeFileName: selectedArchitect.bankDetails?.cancelledChequeFileName,
+      isChequeAccepted: selectedArchitect.bankDetails?.isChequeAccepted,
+      isVerified: selectedArchitect.bankDetails?.isVerified,
+    });
+    if (updatedArch) {
+      setSelectedArchitect({ ...updatedArch });
+      setArchitects((prev) => prev.map((a) => (a.id === updatedArch.id ? updatedArch : a)));
+      setEditingBank(false);
+      success('Bank details saved successfully!');
+    } else {
+      error('Failed to save bank details.');
+    }
+  };
+
+  const handleVerifyBankAndCheque = () => {
+    if (!selectedArchitect) return;
+    const currentBank = selectedArchitect.bankDetails || {
+      bankName: '',
+      accountHolderName: selectedArchitect.name || '',
+      accountNumber: '',
+      ifscCode: '',
+      accountType: 'CURRENT',
+      branch: selectedArchitect.city || '',
+    };
+    const updatedArch = saveArchitectBankDetails(selectedArchitect.id, {
+      ...currentBank,
+      isChequeAccepted: true,
+      isVerified: true,
+    });
+    if (updatedArch) {
+      const chequeDoc = updatedArch.documents?.find(
+        (d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+      );
+      if (chequeDoc) {
+        updateArchitectDocumentStatus(updatedArch.id, chequeDoc.id, 'VERIFIED');
+      }
+      const fresh = ensureArchitectStatutoryDocuments(updatedArch);
+      setSelectedArchitect({ ...fresh });
+      setArchitects((prev) => prev.map((a) => (a.id === fresh.id ? fresh : a)));
+      success('Bank details and cancelled cheque verified successfully!');
+    }
+  };
+
 
 
   const downloadDocumentFile = async (doc: ArchitectKycDocument, archName: string, coaNumber?: string) => {
@@ -362,12 +438,15 @@ export const AdminArchitects: React.FC = () => {
   };
 
   const handleViewCheque = async () => {
-    if (!selectedArchitect || !selectedArchitect.bankDetails) return;
+    if (!selectedArchitect) return;
     const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
-    const chequeKey = selectedArchitect.bankDetails.cancelledChequeStorageKey || `arch_cheque_${cleanPhone}`;
+    const chequeDoc = selectedArchitect.documents?.find(
+      (d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+    );
+    const chequeKey = selectedArchitect.bankDetails?.cancelledChequeStorageKey || chequeDoc?.storageKey || `arch_cheque_${cleanPhone}`;
 
-    let chequeUrl = selectedArchitect.bankDetails.cancelledChequeUrl;
-    let chequeName = selectedArchitect.bankDetails.cancelledChequeFileName || 'Cancelled_Cheque.jpg';
+    let chequeUrl = selectedArchitect.bankDetails?.cancelledChequeUrl || chequeDoc?.fileUrl;
+    let chequeName = selectedArchitect.bankDetails?.cancelledChequeFileName || chequeDoc?.fileName || 'Cancelled_Cheque.jpg';
 
     if (!chequeUrl || chequeUrl === '#' || chequeUrl.startsWith('indexeddb:') || chequeUrl.startsWith('blob:') || chequeUrl.length < 50) {
       const candidateKeys = [
@@ -376,7 +455,8 @@ export const AdminArchitects: React.FC = () => {
         'arch_cheque_guest',
         `arch_doc_${cleanPhone}_CANCELLED_CHEQUE`,
         'arch_doc_guest_CANCELLED_CHEQUE',
-        'doc-cheque'
+        'doc-cheque',
+        'doc-cancelled-cheque'
       ];
       for (const k of candidateKeys) {
         try {
@@ -392,7 +472,7 @@ export const AdminArchitects: React.FC = () => {
 
     if (!chequeUrl || (!chequeUrl.startsWith('data:') && !chequeUrl.startsWith('http'))) {
       chequeUrl = generateCertificateDataUrl(
-        `Cancelled Cheque - ${selectedArchitect.bankDetails.bankName || 'Bank'}`,
+        `Cancelled Cheque - ${selectedArchitect.bankDetails?.bankName || 'Bank'}`,
         selectedArchitect.name,
         selectedArchitect.coaNumber || 'COA/VERIFIED',
         'CANCELLED_CHEQUE'
@@ -402,14 +482,14 @@ export const AdminArchitects: React.FC = () => {
     const docItem: ArchitectKycDocument = {
       id: 'doc-cheque',
       documentType: 'CANCELLED_CHEQUE',
-      title: `Bank Cancelled Cheque (${selectedArchitect.bankDetails.bankName || 'Escrow Account'})`,
+      title: `Bank Cancelled Cheque (${selectedArchitect.bankDetails?.bankName || 'Escrow Account'})`,
       fileName: chequeName,
       fileType: chequeUrl.startsWith('data:application/pdf') ? 'application/pdf' : 'image/jpeg',
       fileUrl: chequeUrl,
       fileSize: 'Original Verified Cheque',
       storageKey: chequeKey,
       isOriginalUpload: true,
-      status: selectedArchitect.bankDetails.isChequeAccepted ? 'VERIFIED' : 'PENDING',
+      status: (selectedArchitect.bankDetails?.isChequeAccepted || chequeDoc?.status === 'VERIFIED') ? 'VERIFIED' : 'PENDING',
       uploadedAt: new Date().toISOString(),
     };
     setActiveReviewDoc(docItem);
@@ -1685,7 +1765,7 @@ export const AdminArchitects: React.FC = () => {
                               {doc.status === 'VERIFIED' && (
                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shrink-0">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>Confirmed ✓</span>
+                                  <span>Verified ✓</span>
                                 </span>
                               )}
                               {doc.status === 'REJECTED' && (
@@ -1735,10 +1815,10 @@ export const AdminArchitects: React.FC = () => {
                                     ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 cursor-default opacity-80'
                                     : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98'
                                 }`}
-                                title="Confirm this statutory document"
+                                title="Verify this statutory document"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>{doc.status === 'VERIFIED' ? 'Confirmed' : 'Confirm'}</span>
+                                <span>{doc.status === 'VERIFIED' ? 'Verified ✓' : 'Verify'}</span>
                               </button>
 
                               <button
@@ -1770,68 +1850,210 @@ export const AdminArchitects: React.FC = () => {
 
                   {/* Step 6: Bank Account & Cheque Acceptance */}
                   <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-xs space-y-4">
-                    <div className="font-extrabold text-navy-950 text-sm font-display flex items-center justify-between border-b border-emerald-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-emerald-600" />
-                        <span>Bank Details & Cheque Verification</span>
-                      </div>
-                      {selectedArchitect.bankDetails?.isChequeAccepted && (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                          Cheque Verified
-                        </span>
-                      )}
-                    </div>
-                    {selectedArchitect.bankDetails?.accountNumber ? (
-                      <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-3 text-xs">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
-                            <span className="font-bold text-navy-950 text-sm">{selectedArchitect.bankDetails.bankName || 'Not specified'}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Holder</span>
-                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.accountHolderName || selectedArchitect.name}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
-                            <span className="font-bold text-slate-800 font-mono">•••• {selectedArchitect.bankDetails.accountNumber.slice(-4)}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">IFSC Code</span>
-                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.bankDetails.ifscCode}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Type</span>
-                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.accountType || 'CURRENT'}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Branch Location</span>
-                            <span className="font-bold text-slate-800">{selectedArchitect.bankDetails.branch || selectedArchitect.city || 'Main Branch'}</span>
-                          </div>
-                        </div>
+                    {(() => {
+                      const bankInfo = selectedArchitect.bankDetails;
+                      const chequeDoc = selectedArchitect.documents?.find(
+                        (d) => d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+                      );
+                      const hasBankInfo = Boolean(
+                        bankInfo &&
+                        (bankInfo.accountNumber ||
+                         bankInfo.bankName ||
+                         bankInfo.ifscCode ||
+                         bankInfo.branch ||
+                         bankInfo.cancelledChequeUrl ||
+                         chequeDoc?.fileUrl)
+                      );
+                      const isBankVerified = Boolean(bankInfo?.isVerified || bankInfo?.isChequeAccepted || chequeDoc?.status === 'VERIFIED');
+                      const chequeFileUrl = bankInfo?.cancelledChequeUrl || chequeDoc?.fileUrl;
 
-                        <div className="pt-3 border-t border-emerald-200 flex items-center justify-between">
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Cheque Document</span>
-                            <span className="font-bold text-navy-950">{selectedArchitect.bankDetails.cancelledChequeFileName || 'Attached Cheque'}</span>
+                      return (
+                        <div className="space-y-4">
+                          <div className="font-extrabold text-navy-950 text-sm font-display flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-emerald-600" />
+                              <span>Bank Details & Cheque Verification</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isBankVerified ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Verified ✓</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyBankAndCheque}
+                                  className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-98"
+                                  title="Verify bank details and cancelled cheque"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Verify Bank Details ✓</span>
+                                </button>
+                              )}
+                              {!editingBank ? (
+                                <button
+                                  type="button"
+                                  onClick={handleStartEditBank}
+                                  className="px-3 py-1 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer active:scale-98"
+                                >
+                                  <span>{hasBankInfo ? 'Edit Bank Details' : '+ Add Bank Details'}</span>
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
-                          {selectedArchitect.bankDetails.cancelledChequeUrl || selectedArchitect.bankDetails.cancelledChequeStorageKey ? (
-                            <button
-                              type="button"
-                              onClick={handleViewCheque}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View &amp; Inspect Cheque</span>
-                            </button>
+
+                          {editingBank ? (
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                              <div className="text-xs font-bold text-slate-700 mb-2">
+                                {hasBankInfo ? 'Update Architect Bank Account & Escrow Details' : 'Enter Official Bank Details for Architect'}
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Bank Name</label>
+                                  <input
+                                    type="text"
+                                    value={bankFormData.bankName}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, bankName: e.target.value })}
+                                    placeholder="e.g. State Bank of India, HDFC"
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Account Holder Name</label>
+                                  <input
+                                    type="text"
+                                    value={bankFormData.accountHolderName}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, accountHolderName: e.target.value })}
+                                    placeholder={selectedArchitect.name}
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Account Number</label>
+                                  <input
+                                    type="text"
+                                    value={bankFormData.accountNumber}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
+                                    placeholder="Enter Account Number"
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">IFSC Code</label>
+                                  <input
+                                    type="text"
+                                    value={bankFormData.ifscCode}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, ifscCode: e.target.value.toUpperCase() })}
+                                    placeholder="e.g. SBIN0001234"
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Account Type</label>
+                                  <select
+                                    value={bankFormData.accountType}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, accountType: e.target.value as any })}
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                                  >
+                                    <option value="CURRENT">Current Account (Firm)</option>
+                                    <option value="SAVINGS">Savings Account (Personal)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Branch Name & City</label>
+                                  <input
+                                    type="text"
+                                    value={bankFormData.branch}
+                                    onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
+                                    placeholder="Branch Name & City"
+                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingBank(false)}
+                                  className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveBankForm}
+                                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer active:scale-98"
+                                >
+                                  Save Bank Details
+                                </button>
+                              </div>
+                            </div>
+                          ) : hasBankInfo ? (
+                            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-3 text-xs">
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
+                                  <span className="font-bold text-navy-950 text-sm">{bankInfo?.bankName || 'Not specified'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Holder</span>
+                                  <span className="font-bold text-slate-800">{bankInfo?.accountHolderName || selectedArchitect.name}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
+                                  <span className="font-bold text-slate-800 font-mono">
+                                    {bankInfo?.accountNumber ? `•••• ${bankInfo.accountNumber.slice(-4)}` : 'Pending entry'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">IFSC Code</span>
+                                  <span className="font-bold text-slate-800 font-mono">{bankInfo?.ifscCode || 'Pending entry'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Type</span>
+                                  <span className="font-bold text-slate-800">{bankInfo?.accountType || 'CURRENT'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Branch Location</span>
+                                  <span className="font-bold text-slate-800">{bankInfo?.branch || selectedArchitect.city || 'Main Branch'}</span>
+                                </div>
+                              </div>
+
+                              <div className="pt-3 border-t border-emerald-200 flex items-center justify-between">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Cheque Document</span>
+                                  <span className="font-bold text-navy-950">{bankInfo?.cancelledChequeFileName || chequeDoc?.fileName || 'Attached Cheque'}</span>
+                                </div>
+                                {chequeFileUrl || bankInfo?.cancelledChequeStorageKey || chequeDoc?.storageKey ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleViewCheque}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>View &amp; Inspect Cheque</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic">No cheque file attached</span>
+                                )}
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-xs text-slate-400 italic">No cheque file attached</span>
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-center space-y-2">
+                              <p className="text-xs text-slate-500 font-medium">Bank details not provided during online registration.</p>
+                              <button
+                                type="button"
+                                onClick={handleStartEditBank}
+                                className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer active:scale-98"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add Bank Details Now</span>
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Bank details not provided during registration.</p>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -2708,10 +2930,10 @@ export const AdminArchitects: React.FC = () => {
                   setActiveReviewDoc(null);
                 }}
                 className="px-7 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-2 shadow-lg transition cursor-pointer active:scale-98"
-                title="Submit and confirm this document verification"
+                title="Verify and approve this statutory document"
               >
                 <CheckCircle2 className="w-4 h-4 text-white" />
-                <span>Submit (स्वीकृत व सबमिट करें)</span>
+                <span>Verify Document (सत्यापित करें)</span>
               </button>
             </div>
           </div>

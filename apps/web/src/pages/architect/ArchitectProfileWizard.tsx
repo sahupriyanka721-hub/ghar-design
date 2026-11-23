@@ -874,6 +874,12 @@ export const ArchitectProfileWizard: React.FC = () => {
         portfolioProjects,
       };
       sessionStorage.setItem(draftKey, JSON.stringify(draftPayload));
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(draftPayload));
+        if (cleanPhone && (bank.accountNumber || bank.bankName || bank.ifscCode || bank.cancelledChequeUrl)) {
+          localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(bank));
+        }
+      } catch (e) {}
     } catch (e) {
       console.warn('Draft auto-save warning:', e);
     }
@@ -1562,6 +1568,7 @@ export const ArchitectProfileWizard: React.FC = () => {
         localStorage.setItem(`arch_directors_${cleanUserPhone}`, JSON.stringify(directors));
         localStorage.setItem(`arch_biz_verif_${cleanUserPhone}`, JSON.stringify(businessVerification));
         localStorage.setItem(`arch_kyc_${cleanUserPhone}`, JSON.stringify(compiledDocs));
+        localStorage.setItem(`arch_bank_${cleanUserPhone}`, JSON.stringify(bank));
       } catch (e) {}
 
       try {
@@ -4487,9 +4494,17 @@ export const ArchitectProfileWizard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  if (currentStep === 6 && bank.accountNumber && bank.confirmAccountNumber && bank.accountNumber !== bank.confirmAccountNumber) {
-                    error('Bank account numbers do not match! Please check and re-confirm.');
-                    return;
+                  if (currentStep === 6) {
+                    if (bank.accountNumber && bank.confirmAccountNumber && bank.accountNumber !== bank.confirmAccountNumber) {
+                      error('Bank account numbers do not match! Please check and re-confirm.');
+                      return;
+                    }
+                    const cleanPhone = (personal.phone || user?.phone || '').replace(/\D/g, '').slice(-10);
+                    if (cleanPhone) {
+                      try {
+                        localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(bank));
+                      } catch (e) {}
+                    }
                   }
                   setCurrentStep(currentStep + 1);
                 }}
