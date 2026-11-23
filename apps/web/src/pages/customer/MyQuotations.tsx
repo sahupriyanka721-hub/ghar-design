@@ -39,6 +39,7 @@ import {
   ExternalLink,
   PlusCircle,
   MessageSquare,
+  Compass,
 } from 'lucide-react';
 import { Quotation } from '@ghar-design/shared';
 
