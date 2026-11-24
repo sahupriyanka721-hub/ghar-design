@@ -216,24 +216,91 @@ export const AdminArchitects: React.FC = () => {
   const handleVerifyBankAndCheque = () => {
     if (!selectedArchitect) return;
     const resolved = resolveArchitectBankDetails(selectedArchitect);
-    const updatedArch = saveArchitectBankDetails(selectedArchitect.id, {
+    const verifiedBank = {
       ...resolved,
       isChequeAccepted: true,
       isVerified: true,
+    };
+
+    // 1. Mark cheque documents as VERIFIED
+    const updatedDocs = (selectedArchitect.documents || []).map((d) => {
+      if (
+        d.id === 'doc-cancelled-cheque' ||
+        d.id === 'doc-cheque' ||
+        (d as any).documentType === 'BANK_CANCELLED_CHEQUE' ||
+        (d as any).documentType === 'CANCELLED_CHEQUE' ||
+        (d.title && d.title.toLowerCase().includes('cheque'))
+      ) {
+        return { ...d, status: 'VERIFIED' as const };
+      }
+      return d;
     });
+
+    const optimisticArch: ArchitectAccount = {
+      ...selectedArchitect,
+      bankDetails: verifiedBank,
+      documents: updatedDocs,
+      kycDocuments: updatedDocs,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update in-memory state IMMEDIATELY
+    selectedArchitectRef.current = optimisticArch;
+    setSelectedArchitect({ ...optimisticArch });
+    setArchitects((prev) =>
+      prev.map((a) => (a.id === optimisticArch.id || a.phone === optimisticArch.phone ? optimisticArch : a))
+    );
+
+    const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
+    if (cleanPhone) {
+      try {
+        localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(verifiedBank));
+        localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(updatedDocs));
+      } catch (e) {}
+    }
+
+    const updatedArch = saveArchitectBankDetails(
+      selectedArchitect.id,
+      verifiedBank,
+      selectedArchitect.phone
+    );
+
     if (updatedArch) {
       const chequeDoc = updatedArch.documents?.find(
-        (d) => d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE'
+        (d) =>
+          d.id === 'doc-cancelled-cheque' ||
+          d.id === 'doc-cheque' ||
+          (d as any).documentType === 'BANK_CANCELLED_CHEQUE' ||
+          (d as any).documentType === 'CANCELLED_CHEQUE'
       );
       if (chequeDoc) {
-        updateArchitectDocumentStatus(updatedArch.id, chequeDoc.id, 'VERIFIED');
+        updateArchitectDocumentStatus(
+          updatedArch.id,
+          chequeDoc.id,
+          'VERIFIED',
+          undefined,
+          selectedArchitect.phone,
+          chequeDoc.title
+        );
       }
       const fresh = ensureArchitectStatutoryDocuments(updatedArch);
+      fresh.bankDetails = verifiedBank;
+      fresh.documents = (fresh.documents || []).map((d) => {
+        if (
+          d.id === 'doc-cheque' ||
+          d.id === 'doc-cancelled-cheque' ||
+          (d as any).documentType === 'CANCELLED_CHEQUE' ||
+          (d.title && d.title.toLowerCase().includes('cheque'))
+        ) {
+          return { ...d, status: 'VERIFIED' as const };
+        }
+        return d;
+      });
       selectedArchitectRef.current = fresh;
       setSelectedArchitect({ ...fresh });
-      setArchitects((prev) => prev.map((a) => (a.id === fresh.id ? fresh : a)));
-      success('Bank details and escrow account verified successfully! ✓');
+      setArchitects((prev) => prev.map((a) => (a.id === fresh.id || a.phone === fresh.phone ? fresh : a)));
     }
+    success('Bank details and escrow account verified successfully! ✓');
   };
 
 
@@ -522,12 +589,17 @@ export const AdminArchitects: React.FC = () => {
   const handleDocumentApprove = (docId: string, docItem?: ArchitectKycDocument) => {
     if (!selectedArchitect) return;
 
+    const normDocId = (docId || '').replace(/-dir-/g, '-');
+    const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
+
     // 1. Optimistic instant state update on selectedArchitect so the UI changes immediately
     const updatedDocs = (selectedArchitect.documents || []).map((d) => {
       const isMatch =
         d.id === docId ||
+        (normDocId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
         (docItem && d.id === docItem.id) ||
-        (docItem && d.documentType && d.documentType === docItem.documentType) ||
+        (docItem && docItem.title && d.title && d.title.trim().toLowerCase() === docItem.title.trim().toLowerCase()) ||
+        (docItem && d.documentType && d.documentType === docItem.documentType && !d.documentType.includes('DIRECTOR')) ||
         (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
         (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
         (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
@@ -543,7 +615,8 @@ export const AdminArchitects: React.FC = () => {
       docId === 'doc-cheque' ||
       docId === 'doc-cancelled-cheque' ||
       docItem?.id === 'doc-cheque' ||
-      docItem?.documentType === 'CANCELLED_CHEQUE';
+      docItem?.documentType === 'CANCELLED_CHEQUE' ||
+      Boolean(docItem?.title && docItem.title.toLowerCase().includes('cheque'));
 
     const optimisticArch: ArchitectAccount = {
       ...selectedArchitect,
@@ -562,40 +635,74 @@ export const AdminArchitects: React.FC = () => {
       prev.map((a) => (a.id === optimisticArch.id || a.phone === optimisticArch.phone ? optimisticArch : a))
     );
 
+    if (cleanPhone) {
+      try {
+        localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(updatedDocs));
+        if (isCheque && optimisticArch.bankDetails) {
+          localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(optimisticArch.bankDetails));
+        }
+      } catch (e) {}
+    }
+
+    if (isCheque && selectedArchitect.bankDetails) {
+      saveArchitectBankDetails(
+        selectedArchitect.id,
+        { ...selectedArchitect.bankDetails, isChequeAccepted: true, isVerified: true },
+        selectedArchitect.phone
+      );
+    }
+
     // 2. Persist to storage
-    const updated = updateArchitectDocumentStatus(selectedArchitect.id, docId, 'VERIFIED');
+    const updated = updateArchitectDocumentStatus(
+      selectedArchitect.id,
+      docId,
+      'VERIFIED',
+      undefined,
+      selectedArchitect.phone,
+      docItem?.title
+    );
+
     if (updated) {
       const enriched = ensureArchitectStatutoryDocuments(updated);
+      const verifiedTitles = new Set(
+        updatedDocs.filter((d) => d.status === 'VERIFIED').map((d) => d.title?.trim().toLowerCase())
+      );
+      enriched.documents = (enriched.documents || []).map((d) => {
+        if (d.title && verifiedTitles.has(d.title.trim().toLowerCase())) {
+          return { ...d, status: 'VERIFIED' as const };
+        }
+        return d;
+      });
+      enriched.kycDocuments = enriched.documents;
+
       selectedArchitectRef.current = enriched;
       setSelectedArchitect({ ...enriched });
       setArchitects((prev) =>
         prev.map((a) => (a.id === enriched.id || a.phone === enriched.phone ? enriched : a))
       );
     } else {
-      const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
-      if (cleanPhone) {
-        try {
-          localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(updatedDocs));
-        } catch (e) {}
-      }
       saveArchitectAccount(optimisticArch);
     }
 
     if (activeReviewDoc) {
       setActiveReviewDoc({ ...activeReviewDoc, status: 'VERIFIED' });
     }
-    success('Document verified successfully!');
+    success(`Document "${docItem?.title || 'KYC'}" verified successfully! ✓`);
   };
 
   const handleDocumentReject = (docId: string, reason?: string, docItem?: ArchitectKycDocument) => {
     if (!selectedArchitect) return;
     const finalReason = reason || docRejectReason || 'Cancelled by admin';
+    const normDocId = (docId || '').replace(/-dir-/g, '-');
+    const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
 
     const updatedDocs = (selectedArchitect.documents || []).map((d) => {
       const isMatch =
         d.id === docId ||
+        (normDocId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
         (docItem && d.id === docItem.id) ||
-        (docItem && d.documentType && d.documentType === docItem.documentType) ||
+        (docItem && docItem.title && d.title && d.title.trim().toLowerCase() === docItem.title.trim().toLowerCase()) ||
+        (docItem && d.documentType && d.documentType === docItem.documentType && !d.documentType.includes('DIRECTOR')) ||
         (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
         (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
         (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
@@ -620,7 +727,20 @@ export const AdminArchitects: React.FC = () => {
       prev.map((a) => (a.id === optimisticArch.id || a.phone === optimisticArch.phone ? optimisticArch : a))
     );
 
-    const updated = updateArchitectDocumentStatus(selectedArchitect.id, docId, 'REJECTED', finalReason);
+    if (cleanPhone) {
+      try {
+        localStorage.setItem(`arch_kyc_${cleanPhone}`, JSON.stringify(updatedDocs));
+      } catch (e) {}
+    }
+
+    const updated = updateArchitectDocumentStatus(
+      selectedArchitect.id,
+      docId,
+      'REJECTED',
+      finalReason,
+      selectedArchitect.phone,
+      docItem?.title
+    );
     if (updated) {
       const enriched = ensureArchitectStatutoryDocuments(updated);
       selectedArchitectRef.current = enriched;
@@ -641,7 +761,13 @@ export const AdminArchitects: React.FC = () => {
     setCustomers([...custs]);
 
     if (selectedArchitectRef.current) {
-      const refreshed = list.find((a) => a.id === selectedArchitectRef.current?.id || a.applicationNumber === selectedArchitectRef.current?.id);
+      const selPhone = (selectedArchitectRef.current.phone || '').replace(/\D/g, '').slice(-10);
+      const refreshed = list.find(
+        (a) =>
+          a.id === selectedArchitectRef.current?.id ||
+          a.applicationNumber === selectedArchitectRef.current?.id ||
+          (selPhone && selPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === selPhone)
+      );
       if (refreshed) {
         setSelectedArchitect(ensureArchitectStatutoryDocuments(refreshed));
       }
@@ -2035,15 +2161,6 @@ export const AdminArchitects: React.FC = () => {
                                   <span>Pending Review</span>
                                 </span>
                               )}
-                              {!editingBank ? (
-                                <button
-                                  type="button"
-                                  onClick={handleStartEditBank}
-                                  className="px-3 py-1 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer active:scale-98"
-                                >
-                                  <span>{hasBankInfo ? 'Edit Bank Details' : '+ Add Bank Details'}</span>
-                                </button>
-                              ) : null}
                             </div>
                           </div>
 
@@ -2200,7 +2317,7 @@ export const AdminArchitects: React.FC = () => {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  {!isBankVerified && (
+                                  {!isBankVerified ? (
                                     <button
                                       type="button"
                                       onClick={handleVerifyBankAndCheque}
@@ -2210,15 +2327,12 @@ export const AdminArchitects: React.FC = () => {
                                       <CheckCircle2 className="w-4 h-4" />
                                       <span>Verify Bank Details ✓</span>
                                     </button>
+                                  ) : (
+                                    <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold inline-flex items-center gap-2">
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      <span>Bank Account Verified ✓</span>
+                                    </span>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={handleStartEditBank}
-                                    className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer active:scale-98"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Edit Bank Details</span>
-                                  </button>
                                 </div>
                               </div>
                             </div>

@@ -632,6 +632,18 @@ export const resolveArchitectBankDetails = (
     (d) => d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE'
   );
 
+  const anyVerified = Boolean(
+    existing?.isVerified ||
+    chosen?.isVerified ||
+    candidates.some((c) => c && (c.isVerified === true || c.isVerified === 'true'))
+  );
+  const anyChequeAccepted = Boolean(
+    existing?.isChequeAccepted ||
+    chosen?.isChequeAccepted ||
+    candidates.some((c) => c && (c.isChequeAccepted === true || c.isChequeAccepted === 'true')) ||
+    chequeDoc?.status === 'VERIFIED'
+  );
+
   return {
     bankName: chosen.bankName || existing?.bankName || '',
     accountHolderName: chosen.accountHolderName || existing?.accountHolderName || arch?.name || '',
@@ -642,8 +654,8 @@ export const resolveArchitectBankDetails = (
     cancelledChequeUrl: chosen.cancelledChequeUrl || existing?.cancelledChequeUrl || chequeDoc?.fileUrl || '',
     cancelledChequeFileName: chosen.cancelledChequeFileName || existing?.cancelledChequeFileName || chequeDoc?.fileName || '',
     cancelledChequeStorageKey: (chosen as any).cancelledChequeStorageKey || (existing as any)?.cancelledChequeStorageKey || chequeDoc?.storageKey || '',
-    isChequeAccepted: Boolean(chosen.isChequeAccepted ?? existing?.isChequeAccepted ?? (chequeDoc?.status === 'VERIFIED')),
-    isVerified: Boolean(chosen.isVerified ?? existing?.isVerified ?? false),
+    isChequeAccepted: anyChequeAccepted,
+    isVerified: anyVerified,
   };
 };
 
@@ -729,15 +741,16 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   // (B) Director(s) KYC Documents
   if (arch.directorsKyc && arch.directorsKyc.length > 0) {
     arch.directorsKyc.forEach((d, idx) => {
+      const cleanDirId = String(d.id || idx + 1).replace(/^dir-?/, '');
       const panUrl = (d as any).panFileUrl || d.panDocUrl || '';
       compiled.push({
-        id: `doc-dir-${d.id || idx + 1}-pan`,
+        id: `doc-dir-${cleanDirId}-pan`,
         documentType: 'PAN_CARD',
         title: `${d.name || arch.name} - PAN Card (${d.panNumber || arch.panNumber || 'Attached'})`,
         fileName: d.panFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_PAN.jpg`,
         fileSize: d.panFileSize || 'PAN Document (JPEG/PDF)',
         fileUrl: panUrl,
-        storageKey: d.panStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_${d.id || idx + 1}`,
+        storageKey: d.panStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_${cleanDirId}`,
         isOriginalUpload: Boolean(d.panStorageKey || (panUrl && panUrl.startsWith('data:'))),
         status: 'PENDING',
         uploadedAt: now,
@@ -745,13 +758,13 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
 
       const aadharUrl = (d as any).aadharFileUrl || d.aadharDocUrl || '';
       compiled.push({
-        id: `doc-dir-${d.id || idx + 1}-aadhaar`,
+        id: `doc-dir-${cleanDirId}-aadhaar`,
         documentType: 'AADHAAR_CARD',
         title: `${d.name || arch.name} - Aadhaar Card (${d.aadharNumber || 'Attached'})`,
         fileName: d.aadharFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_Aadhaar.jpg`,
         fileSize: d.aadharFileSize || 'Aadhaar Document (JPEG/PDF)',
         fileUrl: aadharUrl,
-        storageKey: d.aadharStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_AADHAAR_${d.id || idx + 1}`,
+        storageKey: d.aadharStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_AADHAAR_${cleanDirId}`,
         isOriginalUpload: Boolean(d.aadharStorageKey || (aadharUrl && aadharUrl.startsWith('data:'))),
         status: 'PENDING',
         uploadedAt: now,
@@ -853,12 +866,38 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   compiled.forEach((cDoc) => mergedMap.set(cDoc.id, cDoc));
 
   existingDocs.forEach((eDoc) => {
-    const existingInCompiled = mergedMap.get(eDoc.id);
-    if (existingInCompiled) {
-      mergedMap.set(eDoc.id, {
+    let matchedKey: string | undefined = undefined;
+    if (mergedMap.has(eDoc.id)) {
+      matchedKey = eDoc.id;
+    } else {
+      const normEId = (eDoc.id || '').replace(/-dir-/g, '-');
+      for (const [key, cDoc] of mergedMap.entries()) {
+        const normCKey = key.replace(/-dir-/g, '-');
+        if (
+          normEId === normCKey ||
+          (eDoc.title && cDoc.title && eDoc.title.trim().toLowerCase() === cDoc.title.trim().toLowerCase()) ||
+          (eDoc.documentType && cDoc.documentType === eDoc.documentType && !cDoc.documentType.includes('DIRECTOR'))
+        ) {
+          matchedKey = key;
+          break;
+        }
+      }
+    }
+
+    if (matchedKey) {
+      const existingInCompiled = mergedMap.get(matchedKey)!;
+      const finalStatus =
+        eDoc.status === 'VERIFIED' || existingInCompiled.status === 'VERIFIED'
+          ? 'VERIFIED'
+          : eDoc.status === 'REJECTED' || existingInCompiled.status === 'REJECTED'
+          ? 'REJECTED'
+          : 'PENDING';
+
+      mergedMap.set(matchedKey, {
         ...existingInCompiled,
         ...eDoc,
-        status: eDoc.status || existingInCompiled.status,
+        id: matchedKey,
+        status: finalStatus as any,
         fileUrl: (eDoc.fileUrl && eDoc.fileUrl.length > 20) ? eDoc.fileUrl : existingInCompiled.fileUrl,
       });
     } else {
@@ -872,15 +911,20 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
     arch.profilePhoto = docPhoto.fileUrl;
   }
   const chequeDoc = finalDocs.find((d) => d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'BANK_CANCELLED_CHEQUE' || (d as any).documentType === 'CANCELLED_CHEQUE');
-  if (chequeDoc && (!arch.bankDetails || !arch.bankDetails.cancelledChequeUrl)) {
-    arch.bankDetails = {
-      ...(arch.bankDetails || resolveArchitectBankDetails(arch)),
-      cancelledChequeUrl: chequeDoc.fileUrl || arch.bankDetails?.cancelledChequeUrl || '',
-      cancelledChequeFileName: chequeDoc.fileName || arch.bankDetails?.cancelledChequeFileName || 'Bank_Cancelled_Cheque.jpg',
-      cancelledChequeStorageKey: chequeDoc.storageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
-      isChequeAccepted: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isChequeAccepted),
-      isVerified: Boolean(arch.bankDetails?.isVerified),
-    };
+  if (chequeDoc) {
+    if (arch.bankDetails?.isVerified || arch.bankDetails?.isChequeAccepted) {
+      chequeDoc.status = 'VERIFIED';
+    }
+    if (!arch.bankDetails || !arch.bankDetails.cancelledChequeUrl) {
+      arch.bankDetails = {
+        ...(arch.bankDetails || resolveArchitectBankDetails(arch)),
+        cancelledChequeUrl: chequeDoc.fileUrl || arch.bankDetails?.cancelledChequeUrl || '',
+        cancelledChequeFileName: chequeDoc.fileName || arch.bankDetails?.cancelledChequeFileName || 'Bank_Cancelled_Cheque.jpg',
+        cancelledChequeStorageKey: chequeDoc.storageKey || (arch.bankDetails as any)?.cancelledChequeStorageKey || '',
+        isChequeAccepted: chequeDoc.status === 'VERIFIED' || Boolean(arch.bankDetails?.isChequeAccepted),
+        isVerified: Boolean(arch.bankDetails?.isVerified),
+      };
+    }
   }
   arch.documents = finalDocs;
   arch.kycDocuments = finalDocs;
@@ -900,18 +944,21 @@ export const saveArchitectBankDetails = (
     cancelledChequeFileName?: string;
     isChequeAccepted?: boolean;
     isVerified?: boolean;
-  }
+  },
+  phoneHint?: string
 ): ArchitectAccount | null => {
   const current = getArchitectAccounts();
   const cleanId = (architectId || '').trim();
-  const cleanPhone = cleanId.replace(/\D/g, '').slice(-10);
+  const cleanPhone = (phoneHint || cleanId).replace(/\D/g, '').slice(-10);
 
   const idx = current.findIndex(
     (a) =>
       a.id === cleanId ||
       a.applicationNumber === cleanId ||
       (cleanPhone && cleanPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone) ||
-      (a.name && cleanId.toLowerCase().includes(a.name.toLowerCase()))
+      (a.name && (a.name.toLowerCase() === cleanId.toLowerCase() || cleanId.toLowerCase().includes(a.name.toLowerCase()))) ||
+      (a.firmName && (a.firmName.toLowerCase() === cleanId.toLowerCase() || cleanId.toLowerCase().includes(a.firmName.toLowerCase()))) ||
+      (a.coaNumber && cleanId && a.coaNumber.toLowerCase() === cleanId.toLowerCase())
   );
   if (idx === -1) return null;
 
@@ -926,9 +973,19 @@ export const saveArchitectBankDetails = (
     branch: bank.branch || arch.bankDetails?.branch || '',
     cancelledChequeUrl: bank.cancelledChequeUrl || arch.bankDetails?.cancelledChequeUrl || '',
     cancelledChequeFileName: bank.cancelledChequeFileName || arch.bankDetails?.cancelledChequeFileName || '',
-    isChequeAccepted: bank.isChequeAccepted ?? arch.bankDetails?.isChequeAccepted ?? false,
-    isVerified: bank.isVerified ?? arch.bankDetails?.isVerified ?? false,
+    isChequeAccepted: bank.isChequeAccepted ?? true,
+    isVerified: bank.isVerified ?? true,
   };
+
+  // Mark the cheque document as VERIFIED
+  if (arch.documents) {
+    arch.documents = arch.documents.map((d) =>
+      d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE'
+        ? { ...d, status: 'VERIFIED' as const }
+        : d
+    );
+  }
+
   arch.updatedAt = new Date().toISOString();
   current[idx] = arch;
   safePersistArchitects(current);
@@ -937,6 +994,7 @@ export const saveArchitectBankDetails = (
   if (archPhone) {
     try {
       localStorage.setItem(`arch_bank_${archPhone}`, JSON.stringify(arch.bankDetails));
+      localStorage.setItem(`arch_kyc_${archPhone}`, JSON.stringify(arch.documents));
     } catch (e) {}
   }
 
@@ -950,8 +1008,6 @@ export const saveArchitectBankDetails = (
 
   return arch;
 };
-
-
 
 export const getArchitectAccounts = (): ArchitectAccount[] => {
   try {
@@ -1804,24 +1860,35 @@ export const updateArchitectDocumentStatus = (
   architectId: string,
   docId: string,
   newStatus: 'VERIFIED' | 'REJECTED' | 'PENDING',
-  remarks?: string
+  remarks?: string,
+  phoneHint?: string,
+  docTitle?: string
 ): ArchitectAccount | null => {
   const current = getArchitectAccounts();
-  const cleanArchPhone = (architectId || '').replace(/\D/g, '').slice(-10);
+  const cleanArchPhone = (phoneHint || architectId || '').replace(/\D/g, '').slice(-10);
+  const cleanId = (architectId || '').trim();
+
   const idx = current.findIndex(
     (a) =>
-      a.id === architectId ||
-      a.applicationNumber === architectId ||
+      a.id === cleanId ||
+      a.applicationNumber === cleanId ||
       (cleanArchPhone && cleanArchPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanArchPhone) ||
-      (a.name && architectId.toLowerCase().includes(a.name.toLowerCase()))
+      (a.name && (a.name.toLowerCase() === cleanId.toLowerCase() || cleanId.toLowerCase().includes(a.name.toLowerCase()))) ||
+      (a.firmName && (a.firmName.toLowerCase() === cleanId.toLowerCase() || cleanId.toLowerCase().includes(a.firmName.toLowerCase()))) ||
+      (a.coaNumber && cleanId && a.coaNumber.toLowerCase() === cleanId.toLowerCase())
   );
   if (idx === -1) return null;
 
   const arch = ensureArchitectStatutoryDocuments(current[idx]);
   const docs = arch.documents || [];
+  const normDocId = (docId || '').replace(/-dir-/g, '-');
+
   const docIdx = docs.findIndex(
     (d) =>
       d.id === docId ||
+      (docId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
+      (docTitle && d.title === docTitle) ||
+      (docTitle && d.title && d.title.trim().toLowerCase() === docTitle.trim().toLowerCase()) ||
       (docId === 'doc-cheque-review' && (d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque')) ||
       (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
       (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
