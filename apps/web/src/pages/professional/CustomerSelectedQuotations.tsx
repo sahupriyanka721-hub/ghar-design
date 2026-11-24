@@ -26,7 +26,15 @@ import {
   User,
   ArrowLeft,
 } from 'lucide-react';
-import { getPlatformBookings, getPlatformRequests, getRegisteredCustomers } from '../../data/customerStore.js';
+import {
+  getPlatformBookings,
+  getPlatformRequests,
+  getRegisteredCustomers,
+  broadcastStoreUpdate,
+  updatePlatformRequestStatus,
+} from '../../data/customerStore.js';
+import { safeSetStorage } from '../../lib/safeStorage.js';
+import { getExecutionProjects, saveExecutionProject } from '../../data/projectExecutionStore.js';
 import { getProfessionalByPhone } from '../../data/professionalStore.js';
 
 interface AcceptedQuotationDisplay {
@@ -157,7 +165,55 @@ export const CustomerSelectedQuotations: React.FC = () => {
       )
     );
 
-    success(`Engagement confirmed for Quotation ${selectedQuote.quotationNumber}! Active project workspace initialized.`);
+    // 1. Update Platform Bookings
+    try {
+      const bookings = getPlatformBookings();
+      const bIdx = bookings.findIndex(
+        (b) =>
+          b.id === selectedQuote.id ||
+          b.bookingCode === selectedQuote.id ||
+          b.quoteCode === selectedQuote.quotationNumber
+      );
+      if (bIdx !== -1) {
+        bookings[bIdx].status = 'CONFIRMED';
+        bookings[bIdx].visitDate = proposedDate;
+        safeSetStorage('platform_bookings', bookings);
+        broadcastStoreUpdate('BOOKINGS_UPDATED', bookings);
+      }
+    } catch (e) {}
+
+    // 2. Update Execution Project
+    try {
+      const projs = getExecutionProjects();
+      const matched = projs.find(
+        (p) =>
+          p.quotationId === selectedQuote.id ||
+          p.quotationCode === selectedQuote.quotationNumber ||
+          p.bookingCode === selectedQuote.id
+      );
+      if (matched) {
+        matched.status = 'IN_PROGRESS';
+        matched.plannedStartDate = proposedDate;
+        matched.kickoff.siteDemarcationReady = true;
+        saveExecutionProject(matched);
+      }
+    } catch (e) {}
+
+    // 3. Update Request Status to IN_PROGRESS
+    try {
+      const reqs = getPlatformRequests();
+      const matchedReq = reqs.find(
+        (r) =>
+          r.bookedQuotationId === selectedQuote.id ||
+          r.bookingCode === selectedQuote.id ||
+          r.id === selectedQuote.id
+      );
+      if (matchedReq) {
+        updatePlatformRequestStatus(matchedReq.id, 'IN_PROGRESS');
+      }
+    } catch (e) {}
+
+    success(`Work order accepted & mobilization confirmed for Quotation ${selectedQuote.quotationNumber}! Active project started.`);
     setShowEngagementModal(false);
   };
 

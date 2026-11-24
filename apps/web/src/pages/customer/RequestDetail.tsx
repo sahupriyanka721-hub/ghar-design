@@ -134,12 +134,31 @@ export const RequestDetail: React.FC = () => {
     'COMPLETED',
   ].includes(request.status);
 
-  const areQuotationsPublished = [
-    'QUOTATIONS_AVAILABLE',
-    'BOOKING_CONFIRMED',
-    'IN_PROGRESS',
-    'COMPLETED',
-  ].includes(request.status);
+  const hasPublishedQuotesInStore = (() => {
+    try {
+      const stored = localStorage.getItem('platform_quotations');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.some(
+            (q: any) =>
+              (q.requestId === request.id || q.requestCode === request.requestCode || q.requestId === request.requestCode) &&
+              (q.status === 'PUBLISHED' || q.status === 'PUBLISHED_TO_CUSTOMER' || q.status === 'APPROVED' || q.status === 'ACCEPTED')
+          );
+        }
+      }
+    } catch (e) {}
+    return false;
+  })();
+
+  const areQuotationsPublished =
+    hasPublishedQuotesInStore ||
+    [
+      'QUOTATIONS_AVAILABLE',
+      'BOOKING_CONFIRMED',
+      'IN_PROGRESS',
+      'COMPLETED',
+    ].includes(request.status);
 
   const isBooked = [
     'BOOKING_CONFIRMED',

@@ -154,7 +154,22 @@ export const MyRequests: React.FC = () => {
                     <span className="hidden sm:inline">Receipt PDF</span>
                   </button>
 
-                  {req.status === 'QUOTATIONS_AVAILABLE' && (
+                  {(req.status === 'QUOTATIONS_AVAILABLE' || (() => {
+                    try {
+                      const stored = localStorage.getItem('platform_quotations');
+                      if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (Array.isArray(parsed)) {
+                          return parsed.some(
+                            (q: any) =>
+                              (q.requestId === req.id || q.requestCode === req.requestCode || q.requestId === req.requestCode) &&
+                              (q.status === 'PUBLISHED' || q.status === 'PUBLISHED_TO_CUSTOMER' || q.status === 'APPROVED' || q.status === 'ACCEPTED')
+                          );
+                        }
+                      }
+                    } catch (e) {}
+                    return false;
+                  })()) && (
                     <Link
                       to={`/dashboard/requests/${targetId}/quotations`}
                       className="btn-gold py-2 px-3.5 text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shadow-xs"

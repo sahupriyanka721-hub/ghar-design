@@ -57,18 +57,49 @@ export const QuotationComparison: React.FC = () => {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
             const clean = cleanRecords(parsed);
-            local = clean.filter((q: any) => q.requestId === id || q.requestCode === id);
-            if (local.length === 0 && (!id || id === 'active' || id === 'all')) {
+            const matchedReq = id ? getPlatformRequestById(id) : null;
+            const targetReqId = (matchedReq?.id || id || '').toLowerCase().trim();
+            const targetReqCode = (matchedReq?.requestCode || '').toLowerCase().trim();
+
+            const isReqMatch = (q: any) => {
+              const qReq = (q.requestId || '').toLowerCase().trim();
+              const qCode = (q.requestCode || '').toLowerCase().trim();
+              if (targetReqId && (qReq === targetReqId || qCode === targetReqId)) return true;
+              if (targetReqCode && (qReq === targetReqCode || qCode === targetReqCode)) return true;
+              return false;
+            };
+
+            // 1. Direct request matching
+            let matched = clean.filter(isReqMatch);
+
+            // 2. If no direct match by ID, check if published for this customer / phone / session
+            if (matched.length === 0) {
               const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
-              local = clean.filter((q) => {
-                const isPublished = q.status === 'PUBLISHED' || q.status === 'PUBLISHED_TO_CUSTOMER' || q.status === 'APPROVED';
+              matched = clean.filter((q: any) => {
+                const isPublished =
+                  q.status === 'PUBLISHED' ||
+                  q.status === 'PUBLISHED_TO_CUSTOMER' ||
+                  q.status === 'APPROVED' ||
+                  q.status === 'ACCEPTED';
                 if (!isPublished) return false;
                 if (user?.id && q.customerId === user.id) return true;
-                if (rawPhone && q.customerPhone?.includes(rawPhone)) return true;
+                const qPhone = (q.customerPhone || '').replace(/\D/g, '').slice(-10);
+                if (rawPhone && qPhone && qPhone === rawPhone) return true;
                 if (!rawPhone && !user?.id) return true;
                 return false;
               });
             }
+
+            // Filter for published or accepted quotations only
+            local = matched.filter((q: any) => {
+              return (
+                q.status === 'PUBLISHED' ||
+                q.status === 'PUBLISHED_TO_CUSTOMER' ||
+                q.status === 'APPROVED' ||
+                q.status === 'ACCEPTED' ||
+                q.status === 'SELECTED'
+              );
+            });
 
             // If a quotation has been booked/accepted, only show the chosen architect
             const bookedQuote = local.find((q) => q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked);
@@ -97,6 +128,22 @@ export const QuotationComparison: React.FC = () => {
 
     loadQuotes();
     window.addEventListener('storage', loadQuotes);
+    const onSync = (event: MessageEvent) => {
+      if (event.data?.type === 'QUOTATIONS_UPDATED' || event.data?.type === 'PROJECT_REQUESTS_UPDATED') {
+        loadQuotes();
+      }
+    };
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('gd_platform_sync');
+        bc.addEventListener('message', onSync);
+        return () => {
+          window.removeEventListener('storage', loadQuotes);
+          bc.removeEventListener('message', onSync);
+          bc.close();
+        };
+      } catch (e) {}
+    }
     return () => window.removeEventListener('storage', loadQuotes);
   }, [id]);
 

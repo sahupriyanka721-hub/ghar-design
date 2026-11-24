@@ -398,6 +398,7 @@ export const AdminQuotationsReview: React.FC = () => {
               ...q,
               status: res?.data?.status || newStatus,
               adminFeedback: reviewNote || `Quotation ${action.toLowerCase()}ed by administrator.`,
+              publishedAt: action === 'PUBLISH' ? new Date().toISOString() : q.publishedAt,
             }
           : q
       );
@@ -409,12 +410,29 @@ export const AdminQuotationsReview: React.FC = () => {
               ...prev,
               status: res?.data?.status || newStatus,
               adminFeedback: reviewNote || `Quotation ${action.toLowerCase()}ed by administrator.`,
+              publishedAt: action === 'PUBLISH' ? new Date().toISOString() : prev.publishedAt,
             }
           : prev
       );
       safeSetStorage('platform_quotations', updated);
       broadcastStoreUpdate('QUOTATIONS_UPDATED', updated);
       pushToCloud().catch(() => {});
+
+      if (action === 'PUBLISH') {
+        const targetQ = quotations.find((q) => q.id === quoteId);
+        const reqKey = targetQ?.requestId || targetQ?.requestCode;
+        if (reqKey) {
+          const matchedReq = requests.find((r) => r.id === reqKey || r.requestCode === reqKey);
+          if (matchedReq) {
+            const updatedReq = updatePlatformRequestStatus(matchedReq.id, 'QUOTATIONS_AVAILABLE', {
+              quotationsCount: Math.max(matchedReq.quotationsCount || 0, 1),
+            });
+            if (updatedReq) {
+              broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED', [updatedReq]);
+            }
+          }
+        }
+      }
 
       success(`Quotation ${action.toLowerCase()}ed successfully.`);
       setActiveQuoteId(null);

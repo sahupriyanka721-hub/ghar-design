@@ -492,32 +492,31 @@ export const formatArchitectId = (idOrNum?: string, fallbackSeq = 1): string => 
   const cleanStr = String(idOrNum).replace(/^\[\s*/, '').replace(/\s*\]$/, '').trim();
 
   // 1. Check legacy BG/QUO/XXXX or BG/ARC/XXXX (e.g. BG/QUO/0018 -> BG/Architech/000018)
-  const quoMatch = cleanStr.match(/BG\/(?:QUO|ARC)\/(?:\s*)(\d+)/i);
+  const quoMatch = cleanStr.match(/^BG\/(?:QUO|ARC)\/(?:\s*)(\d+)/i);
   if (quoMatch) {
     const seq = parseInt(quoMatch[1], 10);
     return `BG/Architech/${String(seq).padStart(6, '0')}`;
   }
 
   // 2. Check standard BG/Architech/XXXXXX or BG/Aritech/XXXXXX or BG/Architect/XXXXXX
-  const match = cleanStr.match(/BG\/(?:Architech|Aritech|Architect)\/(?:\s*)(\d+)/i);
+  const match = cleanStr.match(/^BG\/(?:Architech|Aritech|Architect)\/(?:\s*)(\d+)/i);
   if (match) {
     const seq = parseInt(match[1], 10);
     return `BG/Architech/${String(seq).padStart(6, '0')}`;
   }
 
   // 3. Check legacy BG/APP/XXXXXX
-  const appMatch = cleanStr.match(/BG\/APP\/(?:\s*)(\d+)/i);
+  const appMatch = cleanStr.match(/^BG\/APP\/(?:\s*)(\d+)/i);
   if (appMatch) {
     let seq = parseInt(appMatch[1], 10);
     if (seq > 999999) seq = fallbackSeq;
     return `BG/Architech/${String(seq).padStart(6, '0')}`;
   }
 
-  // 4. Any numeric sequence (e.g. "18" -> "BG/Architech/000018", "000001" -> "BG/Architech/000001")
-  const numMatch = cleanStr.match(/(\d+)/);
-  if (numMatch) {
-    let num = parseInt(numMatch[1], 10);
-    if (num > 999999) num = fallbackSeq;
+  // 4. Exact numeric string (e.g. "18" -> "BG/Architech/000018", "000001" -> "BG/Architech/000001")
+  const numOnlyMatch = cleanStr.match(/^(\d{1,6})$/);
+  if (numOnlyMatch) {
+    const num = parseInt(numOnlyMatch[1], 10);
     return `BG/Architech/${String(num).padStart(6, '0')}`;
   }
 
@@ -1129,11 +1128,16 @@ export const getArchitectAccounts = (): ArchitectAccount[] => {
         const exEmail = (existing.email || '').trim().toLowerCase();
         const exId = (existing.id || existing.applicationNumber || '').trim();
 
+        // If both have 10-digit phones and they are DIFFERENT, they are distinct architects!
+        if (phone.length === 10 && exPhone.length === 10 && phone !== exPhone) {
+          return false;
+        }
+
         // 1. Same 10-digit phone number
         if (phone.length === 10 && exPhone.length === 10 && phone === exPhone) return true;
 
-        // 2. Exact same ID
-        if (rawAId && exId && rawAId === exId) return true;
+        // 2. Exact same ID (only if genuine standard BG/Architech format)
+        if (rawAId && exId && rawAId === exId && rawAId.startsWith('BG/Architech/')) return true;
 
         // 3. Exact same COA License Number
         if (coa && exCoa && coa.length >= 6 && coa === exCoa) return true;
@@ -1468,15 +1472,38 @@ export const saveArchitectAccount = (acc: Partial<ArchitectAccount>): ArchitectA
   const cleanCoa = (acc.coaNumber || '').trim().toLowerCase();
   const cleanEmail = (acc.email || '').trim().toLowerCase();
 
-  const existingIdx = current.findIndex(
-    (a) =>
-      a.id === acc.id ||
-      (a.applicationNumber && a.applicationNumber === acc.id) ||
-      (acc.applicationNumber && (a.id === acc.applicationNumber || a.applicationNumber === acc.applicationNumber)) ||
-      (cleanPhone && cleanPhone.length === 10 && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone) ||
-      (cleanCoa && cleanCoa.length >= 6 && (a.coaNumber || '').trim().toLowerCase() === cleanCoa) ||
-      (cleanEmail && cleanEmail.includes('@') && (a.email || '').trim().toLowerCase() === cleanEmail)
-  );
+  const existingIdx = current.findIndex((a) => {
+    const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
+    const aCoa = (a.coaNumber || '').trim().toLowerCase();
+    const aEmail = (a.email || '').trim().toLowerCase();
+
+    // If both have 10-digit phones and they are different, never match
+    if (cleanPhone.length === 10 && aPhone.length === 10 && cleanPhone !== aPhone) {
+      return false;
+    }
+
+    // 1. Phone match
+    if (cleanPhone.length === 10 && aPhone.length === 10 && cleanPhone === aPhone) {
+      return true;
+    }
+
+    // 2. COA License match
+    if (cleanCoa && cleanCoa.length >= 6 && aCoa === cleanCoa) {
+      return true;
+    }
+
+    // 3. Email match
+    if (cleanEmail && cleanEmail.includes('@') && aEmail === cleanEmail) {
+      return true;
+    }
+
+    // 4. Exact standard ID match
+    if (acc.id && a.id && acc.id === a.id && acc.id.startsWith('BG/Architech/')) {
+      return true;
+    }
+
+    return false;
+  });
 
   let updated: ArchitectAccount;
   const now = new Date().toISOString();
@@ -1506,7 +1533,15 @@ export const saveArchitectAccount = (acc: Partial<ArchitectAccount>): ArchitectA
     current.splice(existingIdx, 1);
     current.unshift(updated);
   } else {
-    const assignedSeq = current.length + 1;
+    let maxSeq = 0;
+    for (const a of current) {
+      const match = (a.id || a.applicationNumber || '').match(/BG\/(?:Architech|Aritech|Architect|QUO|ARC)\/(\d+)/i);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSeq && seq < 999999) maxSeq = seq;
+      }
+    }
+    const assignedSeq = Math.max(current.length + 1, maxSeq + 1);
     const finalId = formatArchitectId(acc.id || acc.applicationNumber, assignedSeq);
 
     updated = {

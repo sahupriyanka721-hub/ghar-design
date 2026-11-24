@@ -384,9 +384,13 @@ export const AdminRequestDetail: React.FC = () => {
         );
       }
       if (request) {
-        updatePlatformRequestStatus(request.id, 'QUOTATIONS_AVAILABLE', {
+        const updatedReq = updatePlatformRequestStatus(request.id, 'QUOTATIONS_AVAILABLE', {
           quotationsCount: Math.max((request.quotationsCount || 0), 1),
         });
+        if (updatedReq) {
+          setRequest(updatedReq);
+          broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED', [updatedReq]);
+        }
       }
       success('Quotation published to homeowner successfully.');
     } catch (e: any) {
@@ -414,9 +418,13 @@ export const AdminRequestDetail: React.FC = () => {
         );
       }
       if (request) {
-        updatePlatformRequestStatus(request.id, 'QUOTATIONS_AVAILABLE', {
+        const updatedReq = updatePlatformRequestStatus(request.id, 'QUOTATIONS_AVAILABLE', {
           quotationsCount: requestQuotations.length,
         });
+        if (updatedReq) {
+          setRequest(updatedReq);
+          broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED', [updatedReq]);
+        }
       }
       success(`All ${requestQuotations.length} quotations published to homeowner successfully.`);
     } catch (e: any) {

@@ -723,7 +723,15 @@ export const AssignedRequests: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              {selectedInquiry.status === 'ACCEPTED' ? (
+              {selectedInquiry.request?.status === 'BOOKING_CONFIRMED' ? (
+                <Link
+                  to="/professional/quotations/approved"
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>Homeowner Booked! Accept Work &amp; Start Project</span>
+                </Link>
+              ) : selectedInquiry.status === 'ACCEPTED' ? (
                 <Link
                   to={`/professional/quotation-builder?requestId=${selectedInquiry.requestId}`}
                   className="px-6 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer border border-gold-500/30 active:scale-98"
