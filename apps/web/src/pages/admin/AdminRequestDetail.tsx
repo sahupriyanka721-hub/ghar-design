@@ -309,6 +309,8 @@ export const AdminRequestDetail: React.FC = () => {
 
     try {
       const allAssignedTokens = new Set<string>();
+      const allArchs = getRegisteredArchitects();
+
       selectedProIds.forEach((proId) => {
         allAssignedTokens.add(proId);
         allAssignedTokens.add(proId.replace(/\s+/g, ''));
@@ -319,13 +321,52 @@ export const AdminRequestDetail: React.FC = () => {
             allAssignedTokens.add(matched.id.replace(/\s+/g, ''));
           }
           if (matched.userId) allAssignedTokens.add(matched.userId);
+          if (matched.firmName) {
+            allAssignedTokens.add(matched.firmName);
+            allAssignedTokens.add(matched.firmName.toLowerCase());
+          }
+          if (matched.name) {
+            allAssignedTokens.add(matched.name);
+            allAssignedTokens.add(matched.name.toLowerCase());
+          }
           if (matched.phone) {
             const ph = matched.phone.replace(/\D/g, '').slice(-10);
             if (ph) {
               allAssignedTokens.add(ph);
               allAssignedTokens.add(`+91 ${ph}`);
+              allAssignedTokens.add(`+91${ph}`);
               allAssignedTokens.add(`usr-arch-${ph}`);
               allAssignedTokens.add(`pro-${ph}`);
+              allAssignedTokens.add(`arch-${ph}`);
+            }
+          }
+        }
+
+        const archMatched = allArchs.find(
+          (a) => a.id === proId || a.userId === proId || (a.phone && proId.includes(a.phone.replace(/\D/g, '').slice(-10)))
+        );
+        if (archMatched) {
+          if (archMatched.id) {
+            allAssignedTokens.add(archMatched.id);
+            allAssignedTokens.add(archMatched.id.replace(/\s+/g, ''));
+          }
+          if (archMatched.firmName) {
+            allAssignedTokens.add(archMatched.firmName);
+            allAssignedTokens.add(archMatched.firmName.toLowerCase());
+          }
+          if (archMatched.name) {
+            allAssignedTokens.add(archMatched.name);
+            allAssignedTokens.add(archMatched.name.toLowerCase());
+          }
+          if (archMatched.phone) {
+            const ph = archMatched.phone.replace(/\D/g, '').slice(-10);
+            if (ph) {
+              allAssignedTokens.add(ph);
+              allAssignedTokens.add(`+91 ${ph}`);
+              allAssignedTokens.add(`+91${ph}`);
+              allAssignedTokens.add(`usr-arch-${ph}`);
+              allAssignedTokens.add(`pro-${ph}`);
+              allAssignedTokens.add(`arch-${ph}`);
             }
           }
         }

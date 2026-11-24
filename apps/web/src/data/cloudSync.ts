@@ -249,31 +249,6 @@ export async function pullFromCloud(): Promise<boolean> {
       }
 
       const merged = Array.from(idMap.values());
-      if (storageKey.includes('architect')) {
-        for (let i = 0; i < merged.length; i++) {
-          const item = merged[i];
-          if (!item || typeof item !== 'object') continue;
-          const raw = String(item.id || item.applicationNumber || '').replace(/^\[\s*/, '').replace(/\s*\]$/, '').trim();
-          let seq = i + 1;
-          const quoMatch = raw.match(/BG\/(?:QUO|ARC)\/(?:\s*)(\d+)/i);
-          if (quoMatch) {
-            seq = parseInt(quoMatch[1], 10);
-          } else {
-            const match = raw.match(/BG\/(?:Architech|Aritech|Architect)\/(?:\s*)(\d+)/i);
-            if (match) {
-              seq = parseInt(match[1], 10);
-            } else {
-              const numMatch = raw.match(/(\d+)/);
-              if (numMatch) {
-                const n = parseInt(numMatch[1], 10);
-                if (n < 999999) seq = n;
-              }
-            }
-          }
-          item.id = `BG/Architech/${String(seq).padStart(6, '0')}`;
-          item.applicationNumber = item.id;
-        }
-      }
       if (merged.length !== local.length || hasUpdates) {
         safeSetStorage(storageKey, merged);
         if (typeof window !== 'undefined') {

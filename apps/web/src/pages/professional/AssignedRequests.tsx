@@ -66,24 +66,40 @@ export const AssignedRequests: React.FC = () => {
     const realReqs = getPlatformRequests();
     const savedResponses = getSavedResponses();
 
-    const userStored = (() => {
+    const proUserStored = (() => {
       try {
-        return JSON.parse(localStorage.getItem('user') || '{}');
+        return (
+          JSON.parse(localStorage.getItem('gd_pro_user') || 'null') ||
+          JSON.parse(localStorage.getItem('pro_user') || 'null') ||
+          JSON.parse(localStorage.getItem('user') || '{}')
+        );
       } catch {
         return {};
       }
     })();
 
-    const cleanUserPhone = (user?.phone || userStored.phone || '').replace(/\D/g, '').slice(-10);
+    const effectivePhone =
+      (user?.role === 'PROFESSIONAL' ? user.phone : null) ||
+      proUserStored?.phone ||
+      localStorage.getItem('auth_phone') ||
+      user?.phone ||
+      '';
+    const cleanUserPhone = effectivePhone.replace(/\D/g, '').slice(-10);
     const archByPhone = cleanUserPhone ? getArchitectByPhone(cleanUserPhone) : null;
     const allArchs = getArchitectAccounts();
     const allPros = getPlatformProfessionals();
 
+    const effectiveName =
+      (user?.role === 'PROFESSIONAL' ? user.name : null) ||
+      proUserStored?.name ||
+      '';
+
     const matchedArch =
       archByPhone ||
       (cleanUserPhone ? allArchs.find((a) => (a.phone || '').replace(/\D/g, '').slice(-10) === cleanUserPhone) : null) ||
+      (effectiveName ? allArchs.find((a) => a.name?.toLowerCase().trim() === effectiveName.toLowerCase().trim() || a.firmName?.toLowerCase().trim() === effectiveName.toLowerCase().trim()) : null) ||
       (user?.id ? allArchs.find((a) => a.userId === user.id || a.id === user.id) : null) ||
-      (userStored?.id ? allArchs.find((a) => a.userId === userStored.id || a.id === userStored.id) : null);
+      (proUserStored?.id ? allArchs.find((a) => a.userId === proUserStored.id || a.id === proUserStored.id) : null);
 
     const matchedPro =
       (cleanUserPhone ? allPros.find((p) => (p.phone || '').replace(/\D/g, '').slice(-10) === cleanUserPhone) : null) ||
@@ -92,17 +108,34 @@ export const AssignedRequests: React.FC = () => {
     // Build comprehensive set of all tokens that represent this professional/architect
     const myPossibleIds = new Set<string>();
     if (user?.id) myPossibleIds.add(user.id);
-    if (userStored?.id) myPossibleIds.add(userStored.id);
+    if (proUserStored?.id) myPossibleIds.add(proUserStored.id);
     if (cleanUserPhone) {
       myPossibleIds.add(cleanUserPhone);
       myPossibleIds.add(`+91 ${cleanUserPhone}`);
+      myPossibleIds.add(`+91${cleanUserPhone}`);
       myPossibleIds.add(`usr-arch-${cleanUserPhone}`);
       myPossibleIds.add(`pro-${cleanUserPhone}`);
       myPossibleIds.add(`arch-${cleanUserPhone}`);
     }
     if (matchedArch?.id) {
       myPossibleIds.add(matchedArch.id);
+      myPossibleIds.add(matchedArch.id.toLowerCase());
       myPossibleIds.add(matchedArch.id.replace(/\s+/g, ''));
+      myPossibleIds.add(matchedArch.id.toLowerCase().replace(/\s+/g, ''));
+    }
+    if (matchedArch?.applicationNumber) {
+      myPossibleIds.add(matchedArch.applicationNumber);
+      myPossibleIds.add(matchedArch.applicationNumber.toLowerCase());
+    }
+    if (matchedArch?.firmName) {
+      myPossibleIds.add(matchedArch.firmName);
+      myPossibleIds.add(matchedArch.firmName.toLowerCase());
+      myPossibleIds.add(matchedArch.firmName.toLowerCase().trim());
+    }
+    if (matchedArch?.name) {
+      myPossibleIds.add(matchedArch.name);
+      myPossibleIds.add(matchedArch.name.toLowerCase());
+      myPossibleIds.add(matchedArch.name.toLowerCase().trim());
     }
     if (matchedArch?.userId) myPossibleIds.add(matchedArch.userId);
     if (matchedArch?.phone) {
@@ -110,8 +143,10 @@ export const AssignedRequests: React.FC = () => {
       if (p) {
         myPossibleIds.add(p);
         myPossibleIds.add(`+91 ${p}`);
+        myPossibleIds.add(`+91${p}`);
         myPossibleIds.add(`usr-arch-${p}`);
         myPossibleIds.add(`pro-${p}`);
+        myPossibleIds.add(`arch-${p}`);
       }
     }
     if (matchedPro?.id) myPossibleIds.add(matchedPro.id);
@@ -138,22 +173,38 @@ export const AssignedRequests: React.FC = () => {
       // Check if explicitly assigned to this architect via ANY of their identifiers
       const matchesExplicit = r.assignedProfessionalIds.some((assignedId) => {
         if (!assignedId) return false;
-        if (myPossibleIds.has(assignedId)) return true;
-        if (myPossibleIds.has(assignedId.replace(/\s+/g, ''))) return true;
+        const normAssigned = assignedId.trim();
+        const normLower = normAssigned.toLowerCase();
 
-        const assignedCleanPh = assignedId.replace(/\D/g, '').slice(-10);
+        if (myPossibleIds.has(normAssigned) || myPossibleIds.has(normLower)) return true;
+        if (myPossibleIds.has(normAssigned.replace(/\s+/g, ''))) return true;
+
+        const assignedCleanPh = normAssigned.replace(/\D/g, '').slice(-10);
         if (cleanUserPhone && assignedCleanPh && cleanUserPhone === assignedCleanPh) return true;
 
         if (
           matchedArch?.id &&
-          (assignedId === matchedArch.id || assignedId.replace(/\s+/g, '') === matchedArch.id.replace(/\s+/g, ''))
+          (normAssigned === matchedArch.id || normAssigned.replace(/\s+/g, '') === matchedArch.id.replace(/\s+/g, ''))
         ) {
+          return true;
+        }
+
+        if (matchedArch?.firmName && normLower.includes(matchedArch.firmName.toLowerCase().trim())) {
+          return true;
+        }
+
+        if (matchedArch?.name && normLower.includes(matchedArch.name.toLowerCase().trim())) {
           return true;
         }
 
         if (matchedArch?.name && r.adminNotes && r.adminNotes.toLowerCase().includes(matchedArch.name.toLowerCase())) {
           return true;
         }
+
+        if (matchedArch?.firmName && r.adminNotes && r.adminNotes.toLowerCase().includes(matchedArch.firmName.toLowerCase())) {
+          return true;
+        }
+
         return false;
       });
 

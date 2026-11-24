@@ -190,16 +190,33 @@ export const MyQuotations: React.FC = () => {
 
   const activeProjectRequest = useMemo(() => {
     if (!requests || requests.length === 0) return null;
-    const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
+    const custStored = (() => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem('customer_user') || 'null') ||
+          JSON.parse(localStorage.getItem('gd_customer_user') || 'null') ||
+          JSON.parse(localStorage.getItem('user') || '{}')
+        );
+      } catch {
+        return {};
+      }
+    })();
+    const effectivePhone = (user?.role === 'CUSTOMER' ? user.phone : null) || custStored.phone || user?.phone || localStorage.getItem('auth_phone') || '';
+    const rawPhone = effectivePhone.replace(/\D/g, '').slice(-10);
+
     if (user?.id) {
       const match = requests.find((r) => r.customerId === user.id);
+      if (match) return match;
+    }
+    if (custStored?.id) {
+      const match = requests.find((r) => r.customerId === custStored.id);
       if (match) return match;
     }
     if (rawPhone) {
       const match = requests.find((r) => (r.customerPhone || '').replace(/\D/g, '').slice(-10) === rawPhone);
       if (match) return match;
     }
-    if (quotations.length > 0 && quotations[0].requestId) {
+    if (quotations.length > 0 && (quotations[0].requestId || quotations[0].requestCode)) {
       const match = requests.find((r) => r.id === quotations[0].requestId || r.requestCode === quotations[0].requestCode);
       if (match) return match;
     }
@@ -227,7 +244,6 @@ export const MyQuotations: React.FC = () => {
 
   useEffect(() => {
     const loadAllQuotes = () => {
-      purgeDummyData();
       let localQuotes: any[] = [];
       try {
         const stored = localStorage.getItem('platform_quotations');
@@ -244,13 +260,27 @@ export const MyQuotations: React.FC = () => {
       const allPlatformReqs = getPlatformRequests();
       setRequests(allPlatformReqs);
 
-      // Filter for current logged-in customer if phone/id matches
-      const rawPhone = user?.phone?.replace(/\D/g, '').slice(-10);
+      const custStored = (() => {
+        try {
+          return (
+            JSON.parse(localStorage.getItem('customer_user') || 'null') ||
+            JSON.parse(localStorage.getItem('gd_customer_user') || 'null') ||
+            JSON.parse(localStorage.getItem('user') || '{}')
+          );
+        } catch {
+          return {};
+        }
+      })();
+      const effectivePhone = (user?.role === 'CUSTOMER' ? user.phone : null) || custStored.phone || user?.phone || localStorage.getItem('auth_phone') || '';
+      const rawPhone = effectivePhone.replace(/\D/g, '').slice(-10);
+
       const userRequests = allPlatformReqs.filter((r) => {
         if (user?.id && r.customerId === user.id) return true;
+        if (custStored?.id && r.customerId === custStored.id) return true;
         const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
         if (rawPhone && rPhone && rPhone === rawPhone) return true;
         if (user?.name && r.customerName && r.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+        if (custStored?.name && r.customerName && r.customerName.trim().toLowerCase() === custStored.name.trim().toLowerCase()) return true;
         return false;
       });
 
@@ -274,6 +304,7 @@ export const MyQuotations: React.FC = () => {
       const customerQuotes = localQuotes.filter((q: any) => {
         // Direct customer ID match
         if (user?.id && q.customerId === user.id) return true;
+        if (custStored?.id && q.customerId === custStored.id) return true;
 
         // Customer phone match (clean digits)
         const qPhone = (q.customerPhone || '').replace(/\D/g, '').slice(-10);
@@ -281,10 +312,19 @@ export const MyQuotations: React.FC = () => {
 
         // Customer name match
         if (user?.name && q.customerName && q.customerName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+        if (custStored?.name && q.customerName && q.customerName.trim().toLowerCase() === custStored.name.trim().toLowerCase()) return true;
 
         // Request ID / code match
         if (q.requestId && userReqKeys.has(q.requestId.trim().toLowerCase())) return true;
         if (q.requestCode && userReqKeys.has(q.requestCode.trim().toLowerCase())) return true;
+
+        // Match published quotes for single active request
+        if (userRequests.length > 0) {
+          const firstReqId = userRequests[0].id?.trim().toLowerCase();
+          const firstReqCode = userRequests[0].requestCode?.trim().toLowerCase();
+          if (firstReqId && (q.requestId?.trim().toLowerCase() === firstReqId || q.requestCode?.trim().toLowerCase() === firstReqId)) return true;
+          if (firstReqCode && (q.requestId?.trim().toLowerCase() === firstReqCode || q.requestCode?.trim().toLowerCase() === firstReqCode)) return true;
+        }
 
         // If single user testing without explicit customer ID or phone, show all real quotes
         if (!rawPhone && !user?.id) return true;

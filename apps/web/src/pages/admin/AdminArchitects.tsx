@@ -586,15 +586,16 @@ export const AdminArchitects: React.FC = () => {
     success(`Opening ${chequeName} in viewer.`);
   };
 
-  const handleDocumentApprove = (docId: string, docItem?: ArchitectKycDocument) => {
+  const handleDocumentApprove = (docId: string, docItem?: ArchitectKycDocument, docIndex?: number) => {
     if (!selectedArchitect) return;
 
     const normDocId = (docId || '').replace(/-dir-/g, '-');
     const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
 
     // 1. Optimistic instant state update on selectedArchitect so the UI changes immediately
-    const updatedDocs = (selectedArchitect.documents || []).map((d) => {
+    const updatedDocs = (selectedArchitect.documents || []).map((d, index) => {
       const isMatch =
+        (typeof docIndex === 'number' && index === docIndex) ||
         d.id === docId ||
         (normDocId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
         (docItem && d.id === docItem.id) ||
@@ -667,8 +668,11 @@ export const AdminArchitects: React.FC = () => {
       const verifiedTitles = new Set(
         updatedDocs.filter((d) => d.status === 'VERIFIED').map((d) => d.title?.trim().toLowerCase())
       );
+      const verifiedIds = new Set(
+        updatedDocs.filter((d) => d.status === 'VERIFIED').map((d) => d.id)
+      );
       enriched.documents = (enriched.documents || []).map((d) => {
-        if (d.title && verifiedTitles.has(d.title.trim().toLowerCase())) {
+        if ((d.title && verifiedTitles.has(d.title.trim().toLowerCase())) || (d.id && verifiedIds.has(d.id))) {
           return { ...d, status: 'VERIFIED' as const };
         }
         return d;
@@ -681,7 +685,11 @@ export const AdminArchitects: React.FC = () => {
         prev.map((a) => (a.id === enriched.id || a.phone === enriched.phone ? enriched : a))
       );
     } else {
-      saveArchitectAccount(optimisticArch);
+      const saved = saveArchitectAccount(optimisticArch);
+      if (saved) {
+        selectedArchitectRef.current = saved;
+        setSelectedArchitect({ ...saved });
+      }
     }
 
     if (activeReviewDoc) {
@@ -2082,8 +2090,9 @@ export const AdminArchitects: React.FC = () => {
                                 type="button"
                                 disabled={doc.status === 'VERIFIED'}
                                 onClick={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
-                                  handleDocumentApprove(doc.id, doc);
+                                  handleDocumentApprove(doc.id, doc, idx);
                                 }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs ${
                                   doc.status === 'VERIFIED'

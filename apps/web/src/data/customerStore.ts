@@ -546,15 +546,10 @@ export const purgeDummyData = (): void => {
       'bk-5501', 'bk-5502',
     ]);
     const dummyFirmKeywords = [
-      'rathore heritage', 'apex civil engineering', 'buildcraft turnkey',
-      'apex architecture', 'apex architectural', 'sharma designs', 'sharma engineering', 'singhania architectural',
-      'studio kulkarni', 'yadav civil', 'apex turnkey build', 'luxe spaces',
+      'rathore heritage demo', 'apex civil engineering demo', 'buildcraft turnkey demo',
     ];
     const dummyProKeywords = [
-      'rajesh kumar sharma', 'amit verma', 'devendra rathore',
-      'ananya singhania', 'neha kulkarni', 'rajesh sharma', 'rajesh verma',
-      'surender yadav', 'maheshwar rao', 'gurpreet singh',
-      'reeta verma', 'savi sharma', 'sita singh', 'harshita verma', 'certified professional',
+      'demo professional', 'test architect', 'sample engineer',
     ];
     const dummyCodes = new Set([
       'GHR-ORD-2026-9042', 'GHR-ORD-2026-8812',
@@ -566,35 +561,29 @@ export const purgeDummyData = (): void => {
       'QT-2026-001', 'QT-2026-002', 'QT-2026-801', 'QT-2026-802', 'QT-2026-803',
       'qt-101', 'qt-102',
     ]);
-    const dummyNames = [
-      'vikram', 'priya singhania', 'priya sundaram', 'rajesh bakshi', 'arvind mehta', 'rohit khanna', 'ananya sharma', 'demo',
-      'reeta verma', 'savi sharma', 'sita singh', 'harshita verma', 'certified professional',
-    ];
-    const dummyPhones = [
-      '9876543220', '9811225588', '9922336699', '9810987654', '9812345678', '9822114455',
-      '8585858585', '8787878787', '8999998888', '8956238956', '8569856985', '7878787878',
-    ];
+    const dummyNames = ['dummy user', 'sample client', 'demo customer'];
+    const dummyPhones = ['0000000000', '1111111111'];
 
     const isDummy = (item: any): boolean => {
       if (!item) return true;
       if (dummyIds.has(item.id) || dummyIds.has(item.customerId) || dummyIds.has(item.requestId)) return true;
       if (dummyCodes.has(item.requestCode) || dummyCodes.has(item.bookingCode) || dummyCodes.has(item.orderCode) || dummyCodes.has(item.quotationCode)) return true;
       
-      const name = (item.name || item.customerName || '').toLowerCase();
-      if (dummyNames.some((dn) => name.includes(dn))) return true;
+      const name = (item.name || item.customerName || '').toLowerCase().trim();
+      if (dummyNames.some((dn) => name === dn)) return true;
       
-      const phone = (item.phone || item.customerPhone || '');
-      if (dummyPhones.some((dp) => phone.includes(dp))) return true;
+      const phone = (item.phone || item.customerPhone || '').replace(/\D/g, '').slice(-10);
+      if (dummyPhones.includes(phone)) return true;
 
       // Dummy professional or firm check
-      const proName = (item.professionalName || item.professional?.name || '').toLowerCase();
-      if (dummyProKeywords.some((dp) => proName.includes(dp))) return true;
+      const proName = (item.professionalName || item.professional?.name || '').toLowerCase().trim();
+      if (dummyProKeywords.some((dp) => proName === dp)) return true;
 
-      const firm = (item.firmName || item.professional?.firmName || '').toLowerCase();
-      if (dummyFirmKeywords.some((df) => firm.includes(df))) return true;
+      const firm = (item.firmName || item.professional?.firmName || '').toLowerCase().trim();
+      if (dummyFirmKeywords.some((df) => firm === df)) return true;
 
       const coa = (item.coaNumber || '').toLowerCase();
-      if (coa.includes('ca/2018/8892') || coa.includes('ca/2020/00000') || coa.includes('ca/2026/665552') || coa.includes('ca/5455/55445')) return true;
+      if (coa === 'ca/2020/00000') return true;
 
       // Old mock quotation specifications check
       const specs = (item.specifications || item.adminFeedback || '').toLowerCase();

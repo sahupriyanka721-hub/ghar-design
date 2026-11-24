@@ -657,7 +657,7 @@ const ProfessionalAuthGate: React.FC = () => {
 
                       <p className="text-[11px] text-sky-800 font-semibold">
 
-                        ✨ First-time login: Aapka yeh mobile number authorized Partner Workspace ke roop me register ho jayega.
+                        ✨ First-time login: This mobile number will be registered as your authorized Partner Workspace.
 
                       </p>
 
