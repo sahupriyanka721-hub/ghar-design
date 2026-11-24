@@ -157,13 +157,17 @@ export const ProfessionalRequestDetail: React.FC = () => {
             </span>
           )}
 
-          <Link
-            to={`/professional/quotation-builder?requestId=${request.id}`}
-            className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 text-gold-400" />
-            <span>Prepare Itemized BOQ</span>
-          </Link>
+          {status === 'ACCEPTED' ? (
+            <Link
+              to={`/professional/quotation-builder?requestId=${request.id}`}
+              className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4 text-gold-400" />
+              <span>Prepare Itemized BOQ</span>
+            </Link>
+          ) : (
+            <span className="text-xs text-slate-500 italic">Accept inquiry to prepare quotation</span>
+          )}
         </div>
       </div>
 

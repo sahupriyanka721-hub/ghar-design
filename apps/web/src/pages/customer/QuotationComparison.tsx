@@ -69,6 +69,14 @@ export const QuotationComparison: React.FC = () => {
                 return false;
               });
             }
+
+            // If a quotation has been booked/accepted, only show the chosen architect
+            const bookedQuote = local.find((q) => q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked);
+            if (bookedQuote) {
+              local = [bookedQuote];
+            } else {
+              local = local.filter((q) => q.status !== 'UNSELECTED');
+            }
           }
         }
       } catch (e) {}
@@ -162,9 +170,51 @@ export const QuotationComparison: React.FC = () => {
         projectId: newProj.id,
         workOrderNumber: newProj.workOrderNumber,
         acceptedAt: new Date().toISOString(),
+        isBooked: true,
       });
+
+      // Dismiss all competing unselected quotations for this request so only the booked architect remains
+      try {
+        const stored = localStorage.getItem('platform_quotations');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const updated = parsed.map((q: any) => {
+            if (q.id === sel.id || q.quotationCode === sel.quotationCode) {
+              return {
+                ...q,
+                status: 'ACCEPTED',
+                bookingCode,
+                projectId: newProj.id,
+                workOrderNumber: newProj.workOrderNumber,
+                acceptedAt: new Date().toISOString(),
+                isBooked: true,
+              };
+            }
+            if (
+              (sel.requestId && q.requestId === sel.requestId) ||
+              (id && (q.requestId === id || q.requestCode === id)) ||
+              (sel.requestCode && (q.requestCode === sel.requestCode || q.requestId === sel.requestCode))
+            ) {
+              return {
+                ...q,
+                status: 'UNSELECTED',
+                isDismissed: true,
+                dismissedReason: 'Homeowner selected another architect quotation for this project.',
+              };
+            }
+            return q;
+          });
+          localStorage.setItem('platform_quotations', JSON.stringify(updated));
+        }
+      } catch (e) {}
+
       if (sel.requestId || id) {
-        updatePlatformRequestStatus(sel.requestId || id, 'BOOKING_CONFIRMED');
+        updatePlatformRequestStatus(sel.requestId || id, 'BOOKING_CONFIRMED', {
+          bookedQuotationId: sel.id,
+          bookedArchitectId: sel.professional?.id || (sel as any).architectId,
+          bookedFirmName: sel.professional?.firmName || (sel as any).firmName,
+          bookingCode,
+        });
       }
     }
 

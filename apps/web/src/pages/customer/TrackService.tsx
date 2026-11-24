@@ -222,7 +222,7 @@ export const TrackService: React.FC = () => {
             No Active Construction Project Found
           </h2>
           <p className="text-slate-600 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed">
-            Aapka live 10-stage construction milestone tracker tab shuru hoga jab aap apna naya ghar, renovation ya engineering drawing project request submit karenge.
+            Your live 10-stage construction milestone tracker will begin once your project quotation request is submitted and booked.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
@@ -250,7 +250,7 @@ export const TrackService: React.FC = () => {
               10-Stage Civil Milestone Tracking Standards (IS 456 & CPWD)
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Jab aapka project start hoga, har stage par site engineer inspection notes aur live photos upload ki jayengi:
+              Once your project starts, site engineer inspection notes and live progress photos will be uploaded at every stage:
             </p>
           </div>
 
@@ -643,7 +643,7 @@ export const TrackService: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* 4. UPDATE STAGE PROGRESS MODAL ("Kitna Kaam Hua Ye Update Karein") */}
+      {/* 4. UPDATE STAGE PROGRESS MODAL ("Update Stage Progress") */}
       {/* ========================================================================= */}
       {showUpdateModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">

@@ -251,7 +251,7 @@ export const ProfessionalBookings: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Bookings (वापस जाएं)</span>
+                <span>Back to Bookings</span>
               </button>
 
               <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />

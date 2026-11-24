@@ -476,7 +476,7 @@ export const Login: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-amber-800">
-                  Doosre role se login karne ke liye pehle apna purana session reset karein.
+                  To log in with a different role, please reset your existing session first.
                 </p>
               </div>
               <button

@@ -270,7 +270,7 @@ export const AdminOverview: React.FC = () => {
               onClick={() => setShowClearModal(true)}
               disabled={clearing}
               className="px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/30 text-rose-200 hover:text-white transition flex items-center gap-1.5 cursor-pointer text-xs font-bold shadow-xs disabled:opacity-50"
-              title="Clear All Platform Data (डेटा साफ़ करें)"
+              title="Clear All Platform Data"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
               <span className="hidden sm:inline">Clear Data</span>

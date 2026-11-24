@@ -89,7 +89,7 @@ export const VendorRequests: React.FC = () => {
           <FileText className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm">No Open Material Inquiries</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Jab bhi koi homeowner ya project contractor bulk material estimate request karega, inquiry details yahan display hogi.
+            When a homeowner or project contractor requests bulk material estimates, inquiry details will appear here.
           </p>
         </div>
       ) : (

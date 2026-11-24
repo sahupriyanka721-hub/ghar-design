@@ -159,7 +159,7 @@ export const AdminAgreements: React.FC = () => {
     return `================================================================================
 BUILDGHAR PROFESSIONALURE & CIVIL MARKETPLACE
 TRIPARTITE MASTER SERVICE & CIVIL CONSTRUCTION ESCROW AGREEMENT
-(भवन निर्माण एवं वास्तुकला अनुबंध पत्र)
+(Standard Civil Construction & Architecture Agreement)
 Agreement Ref: ${contractData.agreementNumber}
 Date of Execution: ${contractData.dateOfExecution}
 Jurisdiction: ${contractData.cityOfJurisdiction}
@@ -366,7 +366,7 @@ Signature: _____________________________________________
               Construction Service Agreement Text & Format
             </h1>
             <p className="text-xs text-slate-600 font-medium max-w-xl leading-relaxed">
-              Standard Indian civil construction agreement format (भवन निर्माण अनुबंध पत्र). Edit text directly, copy full contract text, or print out on A4 paper / legal stamp paper.
+              Standard Indian civil construction agreement format. Edit text directly, copy full contract text, or print out on A4 paper / legal stamp paper.
             </p>
           </div>
 
@@ -741,7 +741,7 @@ Signature: _____________________________________________
             Legal Binding Tripartite Agreement
           </div>
           <h2 className="text-lg sm:text-xl md:text-2xl font-black font-display text-navy-950 uppercase tracking-tight">
-            भवन निर्माण एवं वास्तुकला अनुबंध पत्र
+            Master Architecture &amp; Construction Agreement
           </h2>
           <div className="text-xs sm:text-sm font-black font-display text-slate-800 uppercase tracking-wider">
             (Tripartite Civil Construction & Milestone Escrow Master Agreement)
@@ -761,7 +761,7 @@ Signature: _____________________________________________
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
             <div className="font-bold text-navy-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-navy-950 text-white flex items-center justify-center text-[10px] font-black">1</span>
-              <span>THE FIRST PARTY (PROPERTY OWNER / CLIENT / गृहस्वामी):</span>
+              <span>THE FIRST PARTY (PROPERTY OWNER / CLIENT):</span>
             </div>
             <div className="pl-6 space-y-0.5 text-slate-700">
               <div><strong>Full Name:</strong> {contractData.clientName}</div>
@@ -779,7 +779,7 @@ Signature: _____________________________________________
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
             <div className="font-bold text-navy-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-navy-950 text-white flex items-center justify-center text-[10px] font-black">2</span>
-              <span>THE SECOND PARTY (PROFESSIONAL / CIVIL CONTRACTOR / ठेकेदार):</span>
+              <span>THE SECOND PARTY (PROFESSIONAL / CIVIL CONTRACTOR):</span>
             </div>
             <div className="pl-6 space-y-0.5 text-slate-700">
               <div><strong>Lead Professional / Contractor:</strong> {contractData.professionalName}</div>
@@ -796,12 +796,12 @@ Signature: _____________________________________________
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
             <div className="font-bold text-navy-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-navy-950 text-white flex items-center justify-center text-[10px] font-black">3</span>
-              <span>THE THIRD PARTY (PLATFORM ESCROW & QUALITY DESK):</span>
+              <span>THE THIRD PARTY (PLATFORM ESCROW &amp; QUALITY DESK):</span>
             </div>
             <div className="pl-6 space-y-0.5 text-slate-700">
               <div><strong>Company:</strong> BuildGhar Technologies India Private Limited</div>
-              <div><strong>Registered Desk:</strong> Operations & Escrow Trust Division, Connaught Place, New Delhi 110001</div>
-              <div><strong>Role:</strong> Neutral Marketplace Facilitator, Independent Chartered Quality Auditor & Escrow Tranche Disbursal Desk.</div>
+              <div><strong>Registered Desk:</strong> Operations &amp; Escrow Trust Division, Connaught Place, New Delhi 110001</div>
+              <div><strong>Role:</strong> Neutral Marketplace Facilitator, Independent Chartered Quality Auditor &amp; Escrow Tranche Disbursal Desk.</div>
               <div className="text-[10px] text-slate-500 italic mt-0.5">
                 (Hereinafter called the <strong>"BUILDGHAR PLATFORM"</strong>).
               </div>
@@ -813,7 +813,7 @@ Signature: _____________________________________________
         <div className="space-y-6 text-xs font-sans leading-relaxed text-slate-800">
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              1. SCOPE OF CIVIL & ENGINEERING WORKS (कार्य का विवरण)
+              1. SCOPE OF CIVIL &amp; ENGINEERING WORKS
             </h3>
             <p>
               1.1 The Owner engages the Professional/Contractor to execute full engineering planning, municipal submission sets, 3D elevations, RCC structural framing, masonry, electrical, plumbing, tiling, and complete finishing works at the property located at <strong>{contractData.plotAddress}</strong>.
@@ -822,13 +822,13 @@ Signature: _____________________________________________
               1.2 <strong>Plot Area:</strong> {contractData.plotDimensions}. <strong>Proposed Total Built-Up Area:</strong> {contractData.builtUpArea}.
             </p>
             <p className="mt-1">
-              1.3 Structural drawings must strictly adhere to <strong>IS 456:2000 (Plain & Reinforced Concrete)</strong> and <strong>IS 1893:2016 (Earthquake Resistance Design)</strong>. Structural load calculations must be signed by an IEI licensed structural engineer before footing casting.
+              1.3 Structural drawings must strictly adhere to <strong>IS 456:2000 (Plain &amp; Reinforced Concrete)</strong> and <strong>IS 1893:2016 (Earthquake Resistance Design)</strong>. Structural load calculations must be signed by an IEI licensed structural engineer before footing casting.
             </p>
           </div>
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              2. AGREED RATE & FIXED CONSIDERATION (दर एवं कुल अनुबंध राशि)
+              2. AGREED RATE &amp; FIXED CONSIDERATION
             </h3>
             <p>
               2.1 The agreed lump-sum construction rate is <strong>₹{contractData.ratePerSqFt} per sq.ft</strong> of covered built-up slab area.
@@ -837,14 +837,14 @@ Signature: _____________________________________________
               2.2 The total agreed fixed contract sum for the full execution is <strong>₹{contractData.totalContractValue.toLocaleString('en-IN')} ({contractData.totalValueInWords})</strong> inclusive of material, labor, engineering supervision, freight, and taxes.
             </p>
             <p className="mt-1">
-              2.3 <strong>No Price Escalation (मूल्य वृद्धि निषेध):</strong> The agreed rate is fixed. Price fluctuations in cement, steel, sand, or labor during the course of construction shall NOT entitle the Contractor to claim any price enhancement.
+              2.3 <strong>No Price Escalation:</strong> The agreed rate is fixed. Price fluctuations in cement, steel, sand, or labor during the course of construction shall NOT entitle the Contractor to claim any price enhancement.
             </p>
           </div>
 
           {/* ---------------- 10-STAGE ESCROW PAYMENT SCHEDULE ---------------- */}
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2 flex items-center justify-between">
-              <span>3. 10-STAGE MILESTONE PAYMENT SCHEDULE (भुगतान की किश्तें)</span>
+              <span>3. 10-STAGE MILESTONE PAYMENT SCHEDULE</span>
               <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-bold">100% Escrow Protected</span>
             </h3>
             <p className="mb-2.5">
@@ -857,8 +857,8 @@ Signature: _____________________________________________
                 <thead>
                   <tr className="bg-slate-100 text-slate-800 border-b border-slate-300 font-bold text-[11px]">
                     <th className="py-2 px-3 w-16">Tranche</th>
-                    <th className="py-2 px-3">Milestone Stage (कार्य का चरण)</th>
-                    <th className="py-2 px-3 hidden sm:table-cell">Technical Scope (कार्य विवरण)</th>
+                    <th className="py-2 px-3">Milestone Stage</th>
+                    <th className="py-2 px-3 hidden sm:table-cell">Technical Scope</th>
                     <th className="py-2 px-3 w-20 text-center">% Tranche</th>
                     <th className="py-2 px-3 w-28 text-right">Amount (₹)</th>
                   </tr>
@@ -889,20 +889,20 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              4. MATERIAL SPECIFICATIONS (सामग्री एवं गुणवत्ता मानक)
+              4. MATERIAL SPECIFICATIONS
             </h3>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Steel:</strong> Primary TMT Fe-550D (Tata Tiscon / Jindal Panther) with manufacturer test slips.</li>
               <li><strong>Cement:</strong> Grade 43/53 Portland Pozzolana Cement (UltraTech Super / Ambuja / ACC).</li>
-              <li><strong>Aggregates:</strong> 10mm & 20mm blue granite metal, washed coarse river sand (Zone-II).</li>
-              <li><strong>Plumbing & Electrical:</strong> Astral CPVC pipes, Polycab/Finolex FRLS fire-retardant copper wiring.</li>
+              <li><strong>Aggregates:</strong> 10mm &amp; 20mm blue granite metal, washed coarse river sand (Zone-II).</li>
+              <li><strong>Plumbing &amp; Electrical:</strong> Astral CPVC pipes, Polycab/Finolex FRLS fire-retardant copper wiring.</li>
               <li>{contractData.specialConditions}</li>
             </ul>
           </div>
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              5. TIMELINE & DELAYS (समय सीमा एवं विलम्ब शुल्क)
+              5. TIMELINE &amp; DELAYS
             </h3>
             <p>
               5.1 Total duration for full completion and handover is fixed at <strong>{contractData.projectDurationDays} Calendar Days</strong> from site handover.
@@ -914,7 +914,7 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              6. WATER, ELECTRICITY & SITE SECURITY (पानी एवं बिजली व्यवस्था)
+              6. WATER, ELECTRICITY &amp; SITE SECURITY
             </h3>
             <p>
               6.1 The Owner shall provide access to borewell/municipal water suitable for concrete curing and a temporary electrical connection at the plot boundary.
@@ -926,7 +926,7 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              7. EXTRA WORK & VARIATION ORDERS (अतिरिक्त कार्य नियम)
+              7. EXTRA WORK &amp; VARIATION ORDERS
             </h3>
             <p>
               No extra work or modification of the engineering plan shall be executed without prior written Variation Order signed by the Owner specifying exact rates and timeline adjustments.
@@ -935,7 +935,7 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              8. LABOR COMPLIANCE & SAFETY (श्रमिक सुरक्षा एवं बीमा)
+              8. LABOR COMPLIANCE &amp; SAFETY
             </h3>
             <p>
               The Contractor shall strictly comply with the Workmen’s Compensation Act, 1923, and provide mandatory safety helmets, safety nets, and harnesses on site. The Owner shall bear zero liability for any worker injury or mishap on site.
@@ -944,7 +944,7 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              9. 10-YEAR RCC STRUCTURAL WARRANTY (10 वर्ष स्ट्रक्चरल गारंटी)
+              9. 10-YEAR RCC STRUCTURAL WARRANTY
             </h3>
             <p>
               9.1 The Contractor provides a <strong>{contractData.rccStructuralWarrantyYears}-Year Written Guarantee</strong> against structural settlement, beam cracks, column deflection, or slab leakage.
@@ -956,7 +956,7 @@ Signature: _____________________________________________
 
           <div>
             <h3 className="font-black text-xs uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-              10. DISPUTE RESOLUTION & ARBITRATION (विवाद निपटारा)
+              10. DISPUTE RESOLUTION &amp; ARBITRATION
             </h3>
             <p>
               Any dispute between the Owner and Contractor shall first be referred to the BuildGhar Neutral Engineering Desk for fast-track 14-day technical conciliation. If unresolved, it shall be referred to arbitration in accordance with the Arbitration and Conciliation Act, 1996 in <strong>{contractData.arbitrationSeat}</strong>.
@@ -975,14 +975,14 @@ Signature: _____________________________________________
             <div className="border border-slate-300 rounded-2xl p-4 bg-slate-50/50 flex flex-col justify-between min-h-[160px] text-center">
               <div className="space-y-1">
                 <div className="font-black text-navy-950 uppercase text-[11px]">FIRST PARTY</div>
-                <div className="text-[10px] text-slate-500">Property Owner / गृहस्वामी</div>
+                <div className="text-[10px] text-slate-500">Property Owner / Client</div>
               </div>
 
               <div className="my-6 border-b border-dashed border-slate-400"></div>
 
               <div className="space-y-0.5">
                 <div className="font-bold text-slate-900 text-[11px]">{contractData.clientName}</div>
-                <div className="text-[9px] text-slate-500">Signature / अंगूठा & Date</div>
+                <div className="text-[9px] text-slate-500">Signature / Thumbprint &amp; Date</div>
               </div>
             </div>
 
@@ -990,14 +990,14 @@ Signature: _____________________________________________
             <div className="border border-slate-300 rounded-2xl p-4 bg-slate-50/50 flex flex-col justify-between min-h-[160px] text-center">
               <div className="space-y-1">
                 <div className="font-black text-navy-950 uppercase text-[11px]">SECOND PARTY</div>
-                <div className="text-[10px] text-slate-500">Professional / Contractor / ठेकेदार</div>
+                <div className="text-[10px] text-slate-500">Professional / Contractor</div>
               </div>
 
               <div className="my-6 border-b border-dashed border-slate-400"></div>
 
               <div className="space-y-0.5">
                 <div className="font-bold text-slate-900 text-[11px]">{contractData.professionalName}</div>
-                <div className="text-[9px] text-slate-500">Stamp, Seal & Registration No.</div>
+                <div className="text-[9px] text-slate-500">Stamp, Seal &amp; Registration No.</div>
               </div>
             </div>
 
@@ -1012,7 +1012,7 @@ Signature: _____________________________________________
 
               <div className="space-y-0.5">
                 <div className="font-bold text-slate-900 text-[11px]">Authorized Escrow Officer</div>
-                <div className="text-[9px] text-slate-500">Corporate Seal & Audit Stamp</div>
+                <div className="text-[9px] text-slate-500">Corporate Seal &amp; Audit Stamp</div>
               </div>
             </div>
           </div>
@@ -1020,14 +1020,14 @@ Signature: _____________________________________________
           {/* Two Witnesses Block */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6 pt-6 border-t border-slate-200 text-xs">
             <div className="space-y-1">
-              <div className="font-bold text-slate-800 text-[11px]">गवाह 1 (WITNESS 1):</div>
+              <div className="font-bold text-slate-800 text-[11px]">WITNESS 1:</div>
               <div className="h-6 border-b border-dashed border-slate-300"></div>
-              <div className="text-[10px] text-slate-500">Name, Father's Name & Address:</div>
+              <div className="text-[10px] text-slate-500">Name, Father's Name &amp; Address:</div>
             </div>
             <div className="space-y-1">
-              <div className="font-bold text-slate-800 text-[11px]">गवाह 2 (WITNESS 2):</div>
+              <div className="font-bold text-slate-800 text-[11px]">WITNESS 2:</div>
               <div className="h-6 border-b border-dashed border-slate-300"></div>
-              <div className="text-[10px] text-slate-500">Name, Father's Name & Address:</div>
+              <div className="text-[10px] text-slate-500">Name, Father's Name &amp; Address:</div>
             </div>
           </div>
 

@@ -51,6 +51,7 @@ import { getArchitectById, getArchitectByPhone } from '../../data/architectStore
 export const AdminQuotationsReview: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'QUOTATIONS'>('QUOTATIONS');
+  const [viewMode, setViewMode] = useState<'REQUEST_GROUPS' | 'ALL_QUOTES'>('REQUEST_GROUPS');
   const [requests, setRequests] = useState<PlatformProjectRequest[]>([]);
   const [quotations, setQuotations] = useState<any[]>([]);
   const { success, error } = useToast();
@@ -126,6 +127,25 @@ export const AdminQuotationsReview: React.FC = () => {
       );
     });
   }, [quotations, statusFilter, searchTerm]);
+
+  const groupedByRequest = useMemo(() => {
+    const map = new Map<string, { request: PlatformProjectRequest | null; quotes: any[] }>();
+
+    for (const q of filteredQuotations) {
+      const key = q.requestId || q.requestCode || 'DIRECT';
+      if (!map.has(key)) {
+        const matched = requests.find((r) => r.id === key || r.requestCode === key) || null;
+        map.set(key, { request: matched, quotes: [] });
+      }
+      map.get(key)!.quotes.push(q);
+    }
+
+    return Array.from(map.entries()).map(([reqKey, data]) => ({
+      reqKey,
+      request: data.request,
+      quotes: data.quotes,
+    }));
+  }, [filteredQuotations, requests]);
 
   // Modal for admin direct quotation creation
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -404,6 +424,35 @@ export const AdminQuotationsReview: React.FC = () => {
     }
   };
 
+  const handlePublishAllForRequest = (reqKey: string) => {
+    const targetQuotes = quotations.filter((q) => q.requestId === reqKey || q.requestCode === reqKey);
+    if (targetQuotes.length === 0) return;
+    const targetIds = new Set(targetQuotes.map((q) => q.id));
+
+    const updated = quotations.map((q) =>
+      targetIds.has(q.id)
+        ? {
+            ...q,
+            status: 'PUBLISHED_TO_CUSTOMER',
+            publishedAt: new Date().toISOString(),
+          }
+        : q
+    );
+
+    setQuotations(updated);
+    safeSetStorage('platform_quotations', updated);
+    broadcastStoreUpdate('QUOTATIONS_UPDATED', updated);
+    pushToCloud().catch(() => {});
+
+    const matchedReq = requests.find((r) => r.id === reqKey || r.requestCode === reqKey);
+    if (matchedReq) {
+      updatePlatformRequestStatus(matchedReq.id, 'QUOTATIONS_AVAILABLE', {
+        quotationsCount: targetQuotes.length,
+      });
+    }
+    success(`Published ${targetQuotes.length} quotations to homeowner for request ${reqKey}.`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -457,33 +506,232 @@ export const AdminQuotationsReview: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Filters */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Status:</span>
-          {[
-            { id: 'ALL', label: 'All Quotations' },
-            { id: 'PENDING_REVIEW', label: 'Pending Review' },
-            { id: 'APPROVED', label: 'Approved' },
-            { id: 'PUBLISHED_TO_CUSTOMER', label: 'Published' },
-            { id: 'ACCEPTED', label: 'Accepted by Homeowner' },
-            { id: 'REJECTED', label: 'Rejected' },
-          ].map((tab) => (
+        {/* View Mode Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Display Mode:</span>
             <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                statusFilter === tab.id
-                  ? 'bg-navy-950 text-white shadow-2xs'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              type="button"
+              onClick={() => setViewMode('REQUEST_GROUPS')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'REQUEST_GROUPS'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              {tab.label}
+              <Layers className="w-3.5 h-3.5" />
+              <span>Multi-Architect Project Comparison (Table a, b, c...)</span>
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setViewMode('ALL_QUOTES')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'ALL_QUOTES'
+                  ? 'bg-navy-950 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <FileCheck2 className="w-3.5 h-3.5" />
+              <span>Master Quotations Table</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ================= QUOTATIONS TABLE VIEW ================= */}
+      {/* ================= VIEW 1: MULTI-ARCHITECT GROUPED COMPARISON VIEW ================= */}
+      {viewMode === 'REQUEST_GROUPS' && (
+        <div className="space-y-6">
+          {groupedByRequest.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-2xs space-y-2">
+              <FileCheck2 className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-800 text-sm">No Project Quotations Found</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                No customer requests have received quotations matching your active filters.
+              </p>
+            </div>
+          ) : (
+            groupedByRequest.map(({ reqKey, request: matchedReq, quotes: reqQuotes }) => {
+              const reqCode = matchedReq?.requestCode || reqKey;
+              const custName = matchedReq?.customerName || reqQuotes[0]?.customerName || 'Homeowner';
+              const custPhone = matchedReq?.customerPhone || reqQuotes[0]?.customerPhone || '';
+              const city = matchedReq?.city || reqQuotes[0]?.city || 'Site City';
+              const budget = matchedReq?.budgetRange || 'Not Specified';
+              const plotInfo = matchedReq?.plotWidth && matchedReq?.plotLength
+                ? `${matchedReq.plotWidth} × ${matchedReq.plotLength} ${matchedReq.measurementUnit?.toLowerCase() || 'ft'}`
+                : matchedReq?.plotArea
+                ? `${matchedReq.plotArea} ${matchedReq.measurementUnit?.toLowerCase() || 'sq.ft'}`
+                : 'Plot Area as per FSI';
+
+              return (
+                <div key={reqKey} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                  {/* Customer Request Header */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {matchedReq?.id ? (
+                          <Link
+                            to={`/admin/requests/${matchedReq.id}`}
+                            className="font-mono text-sm font-bold text-sky-700 hover:underline"
+                            title="Inspect full customer dossier"
+                          >
+                            {reqCode}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-sm font-bold text-navy-950">{reqCode}</span>
+                        )}
+                        <span className="text-xs font-bold text-slate-900">• Homeowner: {custName}</span>
+                        {custPhone && <span className="text-xs font-mono text-slate-600">({custPhone})</span>}
+                        <span className="text-xs text-slate-500">• {city}</span>
+                        {matchedReq?.status && <Badge status={matchedReq.status} />}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                        <span>Plot: <strong className="text-slate-700">{plotInfo}</strong></span>
+                        <span>• Target Budget: <strong className="text-amber-700">{budget}</strong></span>
+                        {matchedReq?.requiredServices && matchedReq.requiredServices.length > 0 && (
+                          <span>• Deliverables: <strong className="text-blue-700">{matchedReq.requiredServices.slice(0, 3).join(', ')}</strong></span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start lg:self-auto">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        {reqQuotes.length} Architect Bids
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handlePublishAllForRequest(reqKey)}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+                        title="Publish all vetted quotations for this request to homeowner"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Publish All to Homeowner</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Multi-Architect Comparison Table [a, b, c...] */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Slot</th>
+                          <th className="py-2.5 px-3">Architect Firm Name</th>
+                          <th className="py-2.5 px-3">Architect ID</th>
+                          <th className="py-2.5 px-3 text-right">Subtotal</th>
+                          <th className="py-2.5 px-3 text-right">Discount to Client</th>
+                          <th className="py-2.5 px-3 text-right">Net Total</th>
+                          <th className="py-2.5 px-3 text-right">GST (18%)</th>
+                          <th className="py-2.5 px-3 text-right font-black">Final Quotation Total</th>
+                          <th className="py-2.5 px-3 text-center">Status</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {reqQuotes.map((q, idx) => {
+                          const letter = String.fromCharCode(97 + idx); // a, b, c, d...
+                          const { archId, firmName, architectName, archPhone } = resolveArchitectInfo(q);
+                          const subtotal = q.subtotalPaise ? q.subtotalPaise / 100 : (q.totalAmountPaise ? q.totalAmountPaise / 100 : 0);
+                          const discount = q.discountPaise ? q.discountPaise / 100 : 0;
+                          const net = Math.max(0, subtotal - discount);
+                          const tax = q.taxPaise ? q.taxPaise / 100 : Math.round(net * 0.18);
+                          const finalTotal = q.finalAmountPaise ? q.finalAmountPaise / 100 : (net + tax);
+
+                          return (
+                            <tr key={q.id || q.quotationCode || idx} className="hover:bg-sky-50/40 transition">
+                              <td className="py-3 px-3 font-mono font-bold whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[11px]">
+                                  Architect [{letter}]
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="font-bold text-slate-900 block">{firmName}</span>
+                                <span className="text-[11px] text-slate-500">{architectName} • {archPhone}</span>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-xs text-slate-700 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
+                                  {archId}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-700">
+                                ₹{subtotal.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-emerald-700 font-semibold">
+                                {discount > 0 ? `-₹${discount.toLocaleString('en-IN')}` : '₹0'}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-900 font-semibold">
+                                ₹{net.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-600">
+                                ₹{tax.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-black text-navy-950 text-sm whitespace-nowrap">
+                                ₹{finalTotal.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <Badge status={q.status} />
+                              </td>
+                              <td className="py-3 px-3 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setInspectingQuote(q)}
+                                    className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-navy-950 hover:bg-navy-900 text-white flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                                    title="Inspect full BOQ"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-sky-300" />
+                                    <span>Inspect</span>
+                                  </button>
+
+                                  {q.status !== 'APPROVED' && q.status !== 'PUBLISHED_TO_CUSTOMER' && q.status !== 'ACCEPTED' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAction(q.id, 'APPROVE')}
+                                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer"
+                                      title="Approve quotation"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
+                                  {q.status !== 'PUBLISHED_TO_CUSTOMER' && q.status !== 'ACCEPTED' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAction(q.id, 'PUBLISH')}
+                                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                                      title="Publish quotation to homeowner"
+                                    >
+                                      <Share2 className="w-3.5 h-3.5" />
+                                      <span>Publish</span>
+                                    </button>
+                                  )}
+
+                                  {q.status !== 'REJECTED' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAction(q.id, 'REJECT')}
+                                      className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                                      title="Reject quotation"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ================= VIEW 2: MASTER QUOTATIONS TABLE VIEW ================= */}
+      {viewMode === 'ALL_QUOTES' && (
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -736,6 +984,7 @@ export const AdminQuotationsReview: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
 
 
 

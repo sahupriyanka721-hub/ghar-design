@@ -353,7 +353,7 @@ export const AcceptedQuotations: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-amber-900 mt-0.5">
-                  Architect / Partner dwara quotation submit ho chuka hai. Niche diye gaye quotation ko accept karke aap turant apna <strong>Work Order</strong> generate kar sakte hain aur kaam start karwa sakte hain.
+                  A vetted quotation has been submitted by the accredited partner. Accept the quotation below to immediately generate your official <strong>Work Order</strong> and initiate project execution.
                 </p>
               </div>
             </div>

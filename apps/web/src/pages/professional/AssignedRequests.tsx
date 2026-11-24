@@ -130,9 +130,9 @@ export const AssignedRequests: React.FC = () => {
         !r.categorySlug.toLowerCase().includes('interior') ||
         (r.assignedProfessionalIds && r.assignedProfessionalIds.length > 0);
 
-      // If no specific professional IDs list is set, but status is ASSIGNED, make it available to category architects
+      // If no specific professional IDs list is set, request is not dispatched to this architect yet
       if (!r.assignedProfessionalIds || r.assignedProfessionalIds.length === 0) {
-        return isAssignedStatus && isArchOrCivil;
+        return false;
       }
 
       // Check if explicitly assigned to this architect via ANY of their identifiers
@@ -299,7 +299,7 @@ export const AssignedRequests: React.FC = () => {
           <Building className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm">No Assigned Project Inquiries</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Jab bhi GharDesign admin team aapke account ko koi customer project request allocate karegi, inquiry details yahan live display hongi.
+            When the platform administrator allocates verified customer project inquiries to your firm, assignment details will appear live here.
           </p>
         </div>
       ) : (
@@ -427,13 +427,24 @@ export const AssignedRequests: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Link
-                    to={`/professional/quotation-builder?requestId=${asg.requestId}`}
-                    className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <PlusCircle className="w-4 h-4 text-gold-400" />
-                    <span>Build / Edit BOQ Quotation</span>
-                  </Link>
+                  {asg.status === 'ACCEPTED' ? (
+                    <Link
+                      to={`/professional/quotation-builder?requestId=${asg.requestId}`}
+                      className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <PlusCircle className="w-4 h-4 text-gold-400" />
+                      <span>Build / Edit BOQ Quotation</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInquiry(asg)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Accept Inquiry to Quote</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -455,7 +466,7 @@ export const AssignedRequests: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Assigned Inquiries (वापस जाएं)</span>
+                <span>Back to Assigned Inquiries</span>
               </button>
 
               <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
@@ -689,36 +700,42 @@ export const AssignedRequests: React.FC = () => {
                     className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-98"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Accept Inquiry (स्वीकार करें)</span>
+                    <span>Accept Inquiry</span>
                   </button>
                   <button
                     onClick={() => handleRespond(selectedInquiry.id, 'DECLINED')}
                     className="px-5 py-3 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs sm:text-sm font-bold transition border border-slate-200 cursor-pointer active:scale-98"
                   >
                     <X className="w-4 h-4" />
-                    <span>Decline (अस्वीकार करें)</span>
+                    <span>Decline</span>
                   </button>
                 </>
               ) : selectedInquiry.status === 'ACCEPTED' ? (
                 <span className="text-xs sm:text-sm text-emerald-800 font-bold bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-300 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Inquiry Accepted & Active (स्वीकृत)</span>
+                  <span>Inquiry Accepted & Active</span>
                 </span>
               ) : (
                 <span className="text-xs sm:text-sm text-slate-500 bg-slate-100 px-4 py-2.5 rounded-xl border border-slate-200">
-                  Inquiry Declined (अस्वीकृत)
+                  Inquiry Declined
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                to={`/professional/quotation-builder?requestId=${selectedInquiry.requestId}`}
-                className="px-6 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer border border-gold-500/30 active:scale-98"
-              >
-                <PlusCircle className="w-4 h-4 text-gold-400" />
-                <span>Prepare Itemized BOQ Quotation (कोटेशन बनाएं)</span>
-              </Link>
+              {selectedInquiry.status === 'ACCEPTED' ? (
+                <Link
+                  to={`/professional/quotation-builder?requestId=${selectedInquiry.requestId}`}
+                  className="px-6 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer border border-gold-500/30 active:scale-98"
+                >
+                  <PlusCircle className="w-4 h-4 text-gold-400" />
+                  <span>Prepare Itemized BOQ Quotation</span>
+                </Link>
+              ) : (
+                <span className="text-xs text-slate-500 italic hidden sm:inline">
+                  Accept inquiry above to unlock BOQ Quotation Builder
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedInquiry(null)}

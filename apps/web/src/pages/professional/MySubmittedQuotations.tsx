@@ -615,7 +615,7 @@ export const MySubmittedQuotations: React.FC = () => {
           <FileCheck2 className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm">No Quotations Found</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Aapne abhi tak koi quotation create nahi kiya hai ya selected filter se matching records nahi hain.
+            No quotations created yet or no records match your selected filter.
           </p>
           <div className="pt-2">
             <Link

@@ -114,7 +114,7 @@ export const ProfessionalCustomers: React.FC = () => {
           <Users className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm">No Active Clients Yet</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Jab aapka quotation customer select karega, unka contact aur direct chat portal yahan unlock hoga.
+            Once a client accepts and confirms your quotation, their contact and project messaging workspace will unlock here.
           </p>
         </div>
       ) : (

@@ -562,7 +562,7 @@ export const CustomerPurchaseAuthModal: React.FC<CustomerPurchaseAuthModalProps>
                       <span>Registered Customer Direct Login</span>
                     </div>
                     <p className="text-[11px] text-emerald-800 leading-relaxed">
-                      Jis number se aapne pehle register kiya hai, usi number se direct login karein. Aapke saved site addresses aur purchase history restore ho jayegi.
+                      Log in directly using your registered phone number. Your saved site addresses and order history will be restored.
                     </p>
                   </div>
 

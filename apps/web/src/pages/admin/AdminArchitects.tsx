@@ -584,7 +584,7 @@ export const AdminArchitects: React.FC = () => {
     if (activeReviewDoc) {
       setActiveReviewDoc({ ...activeReviewDoc, status: 'VERIFIED' });
     }
-    success('Document verified successfully! (सत्यापित हो गया)');
+    success('Document verified successfully!');
   };
 
   const handleDocumentReject = (docId: string, reason?: string, docItem?: ArchitectKycDocument) => {
@@ -2968,7 +2968,7 @@ export const AdminArchitects: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Back to Partner Application (वापस जाएं)</span>
+                <span>Back to Partner Application</span>
               </button>
               <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
               <div className="min-w-0">
@@ -3104,7 +3104,7 @@ export const AdminArchitects: React.FC = () => {
                 title="Cancel or reject this document"
               >
                 <XCircle className="w-4 h-4 text-rose-400" />
-                <span>Cancel (रद्द करें)</span>
+                <span>Cancel / Reject</span>
               </button>
 
               <button
@@ -3117,7 +3117,7 @@ export const AdminArchitects: React.FC = () => {
                 title="Verify and approve this statutory document"
               >
                 <CheckCircle2 className="w-4 h-4 text-white" />
-                <span>Verify Document (सत्यापित करें)</span>
+                <span>Verify Document</span>
               </button>
             </div>
           </div>

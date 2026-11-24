@@ -351,7 +351,7 @@ export const CreateRequestWizard: React.FC = () => {
       measurementUnit: formData.measurementUnit || 'FEET',
       status: 'UNDER_REVIEW',
       quoteFeePaise: 49900,
-      isFeePaid: true,
+      isFeePaid: false,
       assignedCount: 0,
       quotationsCount: 0,
       createdAt: new Date().toISOString(),
@@ -397,16 +397,16 @@ export const CreateRequestWizard: React.FC = () => {
       try {
         await apiRequest('/requests', {
           method: 'POST',
-          body: JSON.stringify({ ...newRequestRecord, isFeePaid: true }),
+          body: JSON.stringify(newRequestRecord),
         });
       } catch {}
 
-      success(`🎉 Quotation Request [${newRequestRecord.requestCode}] submitted successfully! Dispatched to Admin Desk.`);
-      navigate('/dashboard/requests');
+      // Promptly open the payment section as requested
+      setShowPaymentModal(true);
     } catch (err) {
       savePlatformRequest(newRequestRecord);
-      success(`🎉 Quotation Request [${newRequestRecord.requestCode}] saved! Dispatched to Admin Desk.`);
-      navigate('/dashboard/requests');
+      setCreatedRequestId(newRequestRecord.id);
+      setShowPaymentModal(true);
     } finally {
       setIsSubmitting(false);
     }

@@ -124,10 +124,50 @@ export const MyQuotations: React.FC = () => {
         projectId: newProj.id,
         workOrderNumber: newProj.workOrderNumber,
         acceptedAt: new Date().toISOString(),
+        isBooked: true,
       });
 
+      // Dismiss competing quotations for this request so only the chosen architect remains
+      try {
+        const stored = localStorage.getItem('platform_quotations');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const updated = parsed.map((q: any) => {
+            if (q.id === (quote.id || qId) || q.quotationCode === (quote.quotationCode || qId)) {
+              return {
+                ...q,
+                status: 'ACCEPTED',
+                bookingCode,
+                projectId: newProj.id,
+                workOrderNumber: newProj.workOrderNumber,
+                acceptedAt: new Date().toISOString(),
+                isBooked: true,
+              };
+            }
+            if (
+              (quote.requestId && q.requestId === quote.requestId) ||
+              (quote.requestCode && (q.requestCode === quote.requestCode || q.requestId === quote.requestCode))
+            ) {
+              return {
+                ...q,
+                status: 'UNSELECTED',
+                isDismissed: true,
+                dismissedReason: 'Homeowner selected another architect quotation for this project.',
+              };
+            }
+            return q;
+          });
+          localStorage.setItem('platform_quotations', JSON.stringify(updated));
+        }
+      } catch (e) {}
+
       if (quote.requestId) {
-        updatePlatformRequestStatus(quote.requestId, 'BOOKING_CONFIRMED');
+        updatePlatformRequestStatus(quote.requestId, 'BOOKING_CONFIRMED', {
+          bookedQuotationId: quote.id || qId,
+          bookedArchitectId: quote.professional?.id || quote.architectId,
+          bookedFirmName: quote.professional?.firmName || quote.firmName,
+          bookingCode,
+        });
       }
 
       try {
@@ -280,10 +320,42 @@ export const MyQuotations: React.FC = () => {
               }
             }
           }
-          setQuotations(Array.from(mergedMap.values()));
+          const rawAll = Array.from(mergedMap.values());
+          const bookedRequestIds = new Set<string>();
+          rawAll.forEach((q: any) => {
+            if (q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked) {
+              if (q.requestId) bookedRequestIds.add(q.requestId.toLowerCase().trim());
+              if (q.requestCode) bookedRequestIds.add(q.requestCode.toLowerCase().trim());
+            }
+          });
+
+          const finalFiltered = rawAll.filter((q: any) => {
+            const reqKey = (q.requestId || q.requestCode || '').toLowerCase().trim();
+            if (reqKey && bookedRequestIds.has(reqKey)) {
+              return q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked;
+            }
+            return q.status !== 'UNSELECTED';
+          });
+          setQuotations(finalFiltered);
         })
         .catch(() => {
-          setQuotations(Array.from(mergedMap.values()));
+          const rawAll = Array.from(mergedMap.values());
+          const bookedRequestIds = new Set<string>();
+          rawAll.forEach((q: any) => {
+            if (q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked) {
+              if (q.requestId) bookedRequestIds.add(q.requestId.toLowerCase().trim());
+              if (q.requestCode) bookedRequestIds.add(q.requestCode.toLowerCase().trim());
+            }
+          });
+
+          const finalFiltered = rawAll.filter((q: any) => {
+            const reqKey = (q.requestId || q.requestCode || '').toLowerCase().trim();
+            if (reqKey && bookedRequestIds.has(reqKey)) {
+              return q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked;
+            }
+            return q.status !== 'UNSELECTED';
+          });
+          setQuotations(finalFiltered);
         })
         .finally(() => setLoading(false));
     };

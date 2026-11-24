@@ -65,7 +65,7 @@ export const InteriorDesignerLogin: React.FC = () => {
       const savedName = localStorage.getItem(`registered_interior_designer_name_${cleanPhone}`);
 
       if (!designer && !isRegisteredLocal) {
-        error('Yeh mobile number registered nahi hai. Kripya pehle Interior Designer partner ke roop me register karein.');
+        error('This mobile number is not registered. Please register as an Interior Designer partner first.');
         setLoading(false);
         return;
       }

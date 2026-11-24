@@ -151,7 +151,7 @@ export const ProfessionalProjects: React.FC = () => {
           <Building className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm">No Projects Under Execution Yet</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Jab customer aapke accepted quotation ko confirm karega, automatically yahan design & construction project initialize ho jayega.
+            Once a client accepts and confirms your quotation, the active architectural design and construction workspace will initialize here automatically.
           </p>
         </div>
       ) : (
