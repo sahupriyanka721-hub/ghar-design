@@ -196,22 +196,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const isVerified = Boolean(arch?.isVerified ?? pro?.isVerified);
           const status = arch?.status || pro?.verificationStatus || (resolved.user as any).status || 'VERIFIED';
           const name = arch?.name || pro?.name || resolved.user.name;
-          const updatedUser: User = {
-            ...resolved.user,
-            name,
-            ...(isVerified ? { isVerified: true } : {}),
-            ...({ status, verificationStatus: status, accountStatus: status } as any),
-          };
-          localStorage.setItem(PRO_USER_KEY, JSON.stringify(updatedUser));
-          localStorage.setItem('pro_user', JSON.stringify(updatedUser));
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-          setUser(updatedUser);
+
+          const hasChanged =
+            resolved.user.name !== name ||
+            Boolean(resolved.user.isVerified) !== isVerified ||
+            (resolved.user as any).status !== status ||
+            (resolved.user as any).verificationStatus !== status ||
+            (resolved.user as any).accountStatus !== status;
+
+          if (hasChanged) {
+            const updatedUser: User = {
+              ...resolved.user,
+              name,
+              ...(isVerified ? { isVerified: true } : {}),
+              ...({ status, verificationStatus: status, accountStatus: status } as any),
+            };
+            localStorage.setItem(PRO_USER_KEY, JSON.stringify(updatedUser));
+            localStorage.setItem('pro_user', JSON.stringify(updatedUser));
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+          }
           return;
         }
       }
 
-      setUser(resolved.user);
-      setToken(resolved.token);
+      if (resolved.user?.id !== user?.id || resolved.token !== token) {
+        setUser(resolved.user);
+        setToken(resolved.token);
+      }
     };
 
     window.addEventListener('storage', handleReactiveSync);

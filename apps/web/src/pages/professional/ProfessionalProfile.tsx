@@ -271,7 +271,7 @@ export const ProfessionalProfile: React.FC = () => {
                   <span>
                     {isArchitect
                       ? (architect?.id && (architect.accountStatus === 'APPROVED' || architect.isVerified)
-                          ? `COA Verified ([${formatArchitectId(architect.id)}])`
+                          ? `COA Verified (${formatArchitectId(architect.id)})`
                           : 'COA Registered Architect')
                       : 'IEI Verified'}
                   </span>

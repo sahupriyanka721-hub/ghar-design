@@ -311,7 +311,7 @@ export const ArchitectApplicationStatus: React.FC = () => {
                       Verified Partner
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-900 text-xs font-mono font-bold border border-emerald-300">
-                      Official Architect ID: [{formatArchitectId(architect?.id)}]
+                      Official Architect ID: {formatArchitectId(architect?.id)}
                     </span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black font-display text-navy-950">

@@ -632,15 +632,17 @@ export const resolveArchitectBankDetails = (
   );
 
   const anyVerified = Boolean(
-    existing?.isVerified ||
-    chosen?.isVerified ||
-    candidates.some((c) => c && (c.isVerified === true || c.isVerified === 'true'))
+    arch?.accountStatus === 'APPROVED' ||
+    (existing && typeof existing.isVerified === 'boolean'
+      ? existing.isVerified
+      : (chosen && typeof chosen.isVerified === 'boolean' ? chosen.isVerified : false))
   );
   const anyChequeAccepted = Boolean(
-    existing?.isChequeAccepted ||
-    chosen?.isChequeAccepted ||
-    candidates.some((c) => c && (c.isChequeAccepted === true || c.isChequeAccepted === 'true')) ||
-    chequeDoc?.status === 'VERIFIED'
+    arch?.accountStatus === 'APPROVED' ||
+    chequeDoc?.status === 'VERIFIED' ||
+    (existing && typeof existing.isChequeAccepted === 'boolean'
+      ? existing.isChequeAccepted
+      : (chosen && typeof chosen.isChequeAccepted === 'boolean' ? chosen.isChequeAccepted : false))
   );
 
   return {
@@ -683,11 +685,6 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   }
 
   arch.bankDetails = resolveArchitectBankDetails(arch);
-  if (cleanPhone && (arch.bankDetails.accountNumber || arch.bankDetails.bankName || arch.bankDetails.ifscCode)) {
-    try {
-      localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(arch.bankDetails));
-    } catch {}
-  }
 
   // 4. Ensure Statutory Documents
   let existingDocs = arch.documents || [];
@@ -972,12 +969,12 @@ export const saveArchitectBankDetails = (
     branch: bank.branch || arch.bankDetails?.branch || '',
     cancelledChequeUrl: bank.cancelledChequeUrl || arch.bankDetails?.cancelledChequeUrl || '',
     cancelledChequeFileName: bank.cancelledChequeFileName || arch.bankDetails?.cancelledChequeFileName || '',
-    isChequeAccepted: bank.isChequeAccepted ?? true,
-    isVerified: bank.isVerified ?? true,
+    isChequeAccepted: Boolean(bank.isChequeAccepted),
+    isVerified: Boolean(bank.isVerified),
   };
 
-  // Mark the cheque document as VERIFIED
-  if (arch.documents) {
+  // Only mark cheque document as VERIFIED if bank is explicitly verified
+  if (arch.documents && bank.isVerified) {
     arch.documents = arch.documents.map((d) =>
       d.id === 'doc-cancelled-cheque' || d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE'
         ? { ...d, status: 'VERIFIED' as const }
@@ -1925,12 +1922,8 @@ export const updateArchitectDocumentStatus = (
       (docTitle && d.title === docTitle) ||
       (docTitle && d.title && d.title.trim().toLowerCase() === docTitle.trim().toLowerCase()) ||
       (docId === 'doc-cheque-review' && (d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque')) ||
-      (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-      (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-      (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
-      (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN')) ||
-      (d as any).documentType === docId ||
-      (d.id && docId && d.id.toLowerCase() === docId.toLowerCase())
+      (docId === 'doc-cancelled-cheque' && d.id === 'doc-cheque') ||
+      (docId === 'doc-cheque' && d.id === 'doc-cancelled-cheque')
   );
 
   if (docIdx !== -1) {

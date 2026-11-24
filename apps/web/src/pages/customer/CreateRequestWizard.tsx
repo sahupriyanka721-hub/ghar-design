@@ -456,6 +456,57 @@ export const CreateRequestWizard: React.FC = () => {
 
   const platformCategories = useMemo(() => getPlatformCategories().filter(c => c.isActive !== false), []);
 
+  const availableDeliverableServices = useMemo(() => {
+    const selectedSlugs = formData.categorySlugs && formData.categorySlugs.length > 0
+      ? formData.categorySlugs
+      : (formData.categorySlug ? [formData.categorySlug] : []);
+
+    const list: { name: string; categoryName: string; description?: string }[] = [];
+    const seen = new Set<string>();
+
+    const targetCategories = selectedSlugs.length > 0
+      ? platformCategories.filter((c) => selectedSlugs.includes(c.slug))
+      : platformCategories;
+
+    // 1. Add subcategories from selected categories first
+    targetCategories.forEach((cat) => {
+      if (cat.subcategories && cat.subcategories.length > 0) {
+        cat.subcategories.filter((s) => s.isActive !== false).forEach((s) => {
+          if (!seen.has(s.name)) {
+            seen.add(s.name);
+            list.push({ name: s.name, categoryName: cat.name, description: s.description });
+          }
+        });
+      } else {
+        if (!seen.has(cat.name)) {
+          seen.add(cat.name);
+          list.push({ name: cat.name, categoryName: cat.name, description: cat.shortDescription });
+        }
+      }
+    });
+
+    // 2. Append active subcategories from other platform categories so the client has full options
+    platformCategories.forEach((cat) => {
+      if (cat.subcategories && cat.subcategories.length > 0) {
+        cat.subcategories.filter((s) => s.isActive !== false).forEach((s) => {
+          if (!seen.has(s.name)) {
+            seen.add(s.name);
+            list.push({ name: s.name, categoryName: cat.name, description: s.description });
+          }
+        });
+      }
+    });
+
+    // 3. Fallback to SERVICE_OPTIONS if list is somehow empty
+    if (list.length === 0) {
+      SERVICE_OPTIONS.forEach((opt) => {
+        list.push({ name: opt, categoryName: 'Engineering & Construction' });
+      });
+    }
+
+    return list;
+  }, [platformCategories, formData.categorySlugs, formData.categorySlug]);
+
   const selectedCategoriesList = useMemo(() => {
     const slugs = formData.categorySlugs || (formData.categorySlug ? [formData.categorySlug] : []);
     return platformCategories.filter((c) => slugs.includes(c.slug));
@@ -894,14 +945,17 @@ export const CreateRequestWizard: React.FC = () => {
 
             {/* Required Engineering Services Checkbox Grid */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">Select Required Deliverables (Multi-select) *</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {SERVICE_OPTIONS.map((srv) => {
-                  const isSelected = formData.requiredServices.includes(srv);
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 block">Select Required Deliverables (Multi-select) *</label>
+                <span className="text-[11px] text-slate-500 font-semibold">{formData.requiredServices.length} Selected</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {availableDeliverableServices.map((srv) => {
+                  const isSelected = formData.requiredServices.includes(srv.name);
                   return (
                     <label
-                      key={srv}
-                      className={`p-3 rounded-xl border cursor-pointer transition flex items-center gap-3 ${
+                      key={srv.name}
+                      className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
                         isSelected
                           ? 'border-gold-500 bg-gold-50 text-gold-950 font-semibold shadow-2xs'
                           : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white'
@@ -910,10 +964,15 @@ export const CreateRequestWizard: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => toggleService(srv)}
-                        className="text-gold-600 rounded focus:ring-gold-500"
+                        onChange={() => toggleService(srv.name)}
+                        className="text-gold-600 rounded focus:ring-gold-500 mt-0.5 shrink-0"
                       />
-                      <span className="text-xs">{srv}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold block">{srv.name}</span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5 font-normal">
+                          {srv.description || srv.categoryName}
+                        </span>
+                      </div>
                     </label>
                   );
                 })}

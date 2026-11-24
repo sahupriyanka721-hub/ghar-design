@@ -7,11 +7,14 @@ import { FileText, Users, ChevronRight, Search, Plus, X,
   ArrowLeft, ArrowRight, Check, Building, Phone, User, MapPin, Layers, ShoppingBag } from 'lucide-react';
 import { getPlatformRequests, savePlatformRequest, syncChannel, PlatformProjectRequest } from '../../data/customerStore.js';
 import { getVendorMaterialRequests, VendorMaterialRequest } from '../../data/vendorStore.js';
+import { getArchitectAccounts } from '../../data/architectStore.js';
 
 export const AdminRequests: React.FC = () => {
   const { success, error } = useToast();
   const [requests, setRequests] = useState<PlatformProjectRequest[]>([]);
   const [materialRequests, setMaterialRequests] = useState<VendorMaterialRequest[]>([]);
+  const [architects, setArchitects] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'projects' | 'materials'>('projects');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -33,6 +36,63 @@ export const AdminRequests: React.FC = () => {
   const loadRequests = () => {
     setRequests(getPlatformRequests());
     setMaterialRequests(getVendorMaterialRequests());
+    setArchitects(getArchitectAccounts());
+    try {
+      const qStored = localStorage.getItem('platform_quotations');
+      if (qStored) {
+        setQuotations(JSON.parse(qStored));
+      }
+    } catch {}
+  };
+
+  const getRequestAmount = (req: PlatformProjectRequest) => {
+    const matchingQuote = quotations.find((q: any) =>
+      (q.requestId && (q.requestId === req.id || q.requestId === req.requestCode)) ||
+      (q.requestCode && (q.requestCode === req.requestCode || q.requestCode === req.id))
+    );
+    if (matchingQuote) {
+      const paise = matchingQuote.finalAmountPaise || matchingQuote.totalAmountPaise;
+      if (paise) {
+        return `₹${(paise / 100).toLocaleString('en-IN')}`;
+      }
+      if (matchingQuote.grandTotal) {
+        return `₹${Number(matchingQuote.grandTotal).toLocaleString('en-IN')}`;
+      }
+    }
+    return req.budgetRange || 'Flexible';
+  };
+
+  const getAssignedArchitects = (req: PlatformProjectRequest) => {
+    const ids = req.assignedProfessionalIds || [];
+    if (ids.length === 0) return [];
+
+    return ids.map((id) => {
+      const cleanTarget = String(id).trim().toLowerCase();
+      const cleanPhone = cleanTarget.replace(/\D/g, '').slice(-10);
+
+      const matched = architects.find((a: any) => {
+        if (a.id && a.id.toLowerCase() === cleanTarget) return true;
+        if (a.applicationNumber && a.applicationNumber.toLowerCase() === cleanTarget) return true;
+        const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
+        if (cleanPhone && aPhone && aPhone === cleanPhone) return true;
+        if (a.firmName && cleanTarget.includes(a.firmName.toLowerCase())) return true;
+        if (a.name && cleanTarget.includes(a.name.toLowerCase())) return true;
+        return false;
+      });
+
+      if (matched) {
+        return {
+          firmName: matched.firmName || matched.name,
+          architectName: matched.name,
+          phone: matched.phone ? `+91 ${matched.phone.replace(/\D/g, '').slice(-10)}` : '',
+        };
+      }
+      return {
+        firmName: id,
+        architectName: 'Assigned Partner',
+        phone: '',
+      };
+    });
   };
 
   useEffect(() => {
@@ -206,10 +266,10 @@ export const AdminRequests: React.FC = () => {
               <tr>
                 <th className="p-4">Request Code</th>
                 <th className="p-4">Customer</th>
-                <th className="p-4">Category & City</th>
-                <th className="p-4">Plot Area</th>
+                <th className="p-4">Site Address</th>
+                <th className="p-4">Total Amount</th>
+                <th className="p-4">Assigned Architect</th>
                 <th className="p-4">Status</th>
-                <th className="p-4">Assignments</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -226,54 +286,94 @@ export const AdminRequests: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredProjects.map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-50">
-                    <td className="p-4 font-mono font-bold text-navy-950">
-                      <Link
-                        to={`/admin/requests/${req.id}`}
-                        className="hover:text-blue-600 hover:underline transition"
-                        title="Click to inspect and assign"
-                      >
-                        {req.requestCode}
-                      </Link>
-                    </td>
-                    <td className="p-4">
-                      <Link
-                        to={`/admin/requests/${req.id}`}
-                        className="font-semibold text-slate-800 hover:text-blue-600 hover:underline block transition cursor-pointer"
-                        title="Click to inspect and assign"
-                      >
-                        {req.customerName}
-                      </Link>
-                      <div className="text-[11px] text-slate-400 font-mono">{req.customerPhone}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-slate-800 font-medium capitalize">{req.categorySlug?.replace(/-/g, ' ')}</div>
-                      <div className="text-[11px] text-slate-400">{req.city}</div>
-                    </td>
-                    <td className="p-4 text-slate-700">
-                      {req.plotArea} {req.measurementUnit?.toLowerCase()}²
-                    </td>
-                    <td className="p-4">
-                      <Badge status={req.status} />
-                    </td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                        <Users className="w-3 h-3 text-slate-500" />
-                        {req.assignedCount || 0} Assigned ({req.quotationsCount || 0} Quotes)
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Link
-                        to={`/admin/requests/${req.id}`}
-                        className="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1"
-                      >
-                        <span>Inspect & Assign</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                filteredProjects.map((req) => {
+                  const assignedFirms = getAssignedArchitects(req);
+                  return (
+                    <tr key={req.id} className="hover:bg-slate-50 transition">
+                      {/* 1. Request Code & Date */}
+                      <td className="p-4 font-mono font-bold text-navy-950">
+                        <Link
+                          to={`/admin/requests/${req.id}`}
+                          className="hover:text-blue-600 hover:underline transition block"
+                          title="Click to inspect and assign"
+                        >
+                          {req.requestCode}
+                        </Link>
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          {formatDate(req.createdAt)}
+                        </div>
+                      </td>
+
+                      {/* 2. Customer Name & Contact */}
+                      <td className="p-4">
+                        <Link
+                          to={`/admin/requests/${req.id}`}
+                          className="font-semibold text-slate-800 hover:text-blue-600 hover:underline block transition cursor-pointer"
+                          title="Click to inspect and assign"
+                        >
+                          {req.customerName}
+                        </Link>
+                        <div className="text-[11px] text-slate-400 font-mono">{req.customerPhone}</div>
+                      </td>
+
+                      {/* 3. Customer Site Address */}
+                      <td className="p-4 min-w-[180px]">
+                        <div className="flex items-start gap-1 text-slate-700">
+                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                          <span className="text-xs font-medium leading-snug">
+                            {req.address || [req.locality, req.city, req.state].filter(Boolean).join(', ') || 'Address not specified'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                          {req.plotArea ? `${req.plotArea} ${req.measurementUnit?.toLowerCase() || 'sq.ft'}²` : ''} • {req.categorySlug?.replace(/-/g, ' ')}
+                        </div>
+                      </td>
+
+                      {/* 4. Total Amount */}
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="font-bold text-navy-950 text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 inline-block">
+                          {getRequestAmount(req)}
+                        </span>
+                      </td>
+
+                      {/* 5. Assigned Architect(s) Firm Name, Architect Name & Contact */}
+                      <td className="p-4 min-w-[190px]">
+                        {assignedFirms.length === 0 ? (
+                          <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-flex items-center gap-1">
+                            Pending Assignment
+                          </span>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {assignedFirms.map((firm, idx) => (
+                              <div key={idx} className="text-xs leading-tight">
+                                <div className="font-bold text-slate-900">{firm.firmName}</div>
+                                <div className="text-[11px] text-slate-500">
+                                  {firm.architectName} {firm.phone && <span className="font-mono text-slate-700">• {firm.phone}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 6. Status */}
+                      <td className="p-4">
+                        <Badge status={req.status} />
+                      </td>
+
+                      {/* 7. Actions */}
+                      <td className="p-4 text-right">
+                        <Link
+                          to={`/admin/requests/${req.id}`}
+                          className="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1"
+                        >
+                          <span>Inspect &amp; Assign</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

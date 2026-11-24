@@ -1123,7 +1123,7 @@ export const ProfessionalLayout: React.FC = () => {
                       </span>
                       {isArchitect && archRecord?.id && (archRecord.accountStatus === 'APPROVED' || archRecord.isVerified) && (
                         <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                          [{formatArchitectId(archRecord.id)}]
+                          {formatArchitectId(archRecord.id)}
                         </span>
                       )}
                     </div>
@@ -1449,7 +1449,7 @@ export const ProfessionalLayout: React.FC = () => {
                 <div>
                   <span className="text-xs font-bold text-emerald-950">COA Verified Architectural Partner</span>
                   <span className="ml-2 font-mono font-black text-xs text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
-                    Official ID: [{formatArchitectId(archRecord.id)}]
+                    Official ID: {formatArchitectId(archRecord.id)}
                   </span>
                 </div>
               </div>

@@ -1037,15 +1037,209 @@ export const getProfessionalByPhone = (phone: string): PlatformProfessional | un
 // ==============================================================================
 // PLATFORM SERVICE CATEGORIES STORE
 // ==============================================================================
+export interface PlatformSubCategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  isActive: boolean;
+}
+
 export interface PlatformCategoryItem {
   slug: string;
   name: string;
   shortDescription: string;
   icon?: string;
   isActive: boolean;
+  subcategories?: PlatformSubCategoryItem[];
 }
 
 const CATEGORIES_STORAGE_KEY = 'platform_service_categories';
+
+export const DEFAULT_PLATFORM_CATEGORIES: PlatformCategoryItem[] = [
+  {
+    slug: 'planning-design',
+    name: 'Planning & Design',
+    shortDescription: 'Comprehensive concept drawings, functional space layouts & master site planning.',
+    icon: 'Building2',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-plan-1', name: '2D Floor Plan & Municipal Blueprints', slug: '2d-floor-plan', description: 'Vastu compliant 2D floor plans and municipal submission blueprints.', isActive: true },
+      { id: 'sub-plan-2', name: 'Architectural Working Drawings', slug: 'architectural-working-drawings', description: 'Detailed door-window schedules, masonry dimensions and cross sections.', isActive: true },
+      { id: 'sub-plan-3', name: 'Master Site Planning & Circulation Layout', slug: 'master-site-planning', description: 'Comprehensive site zoning, set-backs, parking, and boundary planning.', isActive: true },
+      { id: 'sub-plan-4', name: 'Vastu Compliant Concept Planning', slug: 'vastu-concept-planning', description: 'Energy alignment, orientation, and functional room placements.', isActive: true },
+    ],
+  },
+  {
+    slug: 'house-map-planning',
+    name: 'House Map / Floor Plan',
+    shortDescription: '2D floor plans, Vastu compliance, municipal approval drawings, and structural layouts.',
+    icon: 'Compass',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-map-1', name: '2D Floor Plan', slug: '2d-floor-plan-basic', description: 'Itemized architectural room layouts and dimensioned floor plan.', isActive: true },
+      { id: 'sub-map-2', name: 'Municipal Sanction Drawings', slug: 'municipal-sanction-drawings', description: 'Authority-compliant blueprints for building permit approvals.', isActive: true },
+      { id: 'sub-map-3', name: 'Furniture Layout Plan', slug: 'furniture-layout-plan', description: 'Detailed space circulation and furniture positioning.', isActive: true },
+    ],
+  },
+  {
+    slug: 'structural-engineering',
+    name: 'Structural Design',
+    shortDescription: 'RCC column design, beam details, load calculations, and soil test vetting.',
+    icon: 'ShieldCheck',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-struct-1', name: 'Structural Load Calculations & RCC Drawings', slug: 'structural-load-rcc', description: 'IS 456 compliant structural frame design with beam, slab, and column schedules.', isActive: true },
+      { id: 'sub-struct-2', name: 'Foundation Design & Soil Test Vetting', slug: 'foundation-design', description: 'Isolated/raft footing sizing based on soil bearing capacity.', isActive: true },
+      { id: 'sub-struct-3', name: 'Structural Stability & Safety Certificate', slug: 'structural-stability-cert', description: 'Licensed structural engineer verification and safety audit certificate.', isActive: true },
+    ],
+  },
+  {
+    slug: 'civil-engineering-consultancy',
+    name: 'Civil Engineering Consultancy',
+    shortDescription: 'Professional engineering vetting, foundation audits, material testing & stability certification.',
+    icon: 'ShieldCheck',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-civil-1', name: 'Detailed Bill of Quantities (BOQ) & Estimate', slug: 'detailed-boq-estimate', description: 'Itemized material consumption: steel, cement, aggregates, and labor rates.', isActive: true },
+      { id: 'sub-civil-2', name: 'Site Soil Testing & Bearing Capacity Audit', slug: 'site-soil-testing', description: 'Laboratory soil borehole test and safe bearing capacity report.', isActive: true },
+      { id: 'sub-civil-3', name: 'Material Quality Batch Testing & Audit', slug: 'material-batch-testing', description: 'Cube compressive test, rebar tensile strength, and quality audit.', isActive: true },
+    ],
+  },
+  {
+    slug: 'interior-designing',
+    name: 'Interior Design',
+    shortDescription: 'Modular kitchens, false ceiling, bespoke lighting, wardrobes and modern aesthetics.',
+    icon: 'Paintbrush',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-int-1', name: 'Turnkey Interior Designing', slug: 'turnkey-interior-designing', description: 'Complete interior design and execution with materials and finishes.', isActive: true },
+      { id: 'sub-int-2', name: 'Modular Kitchen Design', slug: 'modular-kitchen-design', description: 'Ergonomic kitchen layout, hardware fittings, and modular cabinetry.', isActive: true },
+      { id: 'sub-int-3', name: 'Furniture & False Ceiling Layout', slug: 'furniture-false-ceiling', description: 'POP/gypsum false ceiling profiles, coving, and lighting plans.', isActive: true },
+      { id: 'sub-int-4', name: 'Wardrobes & Storage Joinery Design', slug: 'wardrobes-joinery', description: 'Custom fitted wardrobes, vanity units, and TV entertainment units.', isActive: true },
+    ],
+  },
+  {
+    slug: '2d-planning',
+    name: '2D Planning',
+    shortDescription: 'High-precision 2D floor plans, working blueprints, door-window schedules & circulation plans.',
+    icon: 'FileText',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-2d-1', name: 'Comprehensive 2D Working Drawings', slug: 'comprehensive-2d-working', description: 'Full architectural working drawings for on-site mason execution.', isActive: true },
+      { id: 'sub-2d-2', name: 'Door & Window Schedule', slug: 'door-window-schedule', description: 'Detailed openings schedule, lintel heights, and glazing specifications.', isActive: true },
+    ],
+  },
+  {
+    slug: '3d-elevation',
+    name: '3D Elevation',
+    shortDescription: 'Modern, classical or contemporary exterior facade 3D renders with day/night lighting.',
+    icon: 'Sparkles',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-3d-1', name: '3D Elevation & Walkthrough', slug: '3d-elevation-walkthrough', description: 'Photorealistic exterior 3D elevation renders with texture details.', isActive: true },
+      { id: 'sub-3d-2', name: 'Day & Night Facade Lighting Renders', slug: 'day-night-facade', description: 'Exterior lighting scheme with warm LED coving and landscape lighting.', isActive: true },
+      { id: 'sub-3d-3', name: '360 Exterior Virtual Tour', slug: '360-exterior-tour', description: 'Interactive 360-degree exterior architectural rotation view.', isActive: true },
+    ],
+  },
+  {
+    slug: '3d-interior-rendering',
+    name: '3D Interior Rendering',
+    shortDescription: 'Photorealistic 360-degree interior visualisations for living, kitchen, bedrooms and baths.',
+    icon: 'Eye',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-3dint-1', name: 'Living Room 3D Photorealistic Views', slug: 'living-room-3d', description: 'High-definition 3D rendering of living, dining, and foyer areas.', isActive: true },
+      { id: 'sub-3dint-2', name: 'Modular Kitchen 3D Visualisation', slug: 'kitchen-3d-vis', description: 'Detailed finishes, countertop materials, and cabinet visualisations.', isActive: true },
+      { id: 'sub-3dint-3', name: 'Master Bedroom 360 Virtual Tour', slug: 'bedroom-360-tour', description: 'Bespoke bedroom interior renders with wardrobe and lighting.', isActive: true },
+    ],
+  },
+  {
+    slug: 'new-house-construction',
+    name: 'New House Construction',
+    shortDescription: 'Residential civil construction from foundation to finishing with escrow milestones.',
+    icon: 'Building2',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-cons-1', name: 'Complete Civil Construction', slug: 'complete-civil-construction', description: 'Grey structure construction: excavation, foundation, RCC frame, and brickwork.', isActive: true },
+      { id: 'sub-cons-2', name: 'Full Turnkey Construction Package', slug: 'full-turnkey-package', description: 'End-to-end civil construction with flooring, painting, and sanitary fittings.', isActive: true },
+    ],
+  },
+  {
+    slug: 'home-renovation',
+    name: 'Home Renovation',
+    shortDescription: 'Structural repairs, floor extensions, space redesign, water-proofing and modernization.',
+    icon: 'Hammer',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-reno-1', name: 'Renovation / Space Remodeling', slug: 'renovation-remodeling', description: 'Room layout modifications, floor extension, and aesthetic upgrade.', isActive: true },
+      { id: 'sub-reno-2', name: 'Terrace & Wet Area Waterproofing', slug: 'waterproofing-services', description: 'Multi-layer chemical waterproofing and leakage rectification.', isActive: true },
+    ],
+  },
+  {
+    slug: 'complete-construction-package',
+    name: 'Complete Construction Package',
+    shortDescription: 'End-to-end integration: Civil Engineering + Interior Design + Materials.',
+    icon: 'CheckCircle2',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-pkg-1', name: 'Integrated Architecture + Construction + Interiors', slug: 'integrated-turnkey', description: 'Unified single-contract turnkey residential build.', isActive: true },
+    ],
+  },
+  {
+    slug: 'commercial-construction',
+    name: 'Commercial Construction',
+    shortDescription: 'Office spaces, retail shops, showrooms and commercial complex engineering.',
+    icon: 'Briefcase',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-comm-1', name: 'Commercial Office & Retail Interior Fitout', slug: 'commercial-fitout', description: 'Turnkey commercial fitouts, workstations, and lighting.', isActive: true },
+      { id: 'sub-comm-2', name: 'Commercial Complex RCC Construction', slug: 'commercial-rcc-complex', description: 'Commercial grade structural civil construction.', isActive: true },
+    ],
+  },
+  {
+    slug: 'mep-planning',
+    name: 'Plumbing and Electrical Planning',
+    shortDescription: 'Sanitary conduit engineering, conduit piping, load phase distribution and water supply layouts.',
+    icon: 'Wrench',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-mep-1', name: 'Electrical & Plumbing (MEP) Layouts', slug: 'electrical-plumbing-mep', description: 'Circuit phase distribution, switch points, plumbing pipelines, and drainage.', isActive: true },
+      { id: 'sub-mep-2', name: 'Sanitary Drainage & Water Supply Piping', slug: 'sanitary-drainage-piping', description: 'Hydro-pneumatic pump layouts, overhead tank piping, and waste drainage.', isActive: true },
+    ],
+  },
+  {
+    slug: 'site-supervision',
+    name: 'Site Supervision & Project Audit',
+    shortDescription: 'Daily stage inspections, quality batch testing, BOQ verification and work certification.',
+    icon: 'Eye',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-sup-1', name: 'Independent Site Supervision & Audit', slug: 'independent-site-supervision', description: 'Stage-by-stage civil verification before concrete pouring.', isActive: true },
+      { id: 'sub-sup-2', name: 'BOQ Verification & Contractor Billing Audit', slug: 'contractor-billing-audit', description: 'Independent cross-measurement of executed quantities and vendor bills.', isActive: true },
+    ],
+  },
+  {
+    slug: 'boq-estimation',
+    name: 'Material Estimation / BOQ',
+    shortDescription: 'Independent bill of quantities, steel, cement & masonry budget estimation with itemized pricing.',
+    icon: 'Calculator',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-boq-1', name: 'Detailed Bill of Quantities (BOQ) & Estimate', slug: 'boq-material-estimation', description: 'Steel bar bending schedule, cement bag count, brick/block quantities.', isActive: true },
+    ],
+  },
+  {
+    slug: 'other-custom-service',
+    name: 'Other Custom Service',
+    shortDescription: 'Bespoke structural, engineering, landscape or specialty construction requirements.',
+    icon: 'Layers',
+    isActive: true,
+    subcategories: [
+      { id: 'sub-custom-1', name: 'Landscape & Exterior Hardscaping', slug: 'landscape-hardscaping', description: 'Garden layout, boundary wall, driveway pavers, and exterior lighting.', isActive: true },
+    ],
+  },
+];
 
 export const getPlatformCategories = (): PlatformCategoryItem[] => {
   try {
@@ -1053,28 +1247,31 @@ export const getPlatformCategories = (): PlatformCategoryItem[] => {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Guarantee subcategories are present for all categories
+        let hasBackfilled = false;
+        const normalized = parsed.map((cat: PlatformCategoryItem) => {
+          const defaultCat = DEFAULT_PLATFORM_CATEGORIES.find((d) => d.slug === cat.slug);
+          if ((!cat.subcategories || cat.subcategories.length === 0) && defaultCat && defaultCat.subcategories) {
+            hasBackfilled = true;
+            return { ...cat, subcategories: defaultCat.subcategories };
+          }
+          return {
+            ...cat,
+            subcategories: cat.subcategories || (defaultCat?.subcategories || []),
+          };
+        });
+
+        if (hasBackfilled) {
+          try {
+            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(normalized));
+          } catch (e) {}
+        }
+        return normalized;
       }
     }
   } catch (e) {}
-  return [
-    { slug: 'planning-design', name: 'Planning & Design', shortDescription: 'Comprehensive concept drawings, functional space layouts & master site planning.', icon: 'Building2', isActive: true },
-    { slug: 'house-map-planning', name: 'House Map / Floor Plan', shortDescription: '2D floor plans, Vastu compliance, municipal approval drawings, and structural layouts.', icon: 'Compass', isActive: true },
-    { slug: 'structural-engineering', name: 'Structural Design', shortDescription: 'RCC column design, beam details, load calculations, and soil test vetting.', icon: 'ShieldCheck', isActive: true },
-    { slug: 'civil-engineering-consultancy', name: 'Civil Engineering Consultancy', shortDescription: 'Professional engineering vetting, foundation audits, material testing & stability certification.', icon: 'ShieldCheck', isActive: true },
-    { slug: 'interior-designing', name: 'Interior Design', shortDescription: 'Modular kitchens, false ceiling, bespoke lighting, wardrobes and modern aesthetics.', icon: 'Paintbrush', isActive: true },
-    { slug: '2d-planning', name: '2D Planning', shortDescription: 'High-precision 2D floor plans, working blueprints, door-window schedules & circulation plans.', icon: 'FileText', isActive: true },
-    { slug: '3d-elevation', name: '3D Elevation', shortDescription: 'Modern, classical or contemporary exterior facade 3D renders with day/night lighting.', icon: 'Sparkles', isActive: true },
-    { slug: '3d-interior-rendering', name: '3D Interior Rendering', shortDescription: 'Photorealistic 360-degree interior visualisations for living, kitchen, bedrooms and baths.', icon: 'Eye', isActive: true },
-    { slug: 'new-house-construction', name: 'New House Construction', shortDescription: 'Residential civil construction from foundation to finishing with escrow milestones.', icon: 'Building2', isActive: true },
-    { slug: 'home-renovation', name: 'Home Renovation', shortDescription: 'Structural repairs, floor extensions, space redesign, water-proofing and modernization.', icon: 'Hammer', isActive: true },
-    { slug: 'complete-construction-package', name: 'Complete Construction Package', shortDescription: 'End-to-end integration: Civil Engineering + Interior Design + Materials.', icon: 'CheckCircle2', isActive: true },
-    { slug: 'commercial-construction', name: 'Commercial Construction', shortDescription: 'Office spaces, retail shops, showrooms and commercial complex engineering.', icon: 'Briefcase', isActive: true },
-    { slug: 'mep-planning', name: 'Plumbing and Electrical Planning', shortDescription: 'Sanitary conduit engineering, conduit piping, load phase distribution and water supply layouts.', icon: 'Wrench', isActive: true },
-    { slug: 'site-supervision', name: 'Site Supervision & Project Audit', shortDescription: 'Daily stage inspections, quality batch testing, BOQ verification and work certification.', icon: 'Eye', isActive: true },
-    { slug: 'boq-estimation', name: 'Material Estimation / BOQ', shortDescription: 'Independent bill of quantities, steel, cement & masonry budget estimation with itemized pricing.', icon: 'Calculator', isActive: true },
-    { slug: 'other-custom-service', name: 'Other Custom Service', shortDescription: 'Bespoke structural, engineering, landscape or specialty construction requirements.', icon: 'Layers', isActive: true },
-  ];
+
+  return DEFAULT_PLATFORM_CATEGORIES;
 };
 
 export const savePlatformCategory = (cat: PlatformCategoryItem): PlatformCategoryItem[] => {
@@ -1083,9 +1280,13 @@ export const savePlatformCategory = (cat: PlatformCategoryItem): PlatformCategor
   let updated: PlatformCategoryItem[];
   if (existingIndex >= 0) {
     updated = [...current];
-    updated[existingIndex] = cat;
+    updated[existingIndex] = {
+      ...current[existingIndex],
+      ...cat,
+      subcategories: cat.subcategories || current[existingIndex].subcategories || [],
+    };
   } else {
-    updated = [...current, cat];
+    updated = [...current, { ...cat, subcategories: cat.subcategories || [] }];
   }
   try {
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(updated));
@@ -1103,14 +1304,22 @@ export const updatePlatformCategory = (
   let updated: PlatformCategoryItem[];
   if (existingIndex >= 0) {
     updated = [...current];
-    updated[existingIndex] = updatedData;
+    updated[existingIndex] = {
+      ...current[existingIndex],
+      ...updatedData,
+      subcategories: updatedData.subcategories || current[existingIndex].subcategories || [],
+    };
   } else {
     const altIndex = current.findIndex((c) => c.slug === updatedData.slug);
     if (altIndex >= 0) {
       updated = [...current];
-      updated[altIndex] = updatedData;
+      updated[altIndex] = {
+        ...current[altIndex],
+        ...updatedData,
+        subcategories: updatedData.subcategories || current[altIndex].subcategories || [],
+      };
     } else {
-      updated = [...current, updatedData];
+      updated = [...current, { ...updatedData, subcategories: updatedData.subcategories || [] }];
     }
   }
   try {
@@ -1138,5 +1347,133 @@ export const togglePlatformCategoryStatus = (slug: string): PlatformCategoryItem
     broadcastStoreUpdate('CATEGORIES_UPDATED');
   } catch (e) {}
   return updated;
+};
+
+// ==============================================================================
+// SUBCATEGORY MANAGEMENT HELPERS
+// ==============================================================================
+export const addPlatformSubCategory = (
+  categorySlug: string,
+  subcat: { name: string; description?: string; isActive?: boolean }
+): PlatformCategoryItem[] => {
+  const current = getPlatformCategories();
+  const catIdx = current.findIndex((c) => c.slug === categorySlug);
+  if (catIdx === -1) return current;
+
+  const targetCat = current[catIdx];
+  const subSlug = subcat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const newSub: PlatformSubCategoryItem = {
+    id: `sub-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    name: subcat.name.trim(),
+    slug: subSlug || `sub-${Date.now()}`,
+    description: subcat.description?.trim() || '',
+    isActive: subcat.isActive ?? true,
+  };
+
+  const updatedSubcategories = [...(targetCat.subcategories || []), newSub];
+  const updatedCategories = [...current];
+  updatedCategories[catIdx] = {
+    ...targetCat,
+    subcategories: updatedSubcategories,
+  };
+
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(updatedCategories));
+    broadcastStoreUpdate('CATEGORIES_UPDATED', updatedCategories[catIdx]);
+  } catch (e) {}
+  return updatedCategories;
+};
+
+export const updatePlatformSubCategory = (
+  categorySlug: string,
+  subcat: PlatformSubCategoryItem
+): PlatformCategoryItem[] => {
+  const current = getPlatformCategories();
+  const catIdx = current.findIndex((c) => c.slug === categorySlug);
+  if (catIdx === -1) return current;
+
+  const targetCat = current[catIdx];
+  const updatedSubcategories = (targetCat.subcategories || []).map((s) =>
+    s.id === subcat.id ? subcat : s
+  );
+
+  const updatedCategories = [...current];
+  updatedCategories[catIdx] = {
+    ...targetCat,
+    subcategories: updatedSubcategories,
+  };
+
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(updatedCategories));
+    broadcastStoreUpdate('CATEGORIES_UPDATED', updatedCategories[catIdx]);
+  } catch (e) {}
+  return updatedCategories;
+};
+
+export const deletePlatformSubCategory = (
+  categorySlug: string,
+  subcatId: string
+): PlatformCategoryItem[] => {
+  const current = getPlatformCategories();
+  const catIdx = current.findIndex((c) => c.slug === categorySlug);
+  if (catIdx === -1) return current;
+
+  const targetCat = current[catIdx];
+  const updatedSubcategories = (targetCat.subcategories || []).filter((s) => s.id !== subcatId);
+
+  const updatedCategories = [...current];
+  updatedCategories[catIdx] = {
+    ...targetCat,
+    subcategories: updatedSubcategories,
+  };
+
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(updatedCategories));
+    broadcastStoreUpdate('CATEGORIES_UPDATED', updatedCategories[catIdx]);
+  } catch (e) {}
+  return updatedCategories;
+};
+
+export const togglePlatformSubCategoryStatus = (
+  categorySlug: string,
+  subcatId: string
+): PlatformCategoryItem[] => {
+  const current = getPlatformCategories();
+  const catIdx = current.findIndex((c) => c.slug === categorySlug);
+  if (catIdx === -1) return current;
+
+  const targetCat = current[catIdx];
+  const updatedSubcategories = (targetCat.subcategories || []).map((s) =>
+    s.id === subcatId ? { ...s, isActive: !s.isActive } : s
+  );
+
+  const updatedCategories = [...current];
+  updatedCategories[catIdx] = {
+    ...targetCat,
+    subcategories: updatedSubcategories,
+  };
+
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(updatedCategories));
+    broadcastStoreUpdate('CATEGORIES_UPDATED', updatedCategories[catIdx]);
+  } catch (e) {}
+  return updatedCategories;
+};
+
+export const getAllActivePlatformServices = (): string[] => {
+  const categories = getPlatformCategories().filter((c) => c.isActive !== false);
+  const serviceSet = new Set<string>();
+
+  categories.forEach((cat) => {
+    if (cat.subcategories && cat.subcategories.length > 0) {
+      cat.subcategories
+        .filter((sub) => sub.isActive !== false)
+        .forEach((sub) => serviceSet.add(sub.name));
+    } else {
+      serviceSet.add(cat.name);
+    }
+  });
+
+  return Array.from(serviceSet);
 };
 

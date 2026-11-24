@@ -52,7 +52,7 @@ export const ProjectsList: React.FC = () => {
     };
 
     refresh();
-    const interval = setInterval(refresh, 2500);
+    const interval = setInterval(refresh, 20000);
     window.addEventListener('storage', refresh);
     return () => {
       clearInterval(interval);

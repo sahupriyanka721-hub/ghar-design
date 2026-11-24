@@ -93,6 +93,7 @@ export const AdminArchitects: React.FC = () => {
   const [selectedArchitect, setSelectedArchitect] = useState<ArchitectAccount | null>(null);
   const [activeReviewDoc, setActiveReviewDoc] = useState<ArchitectKycDocument | null>(null);
   const [showDocRejectModal, setShowDocRejectModal] = useState<ArchitectKycDocument | null>(null);
+  const [docRejectIndex, setDocRejectIndex] = useState<number | undefined>(undefined);
   const [docRejectReason, setDocRejectReason] = useState('Document scan illegible / Details do not match registration');
 
   // Active Tab inside Full Dossier Modal
@@ -600,11 +601,8 @@ export const AdminArchitects: React.FC = () => {
         (normDocId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
         (docItem && d.id === docItem.id) ||
         (docItem && docItem.title && d.title && d.title.trim().toLowerCase() === docItem.title.trim().toLowerCase()) ||
-        (docItem && d.documentType && d.documentType === docItem.documentType && !d.documentType.includes('DIRECTOR')) ||
-        (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-        (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-        (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
-        (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN'));
+        (docId === 'doc-cheque' && d.id === 'doc-cancelled-cheque') ||
+        (docId === 'doc-cancelled-cheque' && d.id === 'doc-cheque');
 
       if (isMatch) {
         return { ...d, status: 'VERIFIED' as const, rejectionReason: undefined };
@@ -698,23 +696,21 @@ export const AdminArchitects: React.FC = () => {
     success(`Document "${docItem?.title || 'KYC'}" verified successfully! ✓`);
   };
 
-  const handleDocumentReject = (docId: string, reason?: string, docItem?: ArchitectKycDocument) => {
+  const handleDocumentReject = (docId: string, reason?: string, docItem?: ArchitectKycDocument, docIndex?: number) => {
     if (!selectedArchitect) return;
     const finalReason = reason || docRejectReason || 'Cancelled by admin';
     const normDocId = (docId || '').replace(/-dir-/g, '-');
     const cleanPhone = (selectedArchitect.phone || '').replace(/\D/g, '').slice(-10);
 
-    const updatedDocs = (selectedArchitect.documents || []).map((d) => {
+    const updatedDocs = (selectedArchitect.documents || []).map((d, index) => {
       const isMatch =
+        (typeof docIndex === 'number' && index === docIndex) ||
         d.id === docId ||
         (normDocId && d.id && d.id.replace(/-dir-/g, '-') === normDocId) ||
         (docItem && d.id === docItem.id) ||
         (docItem && docItem.title && d.title && d.title.trim().toLowerCase() === docItem.title.trim().toLowerCase()) ||
-        (docItem && d.documentType && d.documentType === docItem.documentType && !d.documentType.includes('DIRECTOR')) ||
-        (docId === 'doc-cheque' && (d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-        (docId === 'doc-cancelled-cheque' && (d.id === 'doc-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE')) ||
-        (docId === 'doc-pan' && (d.id === 'doc-biz-pan' || (d as any).documentType === 'FIRM_PAN')) ||
-        (docId === 'doc-biz-pan' && (d.id === 'doc-pan' || (d as any).documentType === 'FIRM_PAN'));
+        (docId === 'doc-cheque' && d.id === 'doc-cancelled-cheque') ||
+        (docId === 'doc-cancelled-cheque' && d.id === 'doc-cheque');
 
       if (isMatch) {
         return { ...d, status: 'REJECTED' as const, rejectionReason: finalReason };
@@ -992,7 +988,7 @@ export const AdminArchitects: React.FC = () => {
       }
 
       loadData();
-      success(`Architect "${updated.name}" approved successfully! Official ID: [${updated.id}] issued.`);
+      success(`Architect "${updated.name}" approved successfully! Official ID: ${updated.id} issued.`);
     }
   };
 
@@ -1340,7 +1336,7 @@ export const AdminArchitects: React.FC = () => {
                             <>
                               <span className="px-2.5 py-1 rounded-xl font-mono font-black text-xs inline-flex items-center gap-1.5 shadow-2xs w-fit bg-emerald-50 border border-emerald-300 text-emerald-900">
                                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span>[{formatArchitectId(arch.id || arch.applicationNumber)}]</span>
+                                <span>{formatArchitectId(arch.id || arch.applicationNumber)}</span>
                               </span>
                               <span className="text-[10px] font-bold text-emerald-700">
                                 COA Verified Partner
@@ -1380,7 +1376,7 @@ export const AdminArchitects: React.FC = () => {
                           </div>
                           {/* COA Registration */}
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono text-[10px]">
-                            <span className="text-slate-500 font-bold">COA: {arch.coaNumber || 'COA Verified'}</span>
+                            <span className="text-slate-500 font-bold">COA: {arch.coaNumber || (isApproved ? 'COA Verified' : 'Pending Verification')}</span>
                           </div>
                         </div>
                       </td>
@@ -1570,7 +1566,7 @@ export const AdminArchitects: React.FC = () => {
                     </h2>
                     {selectedArchitect.accountStatus === 'APPROVED' ? (
                       <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold border border-emerald-500/30">
-                        Architect ID: [{formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]
+                        Architect ID: {formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}
                       </span>
                     ) : (
                       <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-xs font-bold border border-amber-400/30">
@@ -1582,7 +1578,7 @@ export const AdminArchitects: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-400 font-mono truncate">
-                    {selectedArchitect.name} • {selectedArchitect.city} • COA: {selectedArchitect.coaNumber || 'COA Verified'}
+                    {selectedArchitect.name} • {selectedArchitect.city} • COA: {selectedArchitect.coaNumber || (selectedArchitect.accountStatus === 'APPROVED' ? 'COA Verified' : 'Pending Verification')}
                   </div>
                 </div>
               </div>
@@ -1631,7 +1627,7 @@ export const AdminArchitects: React.FC = () => {
                         {selectedArchitect.firmName || selectedArchitect.name.replace(/\b(buildcon)\b/gi, '').trim() || selectedArchitect.name}
                       </h1>
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-sky-500/20 text-sky-300 border-sky-500/40">
-                        COA: {selectedArchitect.coaNumber || 'COA Verified'}
+                        COA: {selectedArchitect.coaNumber || (selectedArchitect.accountStatus === 'APPROVED' ? 'COA Verified' : 'Pending Verification')}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 font-mono mt-1.5">
@@ -1641,7 +1637,7 @@ export const AdminArchitects: React.FC = () => {
                       <span>•</span>
                       {selectedArchitect.accountStatus === 'APPROVED' ? (
                         <span>
-                          Architect ID: [{formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]
+                          Architect ID: {formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}
                         </span>
                       ) : (
                         <span className="text-amber-300 font-sans font-semibold">
@@ -1815,7 +1811,7 @@ export const AdminArchitects: React.FC = () => {
                             </span>
                             <span className="font-bold text-sky-700 font-mono">
                               {selectedArchitect.accountStatus === 'APPROVED'
-                                ? `[${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]`
+                                ? formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)
                                 : 'Pending Approval (Issued on Approval)'}
                             </span>
                           </div>
@@ -2111,6 +2107,7 @@ export const AdminArchitects: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setShowDocRejectModal(doc);
+                                  setDocRejectIndex(idx);
                                   setDocRejectReason('Document copy illegible / COA number verification failed');
                                 }}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs ${
@@ -2977,7 +2974,7 @@ export const AdminArchitects: React.FC = () => {
                       title="Architect Partner is already approved and officially verified"
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                      <span>Partner Approved ✓ [{formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]</span>
+                      <span>Partner Approved ✓ {formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}</span>
                     </div>
                   ) : (
                     <button
@@ -3106,7 +3103,7 @@ export const AdminArchitects: React.FC = () => {
                 <div className="text-[11px] text-slate-400 font-mono truncate">
                   {activeReviewDoc.fileName ? `${activeReviewDoc.fileName} • ` : ''}
                   {activeReviewDoc.documentType} • Applicant: {selectedArchitect ? (selectedArchitect.firmName ? `${selectedArchitect.firmName} (${selectedArchitect.name})` : selectedArchitect.name) : 'Architect Applicant'}
-                  {selectedArchitect?.accountStatus === 'APPROVED' ? ` • [${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}]` : ''}
+                  {selectedArchitect?.accountStatus === 'APPROVED' ? ` • ${formatArchitectId(selectedArchitect.id || selectedArchitect.applicationNumber)}` : ''}
                 </div>
               </div>
             </div>
@@ -3309,7 +3306,11 @@ export const AdminArchitects: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleDocumentReject(showDocRejectModal.id, docRejectReason, showDocRejectModal)}
+                onClick={() => {
+                  handleDocumentReject(showDocRejectModal.id, docRejectReason, showDocRejectModal, docRejectIndex);
+                  setShowDocRejectModal(null);
+                  setDocRejectIndex(undefined);
+                }}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition cursor-pointer shadow-sm"
               >
                 Confirm Cancellation
