@@ -36,7 +36,9 @@ export const MyPurchases: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Status Filter & Search
-  const [statusTab, setStatusTab] = useState<'ALL' | 'DISPATCHED' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL');
+  const [statusTab, setStatusTab] = useState<
+    'ALL' | 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED'
+  >('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Expandable live tracker
@@ -117,7 +119,13 @@ export const MyPurchases: React.FC = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter((ord) => {
       // Tab filter
-      if (statusTab === 'CONFIRMED' && ord.fulfillmentStatus !== 'CONFIRMED' && ord.fulfillmentStatus !== 'PROCESSING') {
+      if (statusTab === 'PENDING') {
+        if (ord.fulfillmentStatus !== 'PENDING' && ord.paymentStatus !== 'PAYMENT_PENDING') return false;
+      }
+      if (statusTab === 'CONFIRMED' && ord.fulfillmentStatus !== 'CONFIRMED') {
+        return false;
+      }
+      if (statusTab === 'PROCESSING' && ord.fulfillmentStatus !== 'PROCESSING') {
         return false;
       }
       if (statusTab === 'DISPATCHED' && ord.fulfillmentStatus !== 'DISPATCHED' && ord.fulfillmentStatus !== 'OUT_FOR_DELIVERY') {
@@ -126,7 +134,10 @@ export const MyPurchases: React.FC = () => {
       if (statusTab === 'DELIVERED' && ord.fulfillmentStatus !== 'DELIVERED') {
         return false;
       }
-      if (statusTab === 'CANCELLED' && ord.fulfillmentStatus !== 'CANCELLED' && (ord.fulfillmentStatus as any) !== 'RETURN_REQUESTED') {
+      if (statusTab === 'CANCELLED' && ord.fulfillmentStatus !== 'CANCELLED') {
+        return false;
+      }
+      if (statusTab === 'RETURNED' && (ord.fulfillmentStatus as any) !== 'RETURN_REQUESTED' && (ord.fulfillmentStatus as any) !== 'RETURNED') {
         return false;
       }
 
@@ -239,11 +250,14 @@ export const MyPurchases: React.FC = () => {
         {/* Status Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
           {[
-            { id: 'ALL', label: 'All Purchases' },
-            { id: 'DISPATCHED', label: 'In Transit / Dispatched' },
-            { id: 'CONFIRMED', label: 'Confirmed / Mill Allocation' },
+            { id: 'ALL', label: 'All Orders' },
+            { id: 'PENDING', label: 'Pending Orders' },
+            { id: 'CONFIRMED', label: 'Confirmed Orders' },
+            { id: 'PROCESSING', label: 'Processing Orders' },
+            { id: 'DISPATCHED', label: 'Shipped / Dispatched' },
             { id: 'DELIVERED', label: 'Delivered at Site' },
-            { id: 'CANCELLED', label: 'Cancelled / Returned' },
+            { id: 'CANCELLED', label: 'Cancelled Orders' },
+            { id: 'RETURNED', label: 'Returned / Refund Requested' },
           ].map((tab) => {
             const isSelected = statusTab === tab.id;
             return (
