@@ -15,7 +15,7 @@ import {
 interface SavedAddressItem {
   id: string;
   label: string;
-  type: 'PLOT' | 'RESIDENCE' | 'COMMERCIAL';
+  type: 'PLOT' | 'HOME' | 'OFFICE' | 'DELIVERY' | 'COMMERCIAL' | 'RESIDENCE';
   address: string;
   city: string;
   state: string;
@@ -32,7 +32,7 @@ export const SavedAddresses: React.FC = () => {
   const [addresses, setAddresses] = useState<SavedAddressItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [label, setLabel] = useState('');
-  const [type, setType] = useState<'PLOT' | 'RESIDENCE' | 'COMMERCIAL'>('PLOT');
+  const [type, setType] = useState<'PLOT' | 'HOME' | 'OFFICE' | 'DELIVERY' | 'COMMERCIAL' | 'RESIDENCE'>('PLOT');
   const [addressLine, setAddressLine] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -182,13 +182,16 @@ export const SavedAddresses: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Property Type</label>
+              <label className="block text-slate-700 font-semibold mb-1">Property / Address Category</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as any)}
                 className="w-full p-2 border border-slate-300 rounded-xl bg-slate-50"
               >
-                <option value="PLOT">Empty Plot (New Construction)</option>
+                <option value="PLOT">Project Site Address (New Construction / Plot)</option>
+                <option value="HOME">Home Address (Permanent Residence)</option>
+                <option value="OFFICE">Office Address</option>
+                <option value="DELIVERY">Saved Delivery Address (Material Drop-off)</option>
                 <option value="RESIDENCE">Existing Residence (Renovation)</option>
                 <option value="COMMERCIAL">Commercial Property</option>
               </select>

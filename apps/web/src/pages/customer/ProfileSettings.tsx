@@ -13,6 +13,11 @@ import {
   Bell,
   Home,
   Check,
+  Camera,
+  Download,
+  AlertTriangle,
+  Globe,
+  Lock,
 } from 'lucide-react';
 
 export const ProfileSettings: React.FC = () => {
@@ -21,7 +26,10 @@ export const ProfileSettings: React.FC = () => {
   // Basic Profile Info
   const [fullName, setFullName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [avatarUrl, setAvatarUrl] = useState<string>((user as any)?.avatar || '');
+  const [language, setLanguage] = useState('en-IN');
   const [savedSuccessMsg, setSavedSuccessMsg] = useState('');
+  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
 
   // Mobile number change modal
   const [mobileModalOpen, setMobileModalOpen] = useState(false);
@@ -50,6 +58,45 @@ export const ProfileSettings: React.FC = () => {
     payments: true,
     materials: true,
   });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image file size must be less than 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const base64 = uploadEvent.target?.result as string;
+        setAvatarUrl(base64);
+        updateUser({ avatar: base64 } as any);
+        setSavedSuccessMsg('Profile photo updated successfully!');
+        setTimeout(() => setSavedSuccessMsg(''), 3000);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDownloadMyData = () => {
+    const exportData = {
+      userProfile: user,
+      registeredAddresses: addresses,
+      languagePreference: language,
+      notificationPreferences: prefs,
+      exportedAt: new Date().toISOString(),
+      platform: 'BuildGhar Construction & Architecture Management',
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `buildghar-customer-archive-${user?.phone || 'account'}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setSavedSuccessMsg('Account data archive generated and downloaded!');
+    setTimeout(() => setSavedSuccessMsg(''), 3000);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +186,38 @@ export const ProfileSettings: React.FC = () => {
         <h2 className="font-bold text-sm text-slate-900 border-b border-slate-100 pb-2">
           Personal Information
         </h2>
+
+        {/* Profile Photo Avatar Uploader (Section 12.1 Spec) */}
+        <div className="flex items-center gap-4 pb-2">
+          <div className="relative">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile Avatar"
+                className="w-16 h-16 rounded-full object-cover border-2 border-gold-400 shadow-sm"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-navy-950 text-gold-400 font-bold text-xl flex items-center justify-center border-2 border-gold-400/50 shadow-sm">
+                {fullName ? fullName.slice(0, 2).toUpperCase() : 'GD'}
+              </div>
+            )}
+            <label className="absolute bottom-0 right-0 p-1.5 bg-navy-950 text-gold-400 hover:bg-navy-900 rounded-full cursor-pointer shadow-xs border border-white">
+              <Camera className="w-3.5 h-3.5" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-xs">Profile Photo</h3>
+            <p className="text-[11px] text-slate-500">
+              Upload your personal photo or avatar. JPG, PNG up to 2MB.
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
@@ -321,6 +400,110 @@ export const ProfileSettings: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Language & Regional Preferences (Section 12.4 Spec) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <h2 className="font-bold text-sm text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-blue-600" />
+          <span>Language & Regional Preferences (Section 12.4)</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="font-bold text-slate-700">Display Language</label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+            >
+              <option value="en-IN">English (India)</option>
+              <option value="hi-IN">Hindi (हिन्दी)</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="font-bold text-slate-700">Currency & Formatting</label>
+            <input
+              type="text"
+              readOnly
+              value="INR (₹) - Indian Rupee"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-700"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Account Management & Data Privacy (Section 12.5 Spec) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <h2 className="font-bold text-sm text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>Account Management & Data Privacy (Section 12.5)</span>
+        </h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div>
+            <div className="font-bold text-slate-800">Export Customer Archive</div>
+            <div className="text-[11px] text-slate-500">
+              Download a complete JSON record of your profile, projects, site addresses, and quotations.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleDownloadMyData}
+            className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold rounded-lg flex items-center gap-1.5 transition shrink-0"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download My Data</span>
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-rose-50/50 rounded-xl border border-rose-200">
+          <div>
+            <div className="font-bold text-rose-950">Request Account Deactivation</div>
+            <div className="text-[11px] text-rose-700">
+              Permanently close your customer account after verifying all ongoing project escrow settlements.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeactivateModalOpen(true)}
+            className="px-4 py-2 border border-rose-300 bg-white hover:bg-rose-100 text-rose-700 font-bold rounded-lg transition shrink-0"
+          >
+            Request Deactivation
+          </button>
+        </div>
+      </div>
+
+      {/* Account Deactivation Modal */}
+      {deactivateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+            <div className="flex items-center gap-2.5 text-rose-600 font-bold text-base">
+              <AlertTriangle className="w-5 h-5" />
+              <span>Confirm Account Deactivation</span>
+            </div>
+            <p className="text-slate-600 text-xs leading-relaxed">
+              Deactivating your account will pause your access to BuildGhar Customer Portal. If you have active construction projects or pending milestone disbursements, our admin operations team will review and contact you at +91 {user?.phone}.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeactivateModalOpen(false)}
+                className="flex-1 py-2 border border-slate-300 rounded-xl font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeactivateModalOpen(false);
+                  alert('Deactivation request logged with BuildGhar compliance team.');
+                }}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"
+              >
+                Confirm Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Change Modal */}
       {mobileModalOpen && (

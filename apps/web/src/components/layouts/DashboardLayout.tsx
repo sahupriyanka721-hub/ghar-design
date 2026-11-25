@@ -60,6 +60,7 @@ export const DashboardLayout: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Expandable sub-menu open states (Spec Part 1: Collapsible Sidebar)
+  const [dashboardMenuOpen, setDashboardMenuOpen] = useState(true);
   const [quotationMenuOpen, setQuotationMenuOpen] = useState(true);
   const [projectsMenuOpen, setProjectsMenuOpen] = useState(true);
   const [projectPaymentsMenuOpen, setProjectPaymentsMenuOpen] = useState(false);
@@ -344,35 +345,84 @@ export const DashboardLayout: React.FC = () => {
 
                 {/* 1. Dashboard */}
                 <div className="space-y-0.5">
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
-                      location.pathname === '/dashboard' && !location.search
-                        ? 'bg-navy-950 text-white shadow-sm'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                  <button
+                    onClick={() => setDashboardMenuOpen(!dashboardMenuOpen)}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition"
                   >
-                    <LayoutDashboard className={`w-4 h-4 ${location.pathname === '/dashboard' && !location.search ? 'text-gold-400' : 'text-slate-400'}`} />
-                    <span className="flex-1">1. Dashboard</span>
-                  </Link>
-
-                  {/* Smart Cost & Material Estimator Tool */}
-                  <Link
-                    to="/dashboard/calculator"
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
-                      location.pathname === '/dashboard/calculator'
-                        ? 'bg-navy-950 text-white shadow-sm'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Calculator className={`w-4 h-4 ${location.pathname === '/dashboard/calculator' ? 'text-gold-400' : 'text-slate-400'}`} />
-                    <span className="flex-1">Cost & Material Estimator</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gold-500/20 text-gold-700 border border-gold-300">
-                      Smart
-                    </span>
-                  </Link>
+                    <div className="flex items-center gap-3">
+                      <LayoutDashboard className="w-4 h-4 text-slate-400" />
+                      <span className="font-semibold text-navy-950">1. Dashboard</span>
+                    </div>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-slate-400 transform transition-transform ${
+                        dashboardMenuOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {dashboardMenuOpen && (
+                    <div className="pl-7 pr-2 py-1 space-y-0.5 border-l-2 border-slate-100 ml-4">
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setSidebarOpen(false)}
+                        className={`block px-2.5 py-1.5 rounded-md transition ${
+                          location.pathname === '/dashboard' && !location.search
+                            ? 'bg-navy-900 text-white font-semibold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        1.1 Overview
+                      </Link>
+                      <Link
+                        to="/dashboard/projects"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        1.2 My Active Projects
+                      </Link>
+                      <Link
+                        to="/dashboard/quotations?tab=pending"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        1.3 Pending Quotations
+                      </Link>
+                      <Link
+                        to="/dashboard/bookings?tab=visits"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        1.4 Upcoming Site Visits
+                      </Link>
+                      <Link
+                        to="/dashboard/project-payments?tab=approvals"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        1.5 Pending Approvals
+                      </Link>
+                      <Link
+                        to="/dashboard/project-payments?tab=due"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        1.6 Pending Payments
+                      </Link>
+                      <Link
+                        to="/dashboard/calculator"
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-md transition ${
+                          location.pathname === '/dashboard/calculator'
+                            ? 'bg-navy-900 text-white font-semibold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>Cost & Material Estimator</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gold-500/20 text-gold-700 border border-gold-300">
+                          Smart
+                        </span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Quotation Management */}
@@ -715,6 +765,13 @@ export const DashboardLayout: React.FC = () => {
                         6.2 Shopping Cart
                       </Link>
                       <Link
+                        to="/dashboard/materials"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        6.3 Checkout
+                      </Link>
+                      <Link
                         to="/dashboard/material-purchases"
                         onClick={() => setSidebarOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md transition ${
@@ -941,20 +998,35 @@ export const DashboardLayout: React.FC = () => {
                 </Link>
 
                 {/* 11. Notifications */}
-                <Link
-                  to="/dashboard/notifications"
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg font-medium transition ${
-                    location.pathname === '/dashboard/notifications'
-                      ? 'bg-navy-950 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Bell className={`w-4 h-4 ${location.pathname === '/dashboard/notifications' ? 'text-gold-400' : 'text-slate-400'}`} />
-                    <span>11. Notifications</span>
+                <div className="pt-1">
+                  <Link
+                    to="/dashboard/notifications"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg font-medium transition ${
+                      location.pathname === '/dashboard/notifications'
+                        ? 'bg-navy-950 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Bell className={`w-4 h-4 ${location.pathname === '/dashboard/notifications' ? 'text-gold-400' : 'text-slate-400'}`} />
+                      <span>11. Notifications</span>
+                    </div>
+                  </Link>
+                  <div className="pl-7 pr-2 py-0.5 border-l-2 border-slate-100 ml-4">
+                    <Link
+                      to="/dashboard/notification-preferences"
+                      onClick={() => setSidebarOpen(false)}
+                      className={`block px-2.5 py-1 rounded-md text-[11px] transition ${
+                        location.pathname === '/dashboard/notification-preferences'
+                          ? 'text-navy-900 font-bold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      11.2 Preferences
+                    </Link>
                   </div>
-                </Link>
+                </div>
 
                 {/* 12. Settings */}
                 <div className="pt-1">
