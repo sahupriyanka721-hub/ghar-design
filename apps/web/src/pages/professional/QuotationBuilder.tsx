@@ -242,7 +242,7 @@ export const QuotationBuilder: React.FC = () => {
       }
 
       if (matchedReq) {
-        updatePlatformRequestStatus(matchedReq.id, 'QUOTATIONS_AVAILABLE', {
+        updatePlatformRequestStatus(matchedReq.id, matchedReq.status || 'ASSIGNED', {
           quotationsCount: (matchedReq.quotationsCount || 0) + 1,
         });
       }

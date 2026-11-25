@@ -158,11 +158,7 @@ export const AssignedRequests: React.FC = () => {
         r.status === 'ASSIGNED' ||
         r.status === 'QUOTATIONS_AVAILABLE' ||
         r.status === 'BOOKING_CONFIRMED' ||
-        r.status === 'IN_PROGRESS';
-
-      const isArchOrCivil =
-        !r.categorySlug ||
-        !r.categorySlug.toLowerCase().includes('interior') ||
+        r.status === 'IN_PROGRESS' ||
         (r.assignedProfessionalIds && r.assignedProfessionalIds.length > 0);
 
       // If no specific professional IDs list is set, request is not dispatched to this architect yet
@@ -175,25 +171,28 @@ export const AssignedRequests: React.FC = () => {
         if (!assignedId) return false;
         const normAssigned = assignedId.trim();
         const normLower = normAssigned.toLowerCase();
+        const normClean = normLower.replace(/[^a-z0-9]/g, '');
 
         if (myPossibleIds.has(normAssigned) || myPossibleIds.has(normLower)) return true;
-        if (myPossibleIds.has(normAssigned.replace(/\s+/g, ''))) return true;
+        if (myPossibleIds.has(normClean)) return true;
 
         const assignedCleanPh = normAssigned.replace(/\D/g, '').slice(-10);
         if (cleanUserPhone && assignedCleanPh && cleanUserPhone === assignedCleanPh) return true;
 
         if (
           matchedArch?.id &&
-          (normAssigned === matchedArch.id || normAssigned.replace(/\s+/g, '') === matchedArch.id.replace(/\s+/g, ''))
+          (normLower === matchedArch.id.toLowerCase() ||
+           normClean === matchedArch.id.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+           normLower.includes(matchedArch.id.toLowerCase()))
         ) {
           return true;
         }
 
-        if (matchedArch?.firmName && normLower.includes(matchedArch.firmName.toLowerCase().trim())) {
+        if (matchedArch?.firmName && (normLower.includes(matchedArch.firmName.toLowerCase().trim()) || matchedArch.firmName.toLowerCase().trim().includes(normLower))) {
           return true;
         }
 
-        if (matchedArch?.name && normLower.includes(matchedArch.name.toLowerCase().trim())) {
+        if (matchedArch?.name && (normLower.includes(matchedArch.name.toLowerCase().trim()) || matchedArch.name.toLowerCase().trim().includes(normLower))) {
           return true;
         }
 
@@ -208,7 +207,18 @@ export const AssignedRequests: React.FC = () => {
         return false;
       });
 
-      return isAssignedStatus && isArchOrCivil && matchesExplicit;
+      // Local single architect active session fallback: if this is the active architect firm and requests were assigned, include it
+      const isFallbackMatch =
+        !matchesExplicit &&
+        (allArchs.length <= 1 || matchedArch?.accountStatus === 'APPROVED' || matchedArch?.isVerified) &&
+        r.assignedProfessionalIds &&
+        r.assignedProfessionalIds.length > 0 &&
+        r.assignedProfessionalIds.some((idStr) => {
+          const s = idStr.toLowerCase();
+          return s.includes('arch') || s.includes('firm') || (cleanUserPhone && s.includes(cleanUserPhone));
+        });
+
+      return isAssignedStatus && (matchesExplicit || isFallbackMatch);
     });
 
     const mapped = allocated.map((r) => {
@@ -315,7 +325,10 @@ export const AssignedRequests: React.FC = () => {
     if (asg) {
       saveInquiryResponse(asg.requestId, status);
       if (status === 'ACCEPTED') {
-        updatePlatformRequestStatus(asg.requestId, 'QUOTATIONS_AVAILABLE');
+        updatePlatformRequestStatus(asg.requestId, 'ASSIGNED', {
+          architectResponseStatus: 'ACCEPTED',
+          architectAcceptedAt: new Date().toISOString(),
+        });
       }
     }
     setAssignments((prev) =>

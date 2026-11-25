@@ -489,7 +489,7 @@ export const ARCHITECT_ID_PREFIX = 'BG/Architech';
  */
 export const formatArchitectId = (idOrNum?: string, fallbackSeq = 1): string => {
   if (!idOrNum) return `BG/Architech/${String(fallbackSeq).padStart(6, '0')}`;
-  const cleanStr = String(idOrNum).replace(/^\[\s*/, '').replace(/\s*\]$/, '').trim();
+  const cleanStr = String(idOrNum).replace(/[\[\]]/g, '').trim();
 
   // 1. Check legacy BG/QUO/XXXX or BG/ARC/XXXX (e.g. BG/QUO/0018 -> BG/Architech/000018)
   const quoMatch = cleanStr.match(/^BG\/(?:QUO|ARC)\/(?:\s*)(\d+)/i);
@@ -663,8 +663,13 @@ export const resolveArchitectBankDetails = (
 export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallbackSeq = 1): ArchitectAccount => {
   const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
   
-  // Format to strict standard: BG/Architech/XXXXXX
-  arch.id = formatArchitectId(arch.id || arch.applicationNumber, fallbackSeq);
+  // Format to strict standard: BG/Architech/XXXXXX without corrupting existing valid IDs
+  const rawId = arch.id ? String(arch.id).replace(/[\[\]]/g, '').trim() : '';
+  if (rawId && /^BG\/(?:Architech|Aritech|Architect)\/\d{6}$/i.test(rawId)) {
+    arch.id = formatArchitectId(rawId, fallbackSeq);
+  } else {
+    arch.id = formatArchitectId(rawId || arch.applicationNumber, fallbackSeq);
+  }
   arch.applicationNumber = arch.id;
 
   // 1. Ensure Services - do not inject fake defaults & ensure all are string names
@@ -1237,7 +1242,10 @@ export const getArchitectAccounts = (): ArchitectAccount[] => {
     });
 
     const finalized = filtered.map((arch, idx) => {
-      const assignedId = formatArchitectId(arch.id || arch.applicationNumber, idx + 1);
+      const rawId = arch.id ? String(arch.id).replace(/[\[\]]/g, '').trim() : '';
+      const assignedId = rawId && /^BG\/(?:Architech|Aritech|Architect)\/\d{6}$/i.test(rawId)
+        ? formatArchitectId(rawId, idx + 1)
+        : formatArchitectId(rawId || arch.applicationNumber, idx + 1);
       arch.id = assignedId;
       arch.applicationNumber = assignedId;
       return ensureArchitectStatutoryDocuments(arch, idx + 1);

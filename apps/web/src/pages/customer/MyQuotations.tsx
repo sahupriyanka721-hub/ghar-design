@@ -374,7 +374,14 @@ export const MyQuotations: React.FC = () => {
             if (reqKey && bookedRequestIds.has(reqKey)) {
               return q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked;
             }
-            return q.status !== 'UNSELECTED';
+            // Strict Admin Review Gate: Only quotations vetted and published by admin are visible to the customer
+            const isPublishedToCustomer =
+              q.status === 'PUBLISHED_TO_CUSTOMER' ||
+              q.status === 'PUBLISHED' ||
+              q.status === 'ACCEPTED' ||
+              q.status === 'SELECTED' ||
+              Boolean(q.isBooked);
+            return isPublishedToCustomer && q.status !== 'UNSELECTED';
           });
           setQuotations(finalFiltered);
         })
@@ -393,7 +400,14 @@ export const MyQuotations: React.FC = () => {
             if (reqKey && bookedRequestIds.has(reqKey)) {
               return q.status === 'ACCEPTED' || q.status === 'SELECTED' || q.isBooked;
             }
-            return q.status !== 'UNSELECTED';
+            // Strict Admin Review Gate: Only quotations vetted and published by admin are visible to the customer
+            const isPublishedToCustomer =
+              q.status === 'PUBLISHED_TO_CUSTOMER' ||
+              q.status === 'PUBLISHED' ||
+              q.status === 'ACCEPTED' ||
+              q.status === 'SELECTED' ||
+              Boolean(q.isBooked);
+            return isPublishedToCustomer && q.status !== 'UNSELECTED';
           });
           setQuotations(finalFiltered);
         })

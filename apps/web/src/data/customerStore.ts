@@ -508,28 +508,65 @@ export const updatePlatformRequestStatus = (
   newStatus: PlatformProjectRequest['status'],
   extra?: Partial<PlatformProjectRequest>
 ): PlatformProjectRequest | null => {
-  const current = getPlatformRequests();
-  let updatedReq: PlatformProjectRequest | null = null;
-  const updated = current.map((r) => {
-    if (r.id === idOrCode || r.requestCode === idOrCode) {
-      updatedReq = {
-        ...r,
-        status: newStatus,
-        ...extra,
-        updatedAt: new Date().toISOString(),
-      };
-      return updatedReq;
-    }
-    return r;
-  });
+  if (!idOrCode) return null;
+  const clean = idOrCode.trim().toLowerCase();
 
-  if (updatedReq) {
+  // 1. Read current requests from memory or raw localStorage
+  let current = getPlatformRequests();
+  if (current.length === 0) {
     try {
-      localStorage.setItem(REQUESTS_KEY, JSON.stringify(updated));
-      broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED', updatedReq);
-    } catch (e) {
-      console.error('Error updating platform request status', e);
+      const raw = localStorage.getItem(REQUESTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) current = parsed;
+      }
+    } catch {}
+  }
+
+  let matchedIndex = -1;
+  for (let i = 0; i < current.length; i++) {
+    const r = current[i];
+    if (!r) continue;
+    const rId = (r.id || '').trim().toLowerCase();
+    const rCode = (r.requestCode || '').trim().toLowerCase();
+    if (
+      r.id === idOrCode ||
+      r.requestCode === idOrCode ||
+      rId === clean ||
+      rCode === clean ||
+      rId.replace(/[\/_-]/g, '') === clean.replace(/[\/_-]/g, '') ||
+      rCode.replace(/[\/_-]/g, '') === clean.replace(/[\/_-]/g, '') ||
+      (clean.length >= 6 && (rId.includes(clean) || rCode.includes(clean) || clean.includes(rId) || clean.includes(rCode)))
+    ) {
+      matchedIndex = i;
+      break;
     }
+  }
+
+  if (matchedIndex === -1) {
+    console.warn(`[updatePlatformRequestStatus] Could not find request matching "${idOrCode}"`);
+    return null;
+  }
+
+  const existing = current[matchedIndex];
+  const updatedReq: PlatformProjectRequest = {
+    ...existing,
+    status: newStatus,
+    ...extra,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const updatedList = [...current];
+  updatedList[matchedIndex] = updatedReq;
+
+  try {
+    localStorage.setItem(REQUESTS_KEY, JSON.stringify(updatedList));
+    broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED', updatedReq);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (e) {
+    console.error('Error updating platform request status', e);
   }
 
   return updatedReq;

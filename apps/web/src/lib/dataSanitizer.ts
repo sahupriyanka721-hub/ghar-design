@@ -9,9 +9,8 @@ import { safeSetStorage, freeLocalStorageSpace } from './safeStorage.js';
 import { normalizeQuotation } from './utils.js';
 
 export function sanitizeStorage(): void {
-  // 0. Auto-purge any stale dummy test records & free up storage headroom
+  // 0. Auto-purge any stale dummy test records
   try { purgeDummyData(); } catch(e) {}
-  try { freeLocalStorageSpace(); } catch(e) {}
 
   if (typeof window === 'undefined' || !window.localStorage) return;
 

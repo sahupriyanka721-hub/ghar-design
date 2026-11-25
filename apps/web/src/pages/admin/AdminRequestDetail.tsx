@@ -158,7 +158,22 @@ export const AdminRequestDetail: React.FC = () => {
       setRequest(local);
       loadQuotes(local);
       if (local.assignedProfessionalIds && local.assignedProfessionalIds.length > 0) {
-        setSelectedProIds(local.assignedProfessionalIds);
+        // Resolve to distinct primary professional IDs to prevent multiple duplicate tokens from inflating count
+        const tokenSet = new Set(local.assignedProfessionalIds.map((t: string) => String(t).toLowerCase().trim()));
+        const matched = (professionals || []).filter((p) => {
+          const pid = (p.id || '').toLowerCase();
+          const pUser = (p.userId || '').toLowerCase();
+          const pPhone = (p.phone || '').replace(/\D/g, '').slice(-10);
+          return tokenSet.has(pid) || tokenSet.has(pUser) || (pPhone && tokenSet.has(pPhone));
+        }).map((p) => p.id);
+
+        if (matched.length > 0) {
+          setSelectedProIds(Array.from(new Set(matched)));
+        } else {
+          // If professionals haven't loaded yet, keep only distinct tokens
+          const distinct = Array.from(new Set(local.assignedProfessionalIds.filter((t: string) => !t.includes('+91') && !t.includes(' '))));
+          setSelectedProIds(distinct.slice(0, Math.max(local.assignedCount || 1, 1)));
+        }
       }
       if (local.responseDeadline) {
         setResponseDeadline(local.responseDeadline);
@@ -395,7 +410,7 @@ export const AdminRequestDetail: React.FC = () => {
       if (updated) {
         setRequest(updated);
       }
-      success(`Assigned ${selectedProIds.length} certified professionals. They will be notified to review the scope and submit itemized BOQ quotations.`);
+      success(`Assigned ${selectedProIds.length} certified ${selectedProIds.length === 1 ? 'professional firm' : 'professional firms'}. They will be notified to review the scope and submit itemized BOQ quotations.`);
     } catch (err: any) {
       error(err.message || 'Assignment failed');
     } finally {
@@ -755,7 +770,7 @@ export const AdminRequestDetail: React.FC = () => {
             </p>
           </div>
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-            {selectedProIds.length} Firms Selected
+            {selectedProIds.length} {selectedProIds.length === 1 ? 'Firm' : 'Firms'} Selected
           </span>
         </div>
 

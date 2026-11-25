@@ -52,13 +52,10 @@ export function freeLocalStorageSpace(): void {
       const key = localStorage.key(i);
       if (!key) continue;
 
-      // 1. Unconditionally remove heavy document / photo caches (handled permanently by IndexedDB vault)
+      // 1. Remove heavy temporary document file blob caches (handled permanently by IndexedDB vault)
       if (
-        key.startsWith('arch_photo_') ||
         key.startsWith('doc_file_') ||
         key.startsWith('gd_vault_') ||
-        key.startsWith('user_photo_') ||
-        key.startsWith('profile_photo_') ||
         key.startsWith('designer_doc_')
       ) {
         keysToRemove.push(key);

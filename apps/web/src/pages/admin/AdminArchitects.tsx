@@ -807,16 +807,8 @@ export const AdminArchitects: React.FC = () => {
 
     const onFocus = () => {
       loadData();
-      pullFromCloud().then(() => loadData()).catch(() => {});
     };
     window.addEventListener('focus', onFocus);
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        onFocus();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
 
     let bc: BroadcastChannel | null = null;
     try {
