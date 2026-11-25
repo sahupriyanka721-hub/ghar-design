@@ -95,6 +95,7 @@ export interface DailySiteReport {
   materialsConsumed: string;
   equipmentUsed: string;
   sitePhotos: string[];
+  siteVideos?: string[];
   blockers: string;
   safetyObservations: string;
   nextPlannedActivities: string;

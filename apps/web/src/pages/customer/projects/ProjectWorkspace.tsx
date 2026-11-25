@@ -90,6 +90,7 @@ export const ProjectWorkspace: React.FC = () => {
   const [dsrWorkers, setDsrWorkers] = useState<number>(8);
   const [dsrWorkDone, setDsrWorkDone] = useState('');
   const [dsrMaterials, setDsrMaterials] = useState('');
+  const [dsrVideoUrl, setDsrVideoUrl] = useState('');
   const [dsrNextTasks, setDsrNextTasks] = useState('');
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
 
@@ -255,6 +256,7 @@ export const ProjectWorkspace: React.FC = () => {
       sitePhotos: [
         'https://images.unsplash.com/photo-1541888946425-d0fbb18f15f7?auto=format&fit=crop&w=600&q=80',
       ],
+      siteVideos: dsrVideoUrl.trim() ? [dsrVideoUrl.trim()] : [],
       blockers: 'None',
       safetyObservations: 'Helmets & safety boots verified across all workers.',
       nextPlannedActivities: dsrNextTasks || 'Continuing stage concrete curing and reinforcement steel binding.',
@@ -272,8 +274,9 @@ export const ProjectWorkspace: React.FC = () => {
     setShowNewReportModal(false);
     setDsrWorkDone('');
     setDsrMaterials('');
+    setDsrVideoUrl('');
     setDsrNextTasks('');
-    success('Daily Site Report logged with site evidence photos.');
+    success('Daily Site Report logged with site evidence photos & video logs.');
   };
 
   // 4. Milestone Approval & Payment Release
@@ -997,6 +1000,28 @@ export const ProjectWorkspace: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Site Video Footage (Section 8 Spec) */}
+                  {rpt.siteVideos && rpt.siteVideos.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400 mb-2">Site Video & Drone Logs</div>
+                      <div className="flex flex-wrap gap-2">
+                        {rpt.siteVideos.map((vid, idx) => (
+                          <a
+                            key={idx}
+                            href={vid}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-semibold transition"
+                          >
+                            <PlayCircle className="w-3.5 h-3.5 text-blue-600" />
+                            <span>View Site Video #{idx + 1}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-400" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Customer Clarification / Comments */}
                   <div className="pt-3 border-t border-slate-100 space-y-3">
                     <div className="text-xs font-bold text-slate-700">Discussion & Clarifications</div>
@@ -1669,6 +1694,17 @@ export const ProjectWorkspace: React.FC = () => {
                 onChange={(e) => setDsrMaterials(e.target.value)}
                 placeholder=""
                 className="w-full p-2 border border-slate-300 rounded-xl bg-slate-50"
+              />
+            </div>
+
+            <div className="text-xs">
+              <label className="block text-slate-700 font-semibold mb-1">Site Video / Drone Footage URL (Optional)</label>
+              <input
+                type="url"
+                value={dsrVideoUrl}
+                onChange={(e) => setDsrVideoUrl(e.target.value)}
+                placeholder="https://... (Video MP4 or Stream link)"
+                className="w-full p-2 border border-slate-300 rounded-xl bg-slate-50 font-mono"
               />
             </div>
 

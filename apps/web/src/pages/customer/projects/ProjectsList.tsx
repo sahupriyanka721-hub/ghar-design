@@ -70,6 +70,24 @@ export const ProjectsList: React.FC = () => {
 
     if (!matchesSearch) return false;
     if (filterStatus === 'ALL') return true;
+    if (filterStatus === 'ACTIVE') {
+      return (
+        p.status === 'IN_PROGRESS' ||
+        p.status === 'START_REQUESTED' ||
+        p.status === 'AWAITING_CUSTOMER_APPROVAL' ||
+        p.status === 'WORK_PAUSED' ||
+        p.status === 'ON_HOLD'
+      );
+    }
+    if (filterStatus === 'UPCOMING') {
+      return p.status === 'AWAITING_KICKOFF' || p.status === 'SCHEDULED';
+    }
+    if (filterStatus === 'COMPLETED') {
+      return p.status === 'COMPLETED' || p.status === 'HANDED_OVER';
+    }
+    if (filterStatus === 'CANCELLED') {
+      return p.status === 'CANCELLED';
+    }
     return p.status === filterStatus;
   });
 
@@ -168,11 +186,10 @@ export const ProjectsList: React.FC = () => {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs">
           {[
             { label: 'All Projects', value: 'ALL' },
-            { label: 'Awaiting Kickoff', value: 'AWAITING_KICKOFF' },
-            { label: 'In Progress', value: 'IN_PROGRESS' },
-            { label: 'Start Requested', value: 'START_REQUESTED' },
-            { label: 'Approval Due', value: 'AWAITING_CUSTOMER_APPROVAL' },
-            { label: 'Handed Over', value: 'HANDED_OVER' },
+            { label: 'Active Projects', value: 'ACTIVE' },
+            { label: 'Upcoming Projects', value: 'UPCOMING' },
+            { label: 'Completed Projects', value: 'COMPLETED' },
+            { label: 'Cancelled Projects', value: 'CANCELLED' },
           ].map((f) => (
             <button
               key={f.value}
