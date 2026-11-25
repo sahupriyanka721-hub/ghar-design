@@ -10,6 +10,8 @@ import {
   ChevronRight,
   ShieldCheck,
   FileCheck2,
+  DollarSign,
+  User,
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge.js';
 import {
@@ -18,11 +20,63 @@ import {
   markAllNotificationsRead,
   ArchitectNotificationItem,
 } from '../../data/architectPanelStore.js';
+import { formatDate } from '../../lib/utils.js';
 
 export const ArchitectNotifications: React.FC = () => {
-  const [notifications, setNotifications] = useState<ArchitectNotificationItem[]>(() =>
-    getArchitectNotifications()
-  );
+  const ensureDefaultNotifications = (): ArchitectNotificationItem[] => {
+    const stored = getArchitectNotifications();
+    if (stored.length > 0) return stored;
+
+    const defaultNotifs: ArchitectNotificationItem[] = [
+      {
+        id: 'notif-1',
+        type: 'QUOTATION',
+        title: 'New Architectural Request Assigned',
+        message: 'Homeowner Sharika Mishra requested quotation for 30x50 ft G+2 villa design in Indore.',
+        timestamp: '2026-11-24T14:30:00Z',
+        read: false,
+        severity: 'INFO',
+        linkPath: '/professional/assigned',
+      },
+      {
+        id: 'notif-2',
+        type: 'DESIGN_APPROVAL',
+        title: 'Ground Floor Plan Approved',
+        message: 'Sharika Mishra signed off on V2.0 Ground Floor Architectural Plan. Escrow release queued.',
+        timestamp: '2026-11-23T11:00:00Z',
+        read: false,
+        severity: 'SUCCESS',
+        linkPath: '/professional/designs?tab=approvals',
+      },
+      {
+        id: 'notif-3',
+        type: 'PAYMENT',
+        title: 'Escrow Milestone Fee Released',
+        message: '₹48,000 mobilization advance disbursed to your registered HDFC bank account (UTR: HDFCR202611130987654).',
+        timestamp: '2026-11-22T16:00:00Z',
+        read: true,
+        severity: 'SUCCESS',
+        linkPath: '/professional/billing?tab=history',
+      },
+      {
+        id: 'notif-4',
+        type: 'SYSTEM',
+        title: 'Indore Master Plan 2021 Bylaw Update',
+        message: 'Municipal council updated maximum permissible FAR guidelines for residential plots on 40ft sector roads.',
+        timestamp: '2026-11-20T09:00:00Z',
+        read: true,
+        severity: 'WARNING',
+        linkPath: '/professional/designs',
+      },
+    ];
+
+    try {
+      localStorage.setItem('ghar_architect_notifications', JSON.stringify(defaultNotifs));
+    } catch {}
+    return defaultNotifs;
+  };
+
+  const [notifications, setNotifications] = useState<ArchitectNotificationItem[]>(ensureDefaultNotifications);
   const [filter, setFilter] = useState<'ALL' | 'UNREAD'>('ALL');
 
   const reloadNotifications = () => {
@@ -48,50 +102,57 @@ export const ArchitectNotifications: React.FC = () => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-full text-[11px] font-black bg-blue-500/20 text-blue-200 border border-blue-400/30 uppercase tracking-wider font-mono">
-                Section 14 & 19 Notifications
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
-                Real-time System Triggers
-              </span>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* =========================================================================
+          PAGE HEADER & SECTION BADGE (Master Spec Section 14)
+      ========================================================================= */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-900 shadow-2xs">
+              <Bell className="w-5 h-5 text-blue-900" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-white">
-              System Notifications & Alert Center
-            </h1>
-            <p className="text-xs sm:text-sm text-blue-200/80 max-w-2xl mt-1 leading-relaxed">
-              Stay alerted on new homeowner assignments, Admin quotation approvals, client design sign-offs, and milestone escrow payouts.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold font-display text-navy-950">
+                  14. System Notifications & Activity Feed
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900">
+                  {unreadCount} Unread Alerts
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Real-time triggers for lead assignments, Admin reviews, client drawing sign-offs, and bank escrow payouts.
+              </p>
+            </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                className="px-4 py-2.5 rounded-xl bg-white text-navy-950 font-bold text-xs hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5"
-              >
-                <Check className="w-4 h-4 text-emerald-600" />
-                <span>Mark All Read ({unreadCount})</span>
-              </button>
-            )}
-          </div>
+        {/* Quick Action */}
+        <div className="flex items-center gap-2.5 self-start md:self-auto">
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllRead}
+              className="btn-gold text-xs font-bold py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>Mark All Read ({unreadCount})</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* NOTIFICATIONS LIST */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+      {/* =========================================================================
+          NOTIFICATIONS LIST & FILTER BAR
+      ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 filter === 'ALL'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-blue-900 text-white'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -99,9 +160,9 @@ export const ArchitectNotifications: React.FC = () => {
             </button>
             <button
               onClick={() => setFilter('UNREAD')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 filter === 'UNREAD'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-blue-900 text-white'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -112,81 +173,70 @@ export const ArchitectNotifications: React.FC = () => {
 
         {filtered.length > 0 ? (
           <div className="divide-y divide-slate-100">
-            {filtered.map((item) => {
-              const isAlert = item.severity === 'ALERT';
-              const isWarning = item.severity === 'WARNING';
-              const isSuccess = item.severity === 'SUCCESS';
+            {filtered.map((n) => (
+              <div
+                key={n.id}
+                className={`py-4 px-3 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  !n.read ? 'bg-sky-50/50' : 'hover:bg-slate-50/70'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                    n.severity === 'SUCCESS'
+                      ? 'bg-blue-100 text-blue-900'
+                      : n.severity === 'WARNING'
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-sky-100 text-sky-900'
+                  }`}>
+                    {n.severity === 'SUCCESS' ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : n.severity === 'WARNING' ? (
+                      <AlertTriangle className="w-4 h-4" />
+                    ) : (
+                      <Bell className="w-4 h-4" />
+                    )}
+                  </div>
 
-              return (
-                <div
-                  key={item.id}
-                  className={`py-3.5 flex items-start justify-between gap-4 transition ${
-                    !item.read ? 'bg-sky-50/40 px-3 rounded-2xl' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        isAlert
-                          ? 'bg-rose-100 text-rose-600'
-                          : isWarning
-                          ? 'bg-amber-100 text-amber-600'
-                          : isSuccess
-                          ? 'bg-emerald-100 text-emerald-600'
-                          : 'bg-blue-100 text-blue-600'
-                      }`}
-                    >
-                      {isAlert || isWarning ? (
-                        <AlertTriangle className="w-4 h-4" />
-                      ) : isSuccess ? (
-                        <CheckCircle2 className="w-4 h-4" />
-                      ) : (
-                        <Info className="w-4 h-4" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm">{n.title}</h4>
+                      {!n.read && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
                       )}
                     </div>
-
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-navy-950">{item.title}</span>
-                        {!item.read && (
-                          <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">{item.message}</p>
-                      <div className="text-[10px] text-slate-400">
-                        {new Date(item.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.linkPath && (
-                      <Link
-                        to={item.linkPath}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 text-[11px] font-bold transition flex items-center gap-1"
-                      >
-                        <span>View</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </Link>
-                    )}
-                    {!item.read && (
-                      <button
-                        onClick={() => handleMarkAsRead(item.id)}
-                        className="p-1 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition"
-                        title="Mark as Read"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{n.message}</p>
+                    <span className="text-[10px] text-slate-400 font-mono mt-1 block">
+                      {formatDate(n.timestamp)}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  {n.linkPath && (
+                    <Link
+                      to={n.linkPath}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <span>View</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                  {!n.read && (
+                    <button
+                      onClick={() => handleMarkAsRead(n.id)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition cursor-pointer"
+                      title="Mark as read"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="py-12 text-center space-y-2 text-slate-400">
-            <Bell className="w-8 h-8 mx-auto text-slate-300" />
-            <p className="text-xs font-semibold">No notifications found.</p>
+          <div className="p-8 text-center text-slate-400 text-xs">
+            No notifications found under this filter.
           </div>
         )}
       </div>

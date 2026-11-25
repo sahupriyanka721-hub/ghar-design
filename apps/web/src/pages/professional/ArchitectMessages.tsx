@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   MessageSquare,
   Send,
@@ -10,26 +11,138 @@ import {
   CheckCircle2,
   Clock,
   Filter,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
-import { getExecutionProjects } from '../../data/projectExecutionStore.js';
+import { getExecutionProjects, ExecutionProject } from '../../data/projectExecutionStore.js';
 import {
   getArchitectChatMessages,
   sendArchitectChatMessage,
   ArchitectChatMessageItem,
   ChatChannel,
 } from '../../data/architectPanelStore.js';
+import { formatDate } from '../../lib/utils.js';
 
 export const ArchitectMessages: React.FC = () => {
   const { user } = useAuth();
-  const [projects] = useState(() => getExecutionProjects());
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || 'GENERAL');
-  const [activeChannel, setActiveChannel] = useState<ChatChannel>('CUSTOMER');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabParam = searchParams.get('tab');
+  const activeChannel: ChatChannel = useMemo(() => {
+    if (tabParam === 'admin') return 'ADMIN';
+    if (tabParam === 'consultants') return 'CONTRACTOR';
+    return 'CUSTOMER';
+  }, [tabParam]);
+
+  const setActiveChannel = (ch: ChatChannel) => {
+    const tabMap: Record<ChatChannel, string> = {
+      CUSTOMER: 'customers',
+      ADMIN: 'admin',
+      CONTRACTOR: 'consultants',
+      INTERIOR_DESIGNER: 'consultants',
+    };
+    setSearchParams({ tab: tabMap[ch] });
+  };
+
+  const [projects] = useState<ExecutionProject[]>(() => {
+    const list = getExecutionProjects();
+    if (list.length > 0) return list;
+    return [
+      {
+        id: 'PRJ-2026-ARCH-01',
+        requestCode: 'GHR-REQ-2026-0011',
+        workOrderNumber: 'GHR-WO-2026-088',
+        name: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+        customerName: 'Sharika Mishra',
+        customerPhone: '+91 9876543210',
+        propertyAddress: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+        city: 'Indore',
+      } as any,
+    ];
+  });
+
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || 'PRJ-2026-ARCH-01');
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<ArchitectChatMessageItem[]>([]);
 
+  // Seed default chat messages if channel is empty
+  const ensureChannelMessages = (pid: string, ch: ChatChannel): ArchitectChatMessageItem[] => {
+    const existing = getArchitectChatMessages(pid, ch);
+    if (existing.length > 0) return existing;
+
+    const defaultMsgList: Record<ChatChannel, ArchitectChatMessageItem[]> = {
+      CUSTOMER: [
+        {
+          id: 'msg-c1',
+          projectId: pid,
+          channel: 'CUSTOMER',
+          senderId: 'CUST-01',
+          senderName: 'Sharika Mishra',
+          senderRole: 'Homeowner',
+          message: 'Hello architect, we really liked the second revision of the floor plan. When can we expect the 3D elevation renders?',
+          timestamp: '2026-11-20T10:30:00Z',
+          read: true,
+        },
+        {
+          id: 'msg-c2',
+          projectId: pid,
+          channel: 'CUSTOMER',
+          senderId: 'ARCH-SELF',
+          senderName: user?.name || 'Apex Architectural Studio',
+          senderRole: 'Architect',
+          message: 'Thank you Sharika! The 3D model texturing is 75% complete. We will upload the daylight and evening lighting views by tomorrow afternoon.',
+          timestamp: '2026-11-20T11:15:00Z',
+          read: true,
+        },
+      ],
+      ADMIN: [
+        {
+          id: 'msg-a1',
+          projectId: pid,
+          channel: 'ADMIN',
+          senderId: 'ADMIN-AUDIT',
+          senderName: 'BuildGhar Verification Cell',
+          senderRole: 'Compliance Desk',
+          message: 'Architectural setback audit passed. Setback ratios conform to Indore Municipal Corporation Master Plan 2021.',
+          timestamp: '2026-11-19T14:00:00Z',
+          read: true,
+        },
+      ],
+      CONTRACTOR: [
+        {
+          id: 'msg-k1',
+          projectId: pid,
+          channel: 'CONTRACTOR',
+          senderId: 'CONT-RAJ',
+          senderName: 'Rajesh Construction Works',
+          senderRole: 'Lead Civil Contractor',
+          message: 'Sir, we are preparing the column shuttering for footing C3 and C4. Please confirm the clear cover requirement.',
+          timestamp: '2026-11-21T09:00:00Z',
+          read: true,
+        },
+        {
+          id: 'msg-k2',
+          projectId: pid,
+          channel: 'CONTRACTOR',
+          senderId: 'ARCH-SELF',
+          senderName: user?.name || 'Apex Architectural Studio',
+          senderRole: 'Architect',
+          message: 'Clear cover must strictly be 40mm for footings and 25mm for columns per IS 456 detailing sheet DSG-IND-03.',
+          timestamp: '2026-11-21T09:20:00Z',
+          read: true,
+        },
+      ],
+      INTERIOR_DESIGNER: [],
+    };
+
+    const toSeed = defaultMsgList[ch] || [];
+    toSeed.forEach((m) => sendArchitectChatMessage(m));
+    return toSeed;
+  };
+
   const reloadMessages = () => {
-    setMessages(getArchitectChatMessages(selectedProjectId, activeChannel));
+    const list = ensureChannelMessages(selectedProjectId, activeChannel);
+    setMessages(list);
   };
 
   useEffect(() => {
@@ -46,7 +159,7 @@ export const ArchitectMessages: React.FC = () => {
       projectId: selectedProjectId,
       channel: activeChannel,
       senderId: user?.phone || 'ARCH-AUTH',
-      senderName: user?.name || 'Accredited Architect',
+      senderName: user?.name || 'Apex Architectural Studio',
       senderRole: 'Architect',
       message: inputText.trim(),
     });
@@ -58,136 +171,155 @@ export const ArchitectMessages: React.FC = () => {
   const selectedProj = projects.find((p) => p.id === selectedProjectId) || projects[0];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-full text-[11px] font-black bg-blue-500/20 text-blue-200 border border-blue-400/30 uppercase tracking-wider font-mono">
-                Section 9 & 13 Collaboration
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
-                Multi-Channel Realtime Chat
-              </span>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* =========================================================================
+          PAGE HEADER & SECTION BADGE (Master Spec Section 9)
+      ========================================================================= */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-900 shadow-2xs">
+              <MessageSquare className="w-5 h-5 text-blue-900" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-white">
-              Project Communication & Multi-Stakeholder Collaboration
-            </h1>
-            <p className="text-xs sm:text-sm text-blue-200/80 max-w-2xl mt-1 leading-relaxed">
-              Direct, transparent messaging with Homeowners, Platform Admin, Civil Contractors, and Interior Designers for real-time design alignment.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold font-display text-navy-950">
+                  9. Communication & Multi-Stakeholder Collaboration
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900">
+                  Direct Live Channels
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Multi-channel coordination with Homeowner Clients, Admin Compliance Desk, and Site Contractors.
+              </p>
+            </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="text-xs font-bold px-3 py-2 rounded-xl border border-white/20 bg-white/10 text-white focus:outline-none"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id} className="text-slate-900">
-                  {p.title || p.code}
-                </option>
-              ))}
-              {projects.length === 0 && (
-                <option value="GENERAL" className="text-slate-900">
-                  General Consultation Channel
-                </option>
-              )}
-            </select>
-          </div>
+        {/* Project Selector */}
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            className="text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-hidden"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name || (p as any).title}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* CHAT CONTAINER */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
-        {/* Channel Selection Header */}
-        <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            {[
-              { id: 'CUSTOMER', label: 'Homeowner', icon: User },
-              { id: 'ADMIN', label: 'BuildGhar Admin', icon: ShieldCheck },
-              { id: 'CONTRACTOR', label: 'Civil Contractor', icon: HardHat },
-              { id: 'INTERIOR_DESIGNER', label: 'Interior Designer', icon: Compass },
-            ].map((ch) => {
-              const Icon = ch.icon;
-              return (
-                <button
-                  key={ch.id}
-                  onClick={() => setActiveChannel(ch.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    activeChannel === ch.id
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{ch.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* =========================================================================
+          SECTION 9 SUB-NAVIGATION CHANNELS (9.1 to 9.3)
+      ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold">
+          <button
+            onClick={() => setActiveChannel('CUSTOMER')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeChannel === 'CUSTOMER'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>9.1 Customer Channel (Homeowner)</span>
+          </button>
 
-          <div className="text-xs text-slate-500 font-medium hidden sm:block">
-            Project: <span className="font-bold text-slate-800">{selectedProj?.title || selectedProjectId}</span>
+          <button
+            onClick={() => setActiveChannel('ADMIN')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeChannel === 'ADMIN'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>9.2 Admin & Compliance Desk</span>
+          </button>
+
+          <button
+            onClick={() => setActiveChannel('CONTRACTOR')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeChannel === 'CONTRACTOR'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <HardHat className="w-4 h-4" />
+            <span>9.3 Contractor & Structural Consultant Desk</span>
+          </button>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          CHAT ROOM DESK
+      ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col h-[560px]">
+        {/* Chat Room Banner */}
+        <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+          <div>
+            <span className="font-bold text-slate-900">
+              {activeChannel === 'CUSTOMER'
+                ? `Homeowner Client: ${selectedProj?.customerName || 'Sharika Mishra'}`
+                : activeChannel === 'ADMIN'
+                ? 'BuildGhar Admin Quality & Legal Compliance Desk'
+                : 'Lead Site Contractor & Structural IS 456 Consultant'}
+            </span>
+            <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+              Project: {selectedProj?.name}
+            </div>
           </div>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">
+            Encrypted Project Room
+          </span>
         </div>
 
-        {/* Messages Scroll Area */}
-        <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/50">
+        {/* Message Thread */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50 text-xs">
           {messages.map((m) => {
             const isMe = m.senderRole === 'Architect';
             return (
               <div
                 key={m.id}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                className={`max-w-[80%] rounded-2xl p-4 space-y-1 ${
+                  isMe
+                    ? 'bg-blue-900 text-white ml-auto rounded-tr-none'
+                    : 'bg-white rounded-tl-none border border-slate-200 text-slate-800 shadow-2xs'
+                }`}
               >
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
-                  <span className="font-bold text-slate-600">{m.senderName}</span>
-                  <span>•</span>
-                  <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <div className="flex items-center justify-between gap-3 text-[11px]">
+                  <span className={`font-bold ${isMe ? 'text-blue-200' : 'text-slate-900'}`}>
+                    {m.senderName} ({m.senderRole})
+                  </span>
+                  <span className={`font-mono text-[10px] ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
+                    {formatDate(m.timestamp)}
+                  </span>
                 </div>
-                <div
-                  className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
-                    isMe
-                      ? 'bg-blue-600 text-white rounded-tr-none shadow-sm shadow-blue-600/20'
-                      : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none shadow-sm'
-                  }`}
-                >
-                  {m.message}
-                </div>
+                <p className="leading-relaxed">{m.message}</p>
               </div>
             );
           })}
-
-          {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-2 text-slate-400">
-              <MessageSquare className="w-8 h-8 text-slate-300" />
-              <p className="text-xs font-medium">
-                No messages yet on this channel for {selectedProj?.title || 'this project'}.
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Send a message to initiate project coordination.
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Message Input Box */}
-        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-200 flex items-center gap-2">
+        {/* Chat Composer */}
+        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-200 flex items-center gap-3">
           <input
             type="text"
-            placeholder={`Message ${activeChannel.toLowerCase()} regarding drawings, revisions, or site schedule...`}
+            placeholder={`Message ${activeChannel.toLowerCase()} channel regarding design, drawings, or site queries...`}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:outline-hidden"
           />
           <button
             type="submit"
-            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition shadow-md flex items-center gap-1.5 shrink-0"
+            className="btn-gold px-5 py-2.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="w-4 h-4" />
             <span>Send</span>
           </button>
         </form>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
 import { formatINR, formatDate } from '../../lib/utils.js';
@@ -14,6 +15,13 @@ import {
   CheckCircle2,
   Calendar,
   X,
+  FileText,
+  Mail,
+  Compass,
+  Check,
+  Clock,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { getPlatformBookings, getPlatformRequests } from '../../data/customerStore.js';
 import {
@@ -22,21 +30,41 @@ import {
   ProfessionalCustomerMessage,
 } from '../../data/professionalStore.js';
 
+type TabKey = 'list' | 'requirements' | 'history';
+
 interface AuthorizedCustomer {
   id: string;
   name: string;
   phone: string;
+  email: string;
   projectName: string;
   location: string;
   contractAmountPaise: number;
   projectStatus: string;
   rating?: number;
   feedback?: string;
+  plotSize?: string;
+  vastuPreferences?: string;
+  specialRequirements?: string;
+  approvedDrawingsCount: number;
 }
 
 export const ProfessionalCustomers: React.FC = () => {
   const { user } = useAuth();
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabParam = (searchParams.get('tab') as TabKey) || 'list';
+  const activeTab: TabKey = useMemo(() => {
+    if (tabParam === 'list' || tabParam === 'requirements' || tabParam === 'history') {
+      return tabParam;
+    }
+    return 'list';
+  }, [tabParam]);
+
+  const setActiveTab = (tab: TabKey) => {
+    setSearchParams({ tab });
+  };
 
   const [customers, setCustomers] = useState<AuthorizedCustomer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<AuthorizedCustomer | null>(null);
@@ -45,7 +73,23 @@ export const ProfessionalCustomers: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState(false);
 
   useEffect(() => {
-    // Load authorized customers from real bookings
+    const defaultCustomer: AuthorizedCustomer = {
+      id: 'CUST-IND-992',
+      name: 'Sharika Mishra',
+      phone: '+91 9876543210',
+      email: 'sharika.mishra@example.com',
+      projectName: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+      location: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+      contractAmountPaise: 24000000,
+      projectStatus: 'IN_PROGRESS',
+      rating: 5.0,
+      feedback: 'Exceptionally responsive architect! The 3D elevation and Vastu planning were flawless.',
+      plotSize: '30 ft x 50 ft (1,500 sq.ft) North Facing',
+      vastuPreferences: 'Pooja room in North-East Ishanya kon, Kitchen in South-East Agni kon, Master Bed in South-West Nairutya.',
+      specialRequirements: 'Double-height living room with central skylight and private home theater on second floor.',
+      approvedDrawingsCount: 3,
+    };
+
     const bookings = getPlatformBookings();
     const requests = getPlatformRequests();
 
@@ -55,14 +99,23 @@ export const ProfessionalCustomers: React.FC = () => {
         id: b.id,
         name: b.customerName || 'Homeowner Client',
         phone: b.customerPhone || '+91 98765 00000',
-        projectName: b.serviceTitle || (relatedReq as any)?.propertyType || 'Professionalural Planning & Execution',
+        email: (b as any).customerEmail || 'client@buildghar.com',
+        projectName: b.serviceTitle || (relatedReq as any)?.propertyType || 'Architectural Planning & Execution',
         location: b.siteAddress || (b as any).siteLocation || 'Delhi NCR',
         contractAmountPaise: b.totalAmountPaise || (b as any).totalContractPaise || 24000000,
         projectStatus: b.status,
         rating: 4.9,
-        feedback: 'Excellent Vastu planning and structural layout drawings. Very prompt revisions.',
+        feedback: 'Excellent Vastu planning and structural layout drawings.',
+        plotSize: '30 ft x 50 ft',
+        vastuPreferences: 'North-East entrance preferred.',
+        specialRequirements: 'G+2 modern facade with balcony louvers.',
+        approvedDrawingsCount: 2,
       };
     });
+
+    if (!list.some((c) => c.name === defaultCustomer.name)) {
+      list.unshift(defaultCustomer);
+    }
 
     setCustomers(list);
     if (list.length > 0 && !selectedCustomer) {
@@ -96,88 +149,127 @@ export const ProfessionalCustomers: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold font-display text-navy-950">Customer Management</h1>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900">
-            {customers.length} Authorized Clients
-          </span>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* =========================================================================
+          PAGE HEADER & SECTION BADGE (Master Spec Section 8)
+      ========================================================================= */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-900 shadow-2xs">
+              <Users className="w-5 h-5 text-blue-900" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold font-display text-navy-950">
+                  8. Customer Management & Client Relations
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900">
+                  {customers.length} Verified Homeowners
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Client directory, Vastu briefs, bespoke requirements, approval audit logs, and direct communication.
+              </p>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-slate-500 mt-1">
-          Direct project communication, client feedback, and consultation coordination for assigned homeowners.
-        </p>
       </div>
 
-      {customers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-2xs space-y-3">
-          <Users className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="font-bold text-slate-800 text-sm">No Active Clients Yet</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Once a client accepts and confirms your quotation, their contact and project messaging workspace will unlock here.
-          </p>
+      {/* =========================================================================
+          SECTION 8 SUB-NAVIGATION TABS (8.1 to 8.3)
+      ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'list'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>8.1 My Customers Directory ({customers.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('requirements')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'requirements'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>8.2 Customer Requirements & Vastu Brief</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'history'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>8.3 Approval & Interaction History</span>
+          </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {customers.map((cust) => (
+      </div>
+
+      {/* =========================================================================
+          TAB 1: CUSTOMERS DIRECTORY
+      ========================================================================= */}
+      {activeTab === 'list' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {customers.map((c) => (
             <div
-              key={cust.id}
-              className="bg-white rounded-2xl border border-sky-200/90 p-5 shadow-2xs hover:shadow-md transition space-y-4 text-xs"
+              key={c.id}
+              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 font-black flex items-center justify-center text-sm">
-                    {cust.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{cust.name}</h3>
-                    <div className="text-slate-500 font-mono text-[11px] flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      <span>{cust.phone}</span>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-black text-slate-400">{c.id}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">
+                    {c.projectStatus}
+                  </span>
                 </div>
 
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">
-                  {cust.projectStatus}
-                </span>
-              </div>
-
-              {/* Project & Contract Info */}
-              <div className="space-y-1.5 text-slate-600">
-                <div><strong>Project:</strong> {cust.projectName}</div>
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{cust.location}</span>
-                </div>
                 <div>
-                  <strong>Agreed Scope Value:</strong>{' '}
-                  <span className="font-mono font-bold text-blue-900">{formatINR(cust.contractAmountPaise)}</span>
+                  <h3 className="text-sm font-bold text-navy-950">{c.name}</h3>
+                  <div className="text-xs text-slate-500 font-medium truncate mt-0.5">{c.projectName}</div>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{c.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{c.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{c.location}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Contract Value:</span>
+                  <span className="font-mono font-black text-blue-900">{formatINR(c.contractAmountPaise)}</span>
                 </div>
               </div>
 
-              {/* Feedback Snippet */}
-              {cust.feedback && (
-                <div className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1 text-amber-900 font-bold text-[11px]">
-                    <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                    <span>Client Rating: {cust.rating} / 5.0</span>
-                  </div>
-                  <p className="text-slate-600 text-[11px] italic">"{cust.feedback}"</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Authorized Channel
-                </span>
+              <div className="pt-4 border-t border-slate-100 mt-3 flex items-center gap-2">
                 <button
-                  onClick={() => openChat(cust)}
-                  className="px-3.5 py-1.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold rounded-xl shadow-xs hover:from-sky-700 hover:to-blue-700 transition flex items-center gap-1.5"
+                  onClick={() => openChat(c)}
+                  className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Send Message</span>
+                  <span>Message Client</span>
                 </button>
               </div>
             </div>
@@ -185,79 +277,130 @@ export const ProfessionalCustomers: React.FC = () => {
         </div>
       )}
 
-      {/* Customer Message Dialog */}
+      {/* =========================================================================
+          TAB 2: REQUIREMENTS & VASTU BRIEF
+      ========================================================================= */}
+      {activeTab === 'requirements' && (
+        <div className="space-y-4">
+          {customers.map((c) => (
+            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">{c.name}</h3>
+                  <p className="text-xs text-slate-500">{c.projectName}</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg">
+                  Plot: {c.plotSize || '30x50 ft'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <span className="font-bold text-slate-700 uppercase font-mono tracking-wider text-[10px]">
+                    Vastu & Orientation Brief
+                  </span>
+                  <p className="text-slate-600 leading-relaxed font-sans">
+                    {c.vastuPreferences || 'North-facing layout with clear Brahmasthan.'}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <span className="font-bold text-slate-700 uppercase font-mono tracking-wider text-[10px]">
+                    Special Architectural Directives
+                  </span>
+                  <p className="text-slate-600 leading-relaxed font-sans">
+                    {c.specialRequirements || 'Double height living area with facade louvers.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 3: APPROVAL HISTORY
+      ========================================================================= */}
+      {activeTab === 'history' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
+          <h2 className="text-base font-bold text-navy-950">Customer Design Sign-off & Revision Log</h2>
+          <div className="divide-y divide-slate-100 text-xs">
+            <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-slate-900">Sharika Mishra</span>
+                <span className="text-slate-500 ml-2">signed off on <strong>V2.0 Ground Floor Architectural Plan</strong></span>
+              </div>
+              <span className="font-mono text-slate-400 text-[11px]">2026-11-19 14:30</span>
+            </div>
+            <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-slate-900">Sharika Mishra</span>
+                <span className="text-slate-500 ml-2">requested revision on <strong>V1.0 3D Elevation Render</strong> (Balcony texture)</span>
+              </div>
+              <span className="font-mono text-slate-400 text-[11px]">2026-11-21 11:15</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          DIRECT CLIENT CHAT MODAL
+      ========================================================================= */}
       {showChatModal && selectedCustomer && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-sky-200 space-y-4 animate-in fade-in zoom-in-95 duration-150 flex flex-col h-[520px]">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 shadow-2xl border border-sky-200 flex flex-col h-[520px] animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-800 font-black flex items-center justify-center text-xs">
-                  {selectedCustomer.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">{selectedCustomer.name}</h3>
-                  <p className="text-[10px] text-slate-400 font-mono">{selectedCustomer.projectName}</p>
-                </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">{selectedCustomer.name}</h3>
+                <p className="text-[11px] text-slate-400 font-mono">{selectedCustomer.phone}</p>
               </div>
               <button
                 onClick={() => setShowChatModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Chat Thread */}
-            <div className="flex-1 overflow-y-auto space-y-2.5 p-2 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
-              <div className="text-center py-1">
-                <span className="text-[10px] text-slate-400 font-mono bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                  Encrypted Project Communication Thread
-                </span>
+            {/* Chat Body */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs bg-slate-50/60 rounded-xl my-3">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 max-w-[85%] self-start space-y-1">
+                <span className="font-bold text-slate-800 block text-[11px]">{selectedCustomer.name}</span>
+                <p className="text-slate-600">Hello architect, we reviewed the revised floor plan. The pooja room position looks great now!</p>
+                <span className="text-[10px] text-slate-400 font-mono block text-right">Yesterday 04:30 PM</span>
               </div>
 
-              {messages.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  No prior messages. Type below to communicate with the client regarding design approvals or site visits.
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-3 rounded-xl max-w-[85%] space-y-1 ${
+                    m.sender === 'PROFESSIONAL'
+                      ? 'bg-blue-900 text-white ml-auto'
+                      : 'bg-white rounded-xl border border-slate-200'
+                  }`}
+                >
+                  <p>{m.text}</p>
+                  <span className={`text-[10px] block text-right font-mono ${
+                    m.sender === 'PROFESSIONAL' ? 'text-blue-200' : 'text-slate-400'
+                  }`}>
+                    {formatDate(m.timestamp)}
+                  </span>
                 </div>
-              ) : (
-                messages.map((m) => {
-                  const isMe = m.sender === 'PROFESSIONAL';
-                  return (
-                    <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div
-                        className={`max-w-[80%] p-3 rounded-2xl text-xs space-y-1 ${
-                          isMe
-                            ? 'bg-sky-600 text-white rounded-br-xs'
-                            : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs'
-                        }`}
-                      >
-                        <p>{m.text}</p>
-                        <div
-                          className={`text-[9px] font-mono text-right ${
-                            isMe ? 'text-sky-200' : 'text-slate-400'
-                          }`}
-                        >
-                          {formatDate(m.timestamp)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+              ))}
             </div>
 
-            {/* Input Form */}
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-1">
+            {/* Input Bar */}
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
               <input
                 type="text"
+                placeholder="Type your message to client..."
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
-                placeholder="Type your message, drawing query or site update..."
-                className="flex-1 px-4 py-2.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-hidden"
+                className="flex-1 px-3.5 py-2 border border-slate-300 rounded-xl text-xs focus:outline-hidden"
               />
               <button
                 type="submit"
-                className="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl shadow-xs hover:from-sky-700 hover:to-blue-700 transition"
+                className="btn-gold p-2.5 rounded-xl cursor-pointer"
               >
                 <Send className="w-4 h-4" />
               </button>
