@@ -27,6 +27,7 @@ import { getExecutionProjects } from '../../data/projectExecutionStore.js';
 import { getArchitectAccounts } from '../../data/architectStore.js';
 import { getInteriorDesignerAccounts } from '../../data/interiorDesignerStore.js';
 import { pullFromCloud, clearCloudData } from '../../data/cloudSync.js';
+import { ensureDemoDataInitialized } from '../../data/seedDemoData.js';
 import { useToast } from '../../context/ToastContext.js';
 import {
   Users,
@@ -83,6 +84,12 @@ export const AdminOverview: React.FC = () => {
     } finally {
       setClearing(false);
     }
+  };
+
+  const handleLoadDemoData = () => {
+    ensureDemoDataInitialized(true);
+    setRefreshKey((k) => k + 1);
+    success('Realistic demo data loaded successfully across all modules!');
   };
 
   const handleRefresh = async () => {
@@ -264,6 +271,15 @@ export const AdminOverview: React.FC = () => {
               title="Refresh Platform Analytics & Sync Cloud"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-300' : ''}`} />
+            </button>
+
+            <button
+              onClick={handleLoadDemoData}
+              className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 hover:text-white transition flex items-center gap-1.5 cursor-pointer text-xs font-bold shadow-xs"
+              title="Load Realistic Demo Data for Review"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Load Demo Data</span>
             </button>
 
             <button

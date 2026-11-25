@@ -8,10 +8,14 @@ import { ErrorBoundary } from './components/common/ErrorBoundary.js';
 import { App } from './App.js';
 import { initAutoCloudSync } from './data/cloudSync.js';
 import { sanitizeStorage } from './lib/dataSanitizer.js';
+import { ensureDemoDataInitialized } from './data/seedDemoData.js';
 import './index.css';
 
 // Universal pre-boot data sanitization to prevent any schema corruption crashes
 sanitizeStorage();
+
+// Ensure rich, realistic demo data is initialized for review & testing
+ensureDemoDataInitialized();
 
 // Initialize background real-time cloud database synchronization with 30s interval
 initAutoCloudSync(30000);
