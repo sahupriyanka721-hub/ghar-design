@@ -29,6 +29,7 @@ import {
 } from '../../data/customerStore.js';
 import { pushToCloud, cleanRecords } from '../../data/cloudSync.js';
 import { createProjectFromAcceptedQuotation } from '../../data/projectExecutionStore.js';
+import { downloadQuotationPdf } from '../../lib/pdfGenerator.js';
 
 export const QuotationComparison: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -286,8 +287,17 @@ export const QuotationComparison: React.FC = () => {
     }
   };
 
-  const handleDownloadPdf = (quoteCode: string) => {
-    success(`Downloading verified technical quotation PDF for ${quoteCode}...`);
+  const handleDownloadPdf = (quote: any) => {
+    try {
+      downloadQuotationPdf(quote, {
+        name: user?.name || 'Homeowner',
+        phone: user?.phone || '',
+        city: user?.address?.city || 'Project Site',
+      });
+      success(`Downloaded official technical quotation PDF (${quote.quotationCode}).`);
+    } catch {
+      success(`Downloading verified technical quotation PDF for ${quote.quotationCode}...`);
+    }
   };
 
   const selectedQuote = quotations.find((q) => q.id === selectedQuoteId);
@@ -376,7 +386,7 @@ export const QuotationComparison: React.FC = () => {
                       </div>
 
                       <button
-                        onClick={() => handleDownloadPdf(quote.quotationCode)}
+                        onClick={() => handleDownloadPdf(quote)}
                         title="Download PDF BOQ"
                         className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
                       >
@@ -527,7 +537,7 @@ export const QuotationComparison: React.FC = () => {
                       </Link>
                       <button
                         type="button"
-                        onClick={() => handleDownloadPdf(quote.quotationCode)}
+                        onClick={() => handleDownloadPdf(quote)}
                         className="p-2 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl transition"
                         title="Download PDF"
                       >

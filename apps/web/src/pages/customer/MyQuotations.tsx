@@ -432,22 +432,31 @@ export const MyQuotations: React.FC = () => {
   }, [user?.phone, user?.id]);
 
   const filterTabs = [
-    'ALL',
-    'PUBLISHED',
-    'SELECTED',
-    'UNDER_ADMIN_REVIEW',
-    'EXPIRED',
+    { key: 'ALL', label: 'All Quotations' },
+    { key: 'PENDING', label: 'Pending Quotations' },
+    { key: 'RECEIVED', label: 'Received Quotations' },
+    { key: 'UNDER_REVIEW', label: 'Under Review' },
+    { key: 'APPROVED', label: 'Approved Quotations' },
+    { key: 'REJECTED', label: 'Rejected Quotations' },
+    { key: 'EXPIRED', label: 'Expired Quotations' },
   ];
 
   const filteredQuotes = quotations
     .filter((q) => {
       if (filterStatus !== 'ALL') {
-        if (filterStatus === 'PUBLISHED') {
+        if (filterStatus === 'PENDING') {
+          if (q.status !== 'SUBMITTED' && q.status !== 'DRAFT' && q.status !== 'PENDING') return false;
+        } else if (filterStatus === 'RECEIVED') {
           if (q.status !== 'PUBLISHED' && q.status !== 'PUBLISHED_TO_CUSTOMER' && q.status !== 'APPROVED') return false;
-        } else if (filterStatus === 'SELECTED') {
-          if (q.status !== 'SELECTED' && q.status !== 'ACCEPTED' && q.status !== 'CONFIRMED') return false;
-        } else if (filterStatus === 'UNDER_ADMIN_REVIEW') {
-          if (q.status !== 'UNDER_ADMIN_REVIEW' && q.status !== 'SUBMITTED_BY_PRO') return false;
+        } else if (filterStatus === 'UNDER_REVIEW') {
+          if (q.status !== 'UNDER_ADMIN_REVIEW' && q.status !== 'UNDER_REVIEW' && q.status !== 'SUBMITTED_BY_PRO') return false;
+        } else if (filterStatus === 'APPROVED') {
+          if (q.status !== 'APPROVED' && q.status !== 'SELECTED' && q.status !== 'ACCEPTED' && q.status !== 'CONFIRMED' && !Boolean((q as any).isBooked)) return false;
+        } else if (filterStatus === 'REJECTED') {
+          if (q.status !== 'REJECTED' && !(q as any).isDismissed) return false;
+        } else if (filterStatus === 'EXPIRED') {
+          const isPast = q.validUntil && new Date(q.validUntil) < new Date();
+          if (q.status !== 'EXPIRED' && !isPast) return false;
         } else if (q.status !== filterStatus) {
           return false;
         }
@@ -599,15 +608,15 @@ export const MyQuotations: React.FC = () => {
         <div className="flex gap-1.5 overflow-x-auto pb-1 text-[11px] whitespace-nowrap">
           {filterTabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setFilterStatus(tab)}
+              key={tab.key}
+              onClick={() => setFilterStatus(tab.key)}
               className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                filterStatus === tab
+                filterStatus === tab.key
                   ? 'bg-navy-950 text-gold-400 shadow-2xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {tab.replace(/_/g, ' ')}
+              {tab.label}
             </button>
           ))}
         </div>
