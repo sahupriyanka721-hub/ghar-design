@@ -840,6 +840,13 @@ export const clearAllPlatformData = (): void => {
     'material_orders',
     'customer_cart',
     'customer_addresses',
+    'ghar_architect_designs',
+    'ghar_architect_boqs',
+    'ghar_architect_site_visits',
+    'ghar_architect_deliverables',
+    'ghar_architect_reviews',
+    'ghar_architect_notifications',
+    'ghar_architect_messages',
   ];
 
   for (const k of keysToReset) {
