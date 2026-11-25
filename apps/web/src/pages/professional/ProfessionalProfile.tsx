@@ -24,6 +24,12 @@ import {
   CreditCard,
   Clock,
   Upload,
+  GraduationCap,
+  Languages,
+  Sparkles,
+  Eye,
+  Download,
+  Calendar,
 } from 'lucide-react';
 import {
   getProfessionalByPhone,
@@ -511,36 +517,109 @@ export const ProfessionalProfile: React.FC = () => {
 
         {/* Tab 1: Personal Details */}
         {activeTab === 'PERSONAL' && (
-          <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-xl">
-              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Full Name</span>
-              <span className="font-bold text-slate-800">{fullName}</span>
+          <div className="pt-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Full Name</span>
+                <span className="font-bold text-slate-800">{fullName}</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Designation / Title</span>
+                <span className="font-bold text-slate-800">{designation}</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Experience</span>
+                <span className="font-bold text-slate-800">
+                  {architect?.experienceYears || professional?.personal?.experienceYears || 8} Years in Practice
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Mobile Phone</span>
+                <span className="font-bold text-slate-800 font-mono">{phoneDisplay || '—'}</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Alternate Phone / WhatsApp</span>
+                <span className="font-bold text-slate-800 font-mono">
+                  {architect?.alternatePhone ? `+91 ${architect.alternatePhone}` : '—'}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Date of Birth & Gender</span>
+                <span className="font-bold text-slate-800">
+                  {architect?.dob || '—'} {architect?.gender ? `(${architect.gender})` : ''}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Highest Qualification</span>
+                <span className="font-bold text-slate-800">
+                  {architect?.qualification || 'B.Arch'} {architect?.degree ? `(${architect.degree})` : ''}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">College / University & Year</span>
+                <span className="font-bold text-slate-800">
+                  {architect?.university || 'Accredited Architecture Institute'} {architect?.graduationYear ? `(${architect.graduationYear})` : ''}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Primary Specialization</span>
+                <span className="font-bold text-sky-800">
+                  {architect?.specialization || 'Residential Architecture & Luxury Houses'}
+                </span>
+              </div>
             </div>
-            <div className="p-3.5 bg-slate-50 rounded-xl">
-              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Designation</span>
-              <span className="font-bold text-slate-800">{designation}</span>
+
+            {/* Consultation Languages & Software Skills */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 bg-slate-50 rounded-2xl space-y-2 border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold flex items-center gap-1.5">
+                  <Languages className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Consultation Languages</span>
+                </span>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(architect?.languages && architect.languages.length > 0 ? architect.languages : ['English', 'Hindi']).map((lang) => (
+                    <span key={lang} className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-[11px] font-bold">
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl space-y-2 border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>CAD & 3D Drafting Software Proficiencies</span>
+                </span>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(architect?.skills && architect.skills.length > 0 ? architect.skills : ['AutoCAD', 'Revit BIM', 'SketchUp', '3ds Max', 'Lumion']).map((skill) => (
+                    <span key={skill} className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 text-[11px] font-bold">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="p-3.5 bg-slate-50 rounded-xl">
-              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Experience</span>
-              <span className="font-bold text-slate-800">
-                {architect?.experienceYears || professional?.personal?.experienceYears || 8} Years in Practice
-              </span>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-xl sm:col-span-2">
-              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Professional Bio</span>
-              <p className="text-slate-700 mt-1 leading-relaxed">
-                {architect?.bio ||
-                  professional?.personal?.bio ||
-                  'Specializing in modern contemporary residential villas, luxury floor layouts, high-accuracy BOQ estimation, and IS 456 compliant structural drafting.'}
-              </p>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-xl">
-              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">
-                {isArchitect ? 'Council of Architecture (COA) Status' : 'IEI Registration Status'}
-              </span>
-              <span className="font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Active & Verified
-              </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl sm:col-span-2">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Professional Bio & Philosophy</span>
+                <p className="text-slate-700 mt-1 leading-relaxed">
+                  {architect?.bio ||
+                    professional?.personal?.bio ||
+                    'Specializing in modern contemporary residential villas, luxury floor layouts, high-accuracy BOQ estimation, and IS 456 compliant structural drafting.'}
+                </p>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">
+                  {isArchitect ? 'Council of Architecture (COA) Status' : 'IEI Registration Status'}
+                </span>
+                <span className="font-bold text-emerald-800 flex items-center gap-1 mt-1">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Active & Statutory Verified
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-1">
+                  COA Number: <strong className="font-mono text-slate-800">{architect?.coaNumber || 'CA/VERIFIED'}</strong>
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -561,6 +640,14 @@ export const ProfessionalProfile: React.FC = () => {
               <span className="font-bold text-slate-800">{architect?.establishmentYear || professional?.business?.establishmentYear || 2018}</span>
             </div>
             <div className="p-3.5 bg-slate-50 rounded-xl">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Studio Official Email</span>
+              <span className="font-bold text-slate-800">{architect?.businessEmail || '—'}</span>
+            </div>
+            <div className="p-3.5 bg-slate-50 rounded-xl">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Studio Desk Phone</span>
+              <span className="font-mono font-bold text-slate-800">{architect?.businessPhone || '—'}</span>
+            </div>
+            <div className="p-3.5 bg-slate-50 rounded-xl">
               <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Team Strength</span>
               <span className="font-bold text-slate-800">
                 {architect?.teamSize || professional?.business?.teamSize || 6} Total ({(architect as any)?.architectsCount || professional?.business?.professionalsCount || 3} Architects/Engineers)
@@ -574,12 +661,20 @@ export const ProfessionalProfile: React.FC = () => {
               <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">GSTIN (Optional)</span>
               <span className="font-mono font-bold text-slate-800">{architect?.gstin || professional?.business?.gstin || '07AAAAA0000A1Z5'}</span>
             </div>
-            {architect?.coaNumber && (
-              <div className="p-3.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">COA Registration Number</span>
-                <span className="font-mono font-bold text-blue-800">{architect.coaNumber}</span>
-              </div>
-            )}
+            <div className="p-3.5 bg-slate-50 rounded-xl">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">COA Registration Number</span>
+              <span className="font-mono font-bold text-blue-800">{architect?.coaNumber || 'CA/VERIFIED'}</span>
+            </div>
+            <div className="p-3.5 bg-slate-50 rounded-xl sm:col-span-2">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Registered Office Address</span>
+              <span className="font-medium text-slate-800">
+                {architect?.address ? `${architect.address}, ${architect.district ? architect.district + ', ' : ''}${architect.city}, ${architect.state} - ${architect.pincode}` : '—'}
+              </span>
+            </div>
+            <div className="p-3.5 bg-slate-50 rounded-xl">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold">Firm / MSME / ROC Reg No</span>
+              <span className="font-mono font-bold text-slate-800">{architect?.firmRegistrationNumber || 'UDYAM Registered'}</span>
+            </div>
           </div>
         )}
 
@@ -707,21 +802,65 @@ export const ProfessionalProfile: React.FC = () => {
 
         {/* Tab 6: Service Areas */}
         {activeTab === 'AREAS' && (
-          <div className="pt-6 space-y-3 text-xs">
-            <div className="text-slate-500">Operating geographic locations for site visits and offline inspections:</div>
-            <div className="flex flex-wrap gap-2">
-              {(architect?.serviceCities && architect.serviceCities.length > 0
-                ? architect.serviceCities
-                : professional?.business?.serviceCities || ['Delhi NCR', 'Noida', 'Greater Noida', 'Gurugram', 'Faridabad', 'Ghaziabad']
-              ).map((c, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-900 font-bold border border-sky-200 flex items-center gap-1.5"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-sky-600" />
-                  <span>{c}</span>
-                </span>
-              ))}
+          <div className="pt-6 space-y-5 text-xs">
+            {/* Pan-India Remote Consultation Status */}
+            <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-sky-600 text-white shrink-0 mt-0.5">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-navy-950 text-sm flex items-center gap-2">
+                    <span>Pan-India Remote Architectural Consultation</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
+                      {architect?.remoteConsultation ? 'Active' : 'Regional Only'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Your practice accepts digital blueprint commissions, structural analysis, and video consultations across all Indian states and union territories.
+                  </p>
+                </div>
+              </div>
+              <span className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 text-center ${
+                architect?.remoteConsultation
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-slate-200 text-slate-700'
+              }`}>
+                {architect?.remoteConsultation ? '✓ Enabled' : 'Disabled'}
+              </span>
+            </div>
+
+            <div>
+              <div className="text-slate-600 font-bold mb-2 flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-sky-600" />
+                <span>Operating Geographic Cities (Site Inspections & Municipal Liaising):</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(architect?.serviceCities && architect.serviceCities.length > 0
+                  ? architect.serviceCities
+                  : professional?.business?.serviceCities || ['Delhi NCR', 'Noida', 'Greater Noida', 'Gurugram', 'Faridabad', 'Ghaziabad']
+                ).map((c, idx) => (
+                  <span
+                    key={idx}
+                    className="px-3 py-1.5 rounded-xl bg-white text-navy-950 font-bold border border-slate-200 shadow-2xs flex items-center gap-1.5"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{c}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Serviced Pincodes */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 font-mono uppercase block font-bold mb-1">
+                Serviced Local Pincodes (Hyper-Local Site Coordination)
+              </span>
+              <p className="font-mono text-slate-700 font-bold">
+                {architect?.servicePincodes && architect.servicePincodes.length > 0
+                  ? architect.servicePincodes.join(', ')
+                  : 'All sectors and PIN codes within operating metropolitan cities.'}
+              </p>
             </div>
           </div>
         )}

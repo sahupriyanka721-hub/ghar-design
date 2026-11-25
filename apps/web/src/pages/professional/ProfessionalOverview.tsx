@@ -48,11 +48,19 @@ import {
   getArchitectReviews,
   getArchitectChatMessages,
 } from '../../data/architectPanelStore.js';
+import {
+  getArchitectByPhone,
+  getArchitectAccounts,
+  formatArchitectId,
+} from '../../data/architectStore.js';
 
 export const ProfessionalOverview: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [dateFilter, setDateFilter] = useState<'7D' | '30D' | 'ALL'>('ALL');
+
+  const cleanPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+  const realArch = cleanPhone ? getArchitectByPhone(cleanPhone) : (getArchitectAccounts()[0] || null);
 
   // Load real store data with fallback to primary professional fixture
   const archAccount =
@@ -140,7 +148,7 @@ export const ProfessionalOverview: React.FC = () => {
   const pendingPaymentsPaise = Math.max(0, totalContractPaise - totalEarningsPaise);
 
   const firmTitle =
-    archAccount?.business?.firmName || archAccount?.personal?.name || (user?.name ? `${user.name}` : 'Accredited Architecture Firm');
+    realArch?.firmName || archAccount?.business?.firmName || realArch?.name || archAccount?.personal?.name || (user?.name ? `${user.name}` : 'Accredited Architecture Firm');
 
   // 10 Summary Cards Definition
   const summaryCards = [
