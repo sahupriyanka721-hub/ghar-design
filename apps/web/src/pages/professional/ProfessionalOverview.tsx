@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import { Badge } from '../../components/common/Badge.js';
 import { formatINR, formatDate } from '../../lib/utils.js';
@@ -22,6 +22,16 @@ import {
   MapPin,
   Calendar,
   MessageSquare,
+  Compass,
+  FileUp,
+  ListTodo,
+  CheckSquare,
+  DollarSign,
+  BarChart3,
+  Bell,
+  Star,
+  ChevronRight,
+  FolderOpen,
 } from 'lucide-react';
 import { getPlatformRequests, getPlatformBookings, syncChannel } from '../../data/customerStore.js';
 import { getExecutionProjects } from '../../data/projectExecutionStore.js';
@@ -30,413 +40,750 @@ import {
   getProfessionalAccounts,
   getProfessionalPayoutRequests,
 } from '../../data/professionalStore.js';
+import {
+  getArchitectDesigns,
+  getArchitectDeliverables,
+  getArchitectSiteVisits,
+  getArchitectNotifications,
+  getArchitectReviews,
+  getArchitectChatMessages,
+} from '../../data/architectPanelStore.js';
 
 export const ProfessionalOverview: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [dateFilter, setDateFilter] = useState<'7D' | '30D' | 'ALL'>('ALL');
 
   // Load real store data with fallback to primary professional fixture
   const archAccount =
     (user?.phone ? getProfessionalByPhone(user.phone) : null) || getProfessionalAccounts()[0] || null;
+
   const [requests, setRequests] = useState(() =>
     getPlatformRequests().filter((r) => !r.categorySlug || !r.categorySlug.toLowerCase().includes('interior'))
   );
+  const [bookings, setBookings] = useState(() => getPlatformBookings());
+  const [projects, setProjects] = useState(() => getExecutionProjects());
+  const [designs, setDesigns] = useState(() => getArchitectDesigns());
+  const [deliverables, setDeliverables] = useState(() => getArchitectDeliverables());
+  const [siteVisits, setSiteVisits] = useState(() => getArchitectSiteVisits());
+  const [notifications, setNotifications] = useState(() => getArchitectNotifications());
+  const [reviews, setReviews] = useState(() => getArchitectReviews());
+
+  const refreshAllData = () => {
+    setRequests(
+      getPlatformRequests().filter((r) => !r.categorySlug || !r.categorySlug.toLowerCase().includes('interior'))
+    );
+    setBookings(getPlatformBookings());
+    setProjects(getExecutionProjects());
+    setDesigns(getArchitectDesigns());
+    setDeliverables(getArchitectDeliverables());
+    setSiteVisits(getArchitectSiteVisits());
+    setNotifications(getArchitectNotifications());
+    setReviews(getArchitectReviews());
+  };
 
   useEffect(() => {
-    const loadRequests = () => {
-      setRequests(
-        getPlatformRequests().filter((r) => !r.categorySlug || !r.categorySlug.toLowerCase().includes('interior'))
-      );
-    };
-    window.addEventListener('storage', loadRequests);
+    window.addEventListener('storage', refreshAllData);
     const onSync = (event: MessageEvent) => {
       if (
         event.data?.type === 'PROJECT_REQUESTS_UPDATED' ||
-        event.data?.type === 'QUOTATIONS_UPDATED'
+        event.data?.type === 'QUOTATIONS_UPDATED' ||
+        event.data?.type === 'ARCHITECT_DESIGNS_UPDATED' ||
+        event.data?.type === 'ARCHITECT_DELIVERABLES_UPDATED' ||
+        event.data?.type === 'ARCHITECT_SITE_VISITS_UPDATED' ||
+        event.data?.type === 'ARCHITECT_NOTIFICATIONS_UPDATED' ||
+        event.data?.type === 'EXECUTION_PROJECTS_UPDATED'
       ) {
-        loadRequests();
+        refreshAllData();
       }
     };
     if (syncChannel) {
       syncChannel.addEventListener('message', onSync);
     }
     return () => {
-      window.removeEventListener('storage', loadRequests);
+      window.removeEventListener('storage', refreshAllData);
       if (syncChannel) {
         syncChannel.removeEventListener('message', onSync);
       }
     };
   }, []);
-  const bookings = getPlatformBookings();
-  const projects = getExecutionProjects();
+
   const payouts = getProfessionalPayoutRequests(user?.phone || '');
 
-  // Summary Metrics
-  const totalAssigned = requests.length;
-  const draftQuotations = 1;
-  const submittedQuotations = Math.max(1, requests.length);
-  const awaitingRevision = 0;
-  const customerSelected = bookings.length;
-  const activeBookings = bookings.filter((b) => b.status === 'CONFIRMED' || b.status === 'PENDING').length;
+  // 10 Summary KPIs (Real Records Only)
+  const totalAssignedRequests = requests.length;
+  const newQuotationRequests = requests.filter((r) => r.status === 'ASSIGNED' || r.status === 'PENDING').length;
+  const pendingQuotations = requests.filter((r) => r.status === 'QUOTED' || r.status === 'SUBMITTED').length;
+  const acceptedQuotations = bookings.length;
   const activeProjects = projects.filter((p) => p.status !== 'COMPLETED' && p.status !== 'CANCELLED').length;
   const completedProjects = projects.filter((p) => p.status === 'COMPLETED').length;
-  const totalContractPaise = projects.reduce((acc, p) => acc + (p.contractValuePaise || (p as any).totalContractPaise || 0), 0) ;
-  const totalEarningsPaise = Math.round(totalContractPaise * 0.45);
-  const pendingPaymentsPaise = Math.round(totalContractPaise * 0.55);
+  const pendingDesignApprovals = designs.filter(
+    (d) => d.status === 'PENDING_CUSTOMER_APPROVAL' || d.status === 'SUBMITTED_TO_ADMIN'
+  ).length;
 
-  const firmTitle = archAccount?.business?.firmName || (user?.name ? `${user.name}` : 'Associate Professional Firm');
+  const now = new Date().getTime();
+  const upcomingDeadlines = deliverables.filter((d) => {
+    if (d.status === 'COMPLETED') return false;
+    const diffDays = (new Date(d.dueDate).getTime() - now) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 7;
+  }).length;
+
+  const totalContractPaise = projects.reduce(
+    (acc, p) => acc + (p.contractValuePaise || (p as any).totalContractPaise || 0),
+    0
+  );
+  // Real earnings from paid milestone portions
+  const totalEarningsPaise = projects.reduce((acc, p) => {
+    const paidMilestones = p.milestones?.filter((m) => m.paymentStatus === 'PAID') || [];
+    return acc + paidMilestones.reduce((mAcc, m) => mAcc + m.amountPaise, 0);
+  }, 0);
+  const pendingPaymentsPaise = Math.max(0, totalContractPaise - totalEarningsPaise);
+
+  const firmTitle =
+    archAccount?.business?.firmName || archAccount?.personal?.name || (user?.name ? `${user.name}` : 'Accredited Architecture Firm');
+
+  // 10 Summary Cards Definition
+  const summaryCards = [
+    {
+      title: 'Total Assigned Requests',
+      value: totalAssignedRequests,
+      subtext: 'Homeowner briefs allocated by Admin',
+      icon: Inbox,
+      color: 'blue',
+      link: '/professional/assigned',
+    },
+    {
+      title: 'New Quotation Requests',
+      value: newQuotationRequests,
+      subtext: 'Awaiting quotation preparation',
+      icon: PlusCircle,
+      color: 'amber',
+      link: '/professional/assigned',
+    },
+    {
+      title: 'Pending Quotations',
+      value: pendingQuotations,
+      subtext: 'Under admin review or homeowner bid review',
+      icon: Clock,
+      color: 'indigo',
+      link: '/professional/quotations',
+    },
+    {
+      title: 'Accepted Quotations',
+      value: acceptedQuotations,
+      subtext: 'Confirmed homeowner bids & bookings',
+      icon: FileCheck2,
+      color: 'emerald',
+      link: '/professional/quotations/approved',
+    },
+    {
+      title: 'Active Projects',
+      value: activeProjects,
+      subtext: 'Ongoing architectural design execution',
+      icon: Layers,
+      color: 'sky',
+      link: '/professional/projects',
+    },
+    {
+      title: 'Completed Projects',
+      value: completedProjects,
+      subtext: 'Successfully handed over designs',
+      icon: CheckCircle2,
+      color: 'emerald',
+      link: '/professional/projects?status=completed',
+    },
+    {
+      title: 'Pending Design Approvals',
+      value: pendingDesignApprovals,
+      subtext: 'Drawings awaiting client review',
+      icon: Compass,
+      color: 'purple',
+      link: '/professional/designs',
+    },
+    {
+      title: 'Upcoming Deadlines',
+      value: upcomingDeadlines,
+      subtext: 'Deliverables due within 7 days',
+      icon: CalendarCheck,
+      color: 'rose',
+      link: '/professional/deliverables',
+    },
+    {
+      title: 'Total Earnings',
+      value: formatINR(totalEarningsPaise),
+      subtext: 'Released professional fees & payouts',
+      icon: DollarSign,
+      color: 'emerald',
+      link: '/professional/billing',
+    },
+    {
+      title: 'Pending Payments',
+      value: formatINR(pendingPaymentsPaise),
+      subtext: 'Escrow locked milestone balances',
+      icon: CreditCard,
+      color: 'amber',
+      link: '/professional/billing',
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Top Banner with Light Blue Background & High-Contrast Visible Typography */}
+      {/* Top Banner with Real Identity */}
       <div className="bg-gradient-to-br from-[#e8f3fe] via-[#f1f7fe] to-[#e4f0fc] text-slate-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-200/90 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-blue-300/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute left-10 -bottom-10 w-60 h-60 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 rounded-full text-[11px] font-black bg-blue-100 text-blue-900 border border-blue-200 uppercase tracking-wider font-mono">
-                Civil Engineering Practice
+                Architectural Practice Desk
               </span>
               <span className="flex items-center gap-1 text-[11px] text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> IEI Accredited
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Council of Architecture (COA) Accredited
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-navy-950">
               {firmTitle}
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-2xl leading-relaxed">
-              Real-time engineering operations desk: assigned homeowner briefs, IS 456 compliant progress tracking, and milestone escrow settlements.
+              Professional Architectural Management Desk: Receive assigned homeowner inquiries, build itemized BOQ quotations, submit drawings for multi-tier verification, and manage milestone disbursements.
             </p>
           </div>
 
-          {/* Quick Actions & Date Filter */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-1 border border-blue-200/90 shadow-2xs flex text-xs font-bold text-slate-700">
-              {(['7D', '30D', 'ALL'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setDateFilter(mode)}
-                  className={`px-3 py-1.5 rounded-xl transition font-bold ${
-                    dateFilter === mode ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-navy-950 hover:bg-blue-50'
-                  }`}
-                >
-                  {mode === '7D' ? 'Last 7 Days' : mode === '30D' ? 'Last 30 Days' : 'All Time'}
-                </button>
-              ))}
-            </div>
-
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/professional/assigned"
+              className="px-4 py-2.5 rounded-xl bg-sky-600 text-white font-bold text-xs hover:bg-sky-700 shadow-md shadow-sky-600/20 transition flex items-center gap-2"
+            >
+              <Inbox className="w-4 h-4" />
+              <span>Assigned Briefs ({requests.length})</span>
+            </Link>
             <Link
               to="/professional/quotation-builder"
-              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-2xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 active:scale-98"
+              className="px-4 py-2.5 rounded-xl bg-white text-navy-950 font-bold text-xs border border-slate-200 hover:bg-slate-50 transition flex items-center gap-2 shadow-sm"
             >
-              <PlusCircle className="w-4 h-4 text-white" />
-              <span>Create BOQ Quotation</span>
+              <PlusCircle className="w-4 h-4 text-sky-600" />
+              <span>Generate Quotation</span>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* 10 Summary Cards Grid (Master Prompt Section 8) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* 1. Total Assigned Requests */}
-        <Link
-          to="/professional/assigned"
-          className="bg-white p-4 rounded-2xl border border-sky-200/90 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Assigned Requests
-          </div>
-          <div className="text-xl font-black text-navy-950 font-mono">{totalAssigned}</div>
-          <span className="text-[10px] text-sky-800 font-bold flex items-center gap-1">
-            View allocated <ArrowRight className="w-3 h-3" />
-          </span>
-        </Link>
+      {/* QUICK ACTIONS BAR (6 Quick Actions) */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+        <h2 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <span>Quick Actions</span>
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <button
+            onClick={() => navigate('/professional/quotation-builder')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 hover:border-sky-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <PlusCircle className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">Generate Quotation</div>
+              <div className="text-[10px] text-slate-500">Prepare BOQ</div>
+            </div>
+          </button>
 
-        {/* 2. Quotations in Draft */}
-        <Link
-          to="/professional/quotations"
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Draft Quotations
-          </div>
-          <div className="text-xl font-black text-slate-700 font-mono">{draftQuotations}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Unsubmitted drafts</span>
-        </Link>
+          <button
+            onClick={() => navigate('/professional/assigned')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 hover:border-amber-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <Inbox className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">View Requests</div>
+              <div className="text-[10px] text-slate-500">New assignments</div>
+            </div>
+          </button>
 
-        {/* 3. Quotations Submitted */}
-        <Link
-          to="/professional/quotations"
-          className="bg-white p-4 rounded-2xl border border-sky-200/90 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Bids Submitted
-          </div>
-          <div className="text-xl font-black text-sky-800 font-mono">{submittedQuotations}</div>
-          <span className="text-[10px] text-sky-800 font-bold">Admin review queue</span>
-        </Link>
+          <button
+            onClick={() => navigate('/professional/designs?tab=house-maps')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 hover:border-indigo-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">Create House Map</div>
+              <div className="text-[10px] text-slate-500">Floor planning</div>
+            </div>
+          </button>
 
-        {/* 4. Quotations Awaiting Revision */}
-        <Link
-          to="/professional/quotations"
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-amber-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Revisions Req.
-          </div>
-          <div className="text-xl font-black text-amber-800 font-mono">{awaitingRevision}</div>
-          <span className="text-[10px] text-amber-700 font-medium">Action pending</span>
-        </Link>
+          <button
+            onClick={() => navigate('/professional/designs?action=upload')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-purple-50 border border-slate-200/80 hover:border-purple-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <FileUp className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">Upload Design</div>
+              <div className="text-[10px] text-slate-500">2D / 3D drawings</div>
+            </div>
+          </button>
 
-        {/* 5. Customer-Selected Quotations */}
-        <Link
-          to="/professional/quotations/approved"
-          className="bg-white p-4 rounded-2xl border border-blue-200/90 shadow-2xs hover:border-blue-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-blue-700 font-bold uppercase truncate">
-            Customer Selected
-          </div>
-          <div className="text-xl font-black text-blue-900 font-mono">{customerSelected}</div>
-          <span className="text-[10px] text-blue-800 font-bold flex items-center gap-1">
-            Confirmed bids <ArrowRight className="w-3 h-3" />
-          </span>
-        </Link>
+          <button
+            onClick={() => navigate('/professional/site-visits?action=schedule')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 hover:border-emerald-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">Schedule Site Visit</div>
+              <div className="text-[10px] text-slate-500">Site measurement</div>
+            </div>
+          </button>
 
-        {/* 6. Active Bookings */}
-        <Link
-          to="/professional/bookings"
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Active Bookings
-          </div>
-          <div className="text-xl font-black text-slate-900 font-mono">{activeBookings}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Site visits & contracts</span>
-        </Link>
-
-        {/* 7. Active Projects */}
-        <Link
-          to="/professional/projects"
-          className="bg-white p-4 rounded-2xl border border-sky-200/90 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-sky-800 font-bold uppercase truncate">
-            Active Projects
-          </div>
-          <div className="text-xl font-black text-sky-900 font-mono">{activeProjects}</div>
-          <span className="text-[10px] text-sky-800 font-bold">IS 456 tracking</span>
-        </Link>
-
-        {/* 8. Completed Projects */}
-        <Link
-          to="/professional/projects"
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase truncate">
-            Completed Projects
-          </div>
-          <div className="text-xl font-black text-slate-800 font-mono">{completedProjects}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Handed over</span>
-        </Link>
-
-        {/* 9. Pending Payments */}
-        <Link
-          to="/professional/billing"
-          className="bg-white p-4 rounded-2xl border border-amber-200/90 shadow-2xs hover:border-amber-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-amber-700 font-bold uppercase truncate">
-            Pending Escrow
-          </div>
-          <div className="text-sm font-black text-amber-900 font-mono truncate">
-            {formatINR(pendingPaymentsPaise)}
-          </div>
-          <span className="text-[10px] text-amber-700 font-medium">Stage locked</span>
-        </Link>
-
-        {/* 10. Total Earnings */}
-        <Link
-          to="/professional/billing"
-          className="bg-white p-4 rounded-2xl border border-emerald-200/90 shadow-2xs hover:border-emerald-400 hover:shadow-xs transition space-y-1 block"
-        >
-          <div className="text-[10px] font-mono text-emerald-700 font-bold uppercase truncate">
-            Total Earnings
-          </div>
-          <div className="text-sm font-black text-emerald-800 font-mono truncate">
-            {formatINR(totalEarningsPaise)}
-          </div>
-          <span className="text-[10px] text-emerald-700 font-bold">Disbursed & ready</span>
-        </Link>
+          <button
+            onClick={() => navigate('/professional/projects')}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 hover:border-blue-200 text-left transition group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 truncate">View Projects</div>
+              <div className="text-[10px] text-slate-500">Active contracts</div>
+            </div>
+          </button>
+        </div>
       </div>
 
-      {/* Main Two Columns Dashboard Body */}
+      {/* 10 SUMMARY KPI CARDS */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-black text-navy-950 uppercase tracking-wide">
+            10 Key Performance Indicators (KPIs)
+          </h2>
+          <span className="text-[11px] font-semibold text-slate-500">
+            Real-time synced across BuildGhar database
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {summaryCards.map((card, idx) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={idx}
+                to={card.link}
+                className="bg-white p-4 rounded-2xl border border-slate-200/80 hover:border-sky-300 hover:shadow-md transition flex flex-col justify-between group"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      card.color === 'blue'
+                        ? 'bg-blue-50 text-blue-600'
+                        : card.color === 'amber'
+                        ? 'bg-amber-50 text-amber-600'
+                        : card.color === 'indigo'
+                        ? 'bg-indigo-50 text-indigo-600'
+                        : card.color === 'purple'
+                        ? 'bg-purple-50 text-purple-600'
+                        : card.color === 'rose'
+                        ? 'bg-rose-50 text-rose-600'
+                        : card.color === 'sky'
+                        ? 'bg-sky-50 text-sky-600'
+                        : 'bg-emerald-50 text-emerald-600'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-500 leading-tight mb-1 truncate">
+                    {card.title}
+                  </div>
+                  <div className="text-xl font-black text-navy-950 tracking-tight">
+                    {card.value}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1 line-clamp-1">
+                    {card.subtext}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 10 DASHBOARD WIDGETS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (2 Cols) */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Active Projects Execution Snapshot */}
-          <div className="bg-white rounded-2xl border border-sky-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
+        {/* WIDGET 1: New Quotation Requests */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Active Projects Execution & Progress</h3>
+                <Inbox className="w-4 h-4 text-sky-600" />
+                <h3 className="text-sm font-bold text-navy-950">1. New Quotation Requests</h3>
               </div>
-              <Link
-                to="/professional/projects"
-                className="text-xs font-bold text-sky-800 hover:text-navy-950 flex items-center gap-1"
-              >
-                <span>Full Workspace</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+              <Link to="/professional/assigned" className="text-xs text-sky-600 hover:underline font-bold">
+                View All ({requests.length})
               </Link>
             </div>
-
-            {projects.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">No active projects linked yet.</div>
-            ) : (
-              <div className="space-y-4">
-                {projects.slice(0, 3).map((p) => (
-                  <div key={p.id} className="p-4 rounded-xl border border-slate-200 hover:border-sky-300 transition space-y-2.5 text-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-black text-sky-700">{(p as any).projectCode || p.requestCode || p.id}</span>
-                          <span className="font-bold text-slate-900">{(p as any).title || p.name}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Client: {p.customerName} • {(p as any).location?.locality || p.propertyAddress || p.city || 'Site'}, {(p as any).location?.city || p.city || ''}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-blue-900">{formatINR((p as any).totalContractPaise || p.contractValuePaise || 0)}</span>
-                      </div>
+            <div className="divide-y divide-slate-100 mt-2">
+              {requests.slice(0, 3).map((req) => (
+                <div key={req.id} className="py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      {req.customerName || 'Homeowner Request'}
                     </div>
-
-                    {/* Progress */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-mono">
-                        <span className="text-slate-500">IS 456 Structural Milestone Progress</span>
-                        <span className="font-bold text-sky-800">{Math.round((p as any).weightedProgressPercent ?? p.overallVerifiedProgress ?? p.overallReportedProgress ?? 0)}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-sky-500 to-blue-600 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.round((p as any).weightedProgressPercent ?? p.overallVerifiedProgress ?? p.overallReportedProgress ?? 0)}%` }}
-                        />
-                      </div>
+                    <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                      <MapPin className="w-3 h-3 text-slate-400" />
+                      <span>{req.city || req.location || 'Local Site'}</span>
+                      <span>•</span>
+                      <span>{req.plotArea || '30x50 ft'}</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Assigned Requests */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Recent Assigned Customer Requests</h3>
-              </div>
-              <Link
-                to="/professional/assigned"
-                className="text-xs font-bold text-sky-800 hover:text-navy-950 flex items-center gap-1"
-              >
-                <span>View All ({requests.length})</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+                  <Link
+                    to={`/professional/quotation-builder?requestId=${req.id}`}
+                    className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 text-[11px] font-bold shrink-0 transition"
+                  >
+                    Build Quote
+                  </Link>
+                </div>
+              ))}
+              {requests.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No pending quotation requests at present.
+                </div>
+              )}
             </div>
-
-            {requests.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">No pending requests allocated.</div>
-            ) : (
-              <div className="divide-y divide-slate-100 text-xs">
-                {requests.slice(0, 4).map((r) => (
-                  <div key={r.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 font-mono font-bold text-slate-900">
-                        <span>{r.requestCode}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-900">
-                          {r.category}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-1">
-                        {(r as any).locality || r.city || 'Site'}, {r.city || ''} • Plot: {r.plotArea || ''} {r.measurementUnit || 'sq.ft'}
-                      </div>
-                    </div>
-
-                    <Link
-                      to={`/professional/quotation-builder?requestId=${r.id}`}
-                      className="px-3.5 py-1.5 bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 rounded-xl font-bold transition flex items-center gap-1 self-start sm:self-auto"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Prepare Quotation</span>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Right Column (1 Col) */}
-        <div className="space-y-6">
-          {/* IEI Accreditation & Verification Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-sky-50/60 rounded-2xl border border-blue-200/80 p-5 shadow-2xs space-y-3 text-xs">
-            <div className="flex items-center gap-2 font-bold text-blue-900">
-              <ShieldCheck className="w-5 h-5 text-blue-600" />
-              <span>IEI & Firm Verification Desk</span>
-            </div>
-            <p className="text-slate-600 leading-relaxed text-[11px]">
-              your firm is verified under the Council of Professionalure and GharDesign engineering standards. Authorized to generate BOQs and structural drawing packages.
-            </p>
-            <div className="pt-2 border-t border-blue-100 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-mono">App Ref: {archAccount?.applicationNumber || 'APP-2026-1001'}</span>
-              <Link to="/professional/profile" className="font-bold text-blue-800 hover:underline">
-                View Credentials ?
+        {/* WIDGET 2: Recent Projects */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-bold text-navy-950">2. Recent Projects</h3>
+              </div>
+              <Link to="/professional/projects" className="text-xs text-sky-600 hover:underline font-bold">
+                All Projects ({projects.length})
               </Link>
             </div>
-          </div>
-
-          {/* Upcoming Deadlines Widget */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3 text-xs">
-            <div className="flex items-center gap-2 font-bold text-slate-900">
-              <Clock className="w-4 h-4 text-amber-500" />
-              <span>Upcoming Milestones & Deadlines</span>
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-xl space-y-1">
-                <div className="flex justify-between font-bold text-amber-900">
-                  <span>Preliminary 2D Floor Plan</span>
-                  <span className="text-[10px] font-mono">2 Days Left</span>
+            <div className="divide-y divide-slate-100 mt-2">
+              {projects.slice(0, 3).map((p) => (
+                <div key={p.id} className="py-2.5">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-slate-900 truncate">{p.title || p.code}</span>
+                    <Badge variant={p.status === 'COMPLETED' ? 'success' : 'info'} size="sm">
+                      {p.status}
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] text-slate-500 flex items-center justify-between mb-1.5">
+                    <span>{p.city || p.location}</span>
+                    <span className="font-bold text-slate-700">{p.progressPercent || 0}% Complete</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-full rounded-full transition-all"
+                      style={{ width: `${p.progressPercent || 0}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-[11px] text-slate-600">Client: Arpit Sharma (Noida Sector 150)</div>
-              </div>
-
-              <div className="p-3 bg-sky-50/60 border border-sky-200/70 rounded-xl space-y-1">
-                <div className="flex justify-between font-bold text-sky-900">
-                  <span>3D Front Elevation Walkthrough</span>
-                  <span className="text-[10px] font-mono">5 Days Left</span>
+              ))}
+              {projects.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No active architectural projects recorded yet.
                 </div>
-                <div className="text-[11px] text-slate-600">Client: Sunita Verma (Gurugram Sec 48)</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 3: Project Progress Overview */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-navy-950">3. Progress Overview</h3>
+              </div>
+              <span className="text-xs font-bold text-emerald-700">Architecture Stages</span>
+            </div>
+            <div className="space-y-3 mt-3 text-xs">
+              <div>
+                <div className="flex justify-between font-bold text-slate-700 mb-1">
+                  <span>Concept & Floor Planning</span>
+                  <span>85%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '85%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between font-bold text-slate-700 mb-1">
+                  <span>2D & Structural Drawings</span>
+                  <span>60%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="bg-sky-500 h-full rounded-full" style={{ width: '60%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between font-bold text-slate-700 mb-1">
+                  <span>3D Elevation & Walkthrough</span>
+                  <span>45%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="bg-purple-500 h-full rounded-full" style={{ width: '45%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between font-bold text-slate-700 mb-1">
+                  <span>Working Drawing Handover</span>
+                  <span>30%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="bg-amber-500 h-full rounded-full" style={{ width: '30%' }} />
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Quick Support Desk Link */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3 text-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-slate-900">
-                <MessageSquare className="w-4 h-4 text-sky-600" />
-                <span>Admin Messages Desk</span>
+        {/* WIDGET 4: Upcoming Tasks & Deliverables */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <ListTodo className="w-4 h-4 text-rose-600" />
+                <h3 className="text-sm font-bold text-navy-950">4. Upcoming Tasks</h3>
               </div>
-              <Link to="/professional/support" className="text-sky-800 font-bold hover:underline">
-                Open
+              <Link to="/professional/deliverables" className="text-xs text-sky-600 hover:underline font-bold">
+                View All ({deliverables.length})
               </Link>
             </div>
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Need assistance with client revision limits, drawing signoffs, or escrow settlements? Connect directly with the verification cell.
-            </p>
+            <div className="divide-y divide-slate-100 mt-2">
+              {deliverables.slice(0, 3).map((item) => (
+                <div key={item.id} className="py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold text-slate-900 truncate">{item.title}</div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                      <span>Due: {item.dueDate}</span>
+                      <span className="font-semibold text-rose-600">{item.priority}</span>
+                    </div>
+                  </div>
+                  <Badge variant={item.status === 'COMPLETED' ? 'success' : 'warning'} size="sm">
+                    {item.status}
+                  </Badge>
+                </div>
+              ))}
+              {deliverables.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No upcoming tasks scheduled. Create one in Deliverables.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 5: Upcoming Site Visits */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-navy-950">5. Upcoming Site Visits</h3>
+              </div>
+              <Link to="/professional/site-visits" className="text-xs text-sky-600 hover:underline font-bold">
+                Visits ({siteVisits.length})
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100 mt-2">
+              {siteVisits.slice(0, 3).map((sv) => (
+                <div key={sv.id} className="py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold text-slate-900 truncate">{sv.customerName}</div>
+                    <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                      {sv.visitDate} at {sv.visitTime} • {sv.propertyLocation}
+                    </div>
+                  </div>
+                  <Badge variant={sv.status === 'COMPLETED' ? 'success' : 'info'} size="sm">
+                    {sv.status}
+                  </Badge>
+                </div>
+              ))}
+              {siteVisits.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No scheduled site visits recorded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 6: Pending Customer Approvals */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-bold text-navy-950">6. Customer Design Approvals</h3>
+              </div>
+              <Link to="/professional/designs" className="text-xs text-sky-600 hover:underline font-bold">
+                Studio ({designs.length})
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100 mt-2">
+              {designs.slice(0, 3).map((ds) => (
+                <div key={ds.id} className="py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold text-slate-900 truncate">{ds.title}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {ds.category} • {ds.currentVersion}
+                    </div>
+                  </div>
+                  <Badge
+                    variant={
+                      ds.status === 'APPROVED'
+                        ? 'success'
+                        : ds.status === 'REVISION_REQUESTED'
+                        ? 'danger'
+                        : 'warning'
+                    }
+                    size="sm"
+                  >
+                    {ds.status}
+                  </Badge>
+                </div>
+              ))}
+              {designs.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No architectural drawings submitted for approval yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 7: Recent Messages */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-bold text-navy-950">7. Recent Messages</h3>
+              </div>
+              <Link to="/professional/messages" className="text-xs text-sky-600 hover:underline font-bold">
+                Open Chat
+              </Link>
+            </div>
+            <div className="py-8 text-center text-xs text-slate-500 font-medium">
+              Direct project messaging channels active. Click to collaborate with Homeowner, Admin, and Contractor.
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 8: Recent Notifications */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-navy-950">8. Recent Notifications</h3>
+              </div>
+              <Link to="/professional/notifications" className="text-xs text-sky-600 hover:underline font-bold">
+                Notifications ({notifications.length})
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100 mt-2">
+              {notifications.slice(0, 3).map((n) => (
+                <div key={n.id} className="py-2.5">
+                  <div className="text-xs font-bold text-slate-900">{n.title}</div>
+                  <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{n.message}</div>
+                </div>
+              ))}
+              {notifications.length === 0 && (
+                <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                  No new unread platform alerts.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 9: Earnings & Escrow Summary */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-navy-950">9. Earnings Summary</h3>
+              </div>
+              <Link to="/professional/billing" className="text-xs text-sky-600 hover:underline font-bold">
+                Payouts
+              </Link>
+            </div>
+            <div className="space-y-3 mt-3 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Contract Total</span>
+                <span className="font-bold text-slate-900">{formatINR(totalContractPaise)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Earned & Released</span>
+                <span className="font-bold text-emerald-600">{formatINR(totalEarningsPaise)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">In Escrow Lock</span>
+                <span className="font-bold text-amber-600">{formatINR(pendingPaymentsPaise)}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-slate-500">Bank Verification</span>
+                <span className="font-bold text-emerald-600">Active & Verified ✓</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* WIDGET 10: Monthly Performance Chart */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:col-span-3 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-sky-600" />
+                <h3 className="text-sm font-bold text-navy-950">10. Monthly Performance & Bidding Conversion</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">Year 2026</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="text-xs text-slate-500 font-bold">Quotation Response Rate</div>
+                <div className="text-xl font-black text-navy-950 mt-1">96.4%</div>
+                <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Top 5% among Architects</div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="text-xs text-slate-500 font-bold">Client Win Ratio</div>
+                <div className="text-xl font-black text-navy-950 mt-1">68.2%</div>
+                <div className="text-[10px] text-sky-600 font-bold mt-0.5">High homeowner booking rate</div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="text-xs text-slate-500 font-bold">Avg Drawing Approval Time</div>
+                <div className="text-xl font-black text-navy-950 mt-1">1.8 Days</div>
+                <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Fast turnaround time</div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="text-xs text-slate-500 font-bold">Average Review Rating</div>
+                <div className="text-xl font-black text-navy-950 mt-1 flex items-center gap-1">
+                  <span>4.9</span>
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400 inline" />
+                </div>
+                <div className="text-[10px] text-amber-700 font-bold mt-0.5">Verified Homeowner Feedback</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

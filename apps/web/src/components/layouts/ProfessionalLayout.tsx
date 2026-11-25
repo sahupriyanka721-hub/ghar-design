@@ -18,70 +18,43 @@ import { compressAvatarImage } from '../../lib/utils.js';
 import { motion } from 'framer-motion';
 
 import {
-
   LayoutDashboard,
-
   FileText,
-
   PlusCircle,
-
   FileCheck2,
-
   CalendarCheck,
-
   UserCheck,
-
   LogOut,
-
   Layers,
-
   Building2,
-
   Menu,
-
   X,
-
   ChevronDown,
-
   ChevronRight,
-
   ExternalLink,
-
   ShieldCheck,
-
   CheckCircle2,
   Camera,
-
   Briefcase,
-
   Sparkles,
-
   Phone,
-
   KeyRound,
-
   ArrowRight,
-
   ArrowLeft,
-
   AlertCircle,
-
   Zap,
-
   HardHat,
-
   Users,
-
   CreditCard,
-
   BarChart3,
-
   LifeBuoy,
-
   Sliders,
-
   Compass,
-
+  Star,
+  Bell,
+  MessageSquare,
+  Calculator,
+  MapPin,
 } from 'lucide-react';
 
 
@@ -863,28 +836,240 @@ export const ProfessionalLayout: React.FC = () => {
     return <ProfessionalAuthGate />;
   }
 
+  // Collapsible Accordion Sub-Menu States (17 Sections Spec)
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+    dashboard: false,
+    profile: false,
+    quotations: false,
+    projects: false,
+    designs: false,
+    boq: false,
+    'site-visits': false,
+    customers: false,
+    messages: false,
+    deliverables: false,
+    billing: false,
+    reports: false,
+    support: false,
+    settings: false,
+  });
+
+  const toggleMenu = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setOpenMenus((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const navItems = [
-    { label: '1. Dashboard', path: '/professional', icon: LayoutDashboard, exact: true },
-    { label: '2. Profile Management', path: '/professional/profile', icon: UserCheck },
     {
+      id: 'dashboard',
+      label: '1. Dashboard',
+      path: '/professional',
+      icon: LayoutDashboard,
+      exact: true,
+      sublinks: [
+        { label: 'Overview', path: '/professional' },
+        { label: 'Profile Completion', path: '/professional/profile?tab=personal' },
+        { label: 'Verification Status', path: '/professional/profile?tab=documents' },
+        { label: 'New Quotation Requests', path: '/professional/assigned' },
+        { label: 'Pending Quotations', path: '/professional/quotations?status=submitted' },
+        { label: 'Accepted Quotations', path: '/professional/quotations/approved' },
+        { label: 'Active Projects', path: '/professional/projects?status=active' },
+        { label: 'Pending Design Approvals', path: '/professional/designs?tab=approvals' },
+        { label: 'Upcoming Deadlines', path: '/professional/deliverables?tab=upcoming' },
+        { label: 'Payment Summary', path: '/professional/billing' },
+        { label: 'Notifications', path: '/professional/notifications' },
+      ],
+    },
+    {
+      id: 'profile',
+      label: '2. Profile Management',
+      path: '/professional/profile',
+      icon: UserCheck,
+      sublinks: [
+        { label: '2.1 My Profile', path: '/professional/profile?tab=personal' },
+        { label: '2.2 Business Management', path: '/professional/profile?tab=business' },
+        { label: '2.3 KYC & Verification', path: '/professional/profile?tab=documents' },
+        { label: '2.4 Portfolio Management', path: '/professional/profile?tab=portfolio' },
+        { label: '2.5 Bank Details', path: '/professional/profile?tab=bank' },
+      ],
+    },
+    {
+      id: 'quotations',
       label: '3. Quotation Management',
       path: '/professional/quotations',
       icon: FileCheck2,
       sublinks: [
-        { label: 'Assigned Requests', path: '/professional/assigned' },
-        { label: 'Quotation Builder (BOQ)', path: '/professional/quotation-builder' },
-        { label: 'Quotation List', path: '/professional/quotations' },
-        { label: 'Customer-Selected', path: '/professional/quotations/approved' },
+        { label: '3.1 New Requests', path: '/professional/assigned' },
+        { label: '3.2 Generate Quotation', path: '/professional/quotation-builder' },
+        { label: '3.3 Quotation List', path: '/professional/quotations' },
+        { label: '3.4 Approved Quotations', path: '/professional/quotations/approved' },
+        { label: '3.5 Quotation History', path: '/professional/quotations?tab=history' },
       ],
     },
-    { label: '4. Booking Management', path: '/professional/bookings', icon: CalendarCheck },
-    { label: '5. Project Management', path: '/professional/projects', icon: HardHat },
-    { label: '6. Customer Management', path: '/professional/customers', icon: Users },
-    { label: '7. Billing & Payments', path: '/professional/billing', icon: CreditCard },
-    { label: '8. Reports & Analytics', path: '/professional/reports', icon: BarChart3 },
-    { label: '9. Support & Admin Desk', path: '/professional/support', icon: LifeBuoy },
-    { label: '10. Settings', path: '/professional/settings', icon: Sliders },
+    {
+      id: 'projects',
+      label: '4. Project Management',
+      path: '/professional/projects',
+      icon: HardHat,
+      sublinks: [
+        { label: '4.1 My Assigned Projects', path: '/professional/projects?tab=overview' },
+        { label: '4.2 Project Overview', path: '/professional/projects?tab=overview' },
+        { label: '4.3 Project Kickoff', path: '/professional/projects?tab=kickoff' },
+        { label: '4.4 Project Planning', path: '/professional/projects?tab=planning' },
+        { label: '4.5 Project Tasks', path: '/professional/projects?tab=tasks' },
+        { label: '4.6 Project Coordination', path: '/professional/projects?tab=coordination' },
+        { label: '4.7 Project Progress', path: '/professional/projects?tab=progress' },
+      ],
+    },
+    {
+      id: 'designs',
+      label: '5. Architecture Design',
+      path: '/professional/designs',
+      icon: Compass,
+      sublinks: [
+        { label: '5.1 House Map / Floor Plan', path: '/professional/designs?tab=floor-plan' },
+        { label: '5.2 Architectural Drawings', path: '/professional/designs?tab=drawings' },
+        { label: '5.3 Design Files', path: '/professional/designs?tab=files' },
+        { label: '5.4 Version Management', path: '/professional/designs?tab=versions' },
+        { label: '5.5 Design Approval', path: '/professional/designs?tab=approvals' },
+      ],
+    },
+    {
+      id: 'boq',
+      label: '6. BOQ & Cost Estimation',
+      path: '/professional/boq',
+      icon: Calculator,
+      sublinks: [
+        { label: 'Create New BOQ', path: '/professional/boq?action=create' },
+        { label: 'BOQ Registry', path: '/professional/boq?action=list' },
+        { label: 'Quantity & Cost Estimation', path: '/professional/boq?action=estimator' },
+      ],
+    },
+    {
+      id: 'site-visits',
+      label: '7. Site Visit Management',
+      path: '/professional/site-visits',
+      icon: MapPin,
+      sublinks: [
+        { label: 'Upcoming Visits & Calendar', path: '/professional/site-visits?tab=calendar' },
+        { label: 'Schedule Site Visit', path: '/professional/site-visits?tab=schedule' },
+        { label: 'Site Visit Reports & Photos', path: '/professional/site-visits?tab=reports' },
+      ],
+    },
+    {
+      id: 'customers',
+      label: '8. Customer Management',
+      path: '/professional/customers',
+      icon: Users,
+      sublinks: [
+        { label: 'My Customers', path: '/professional/customers?tab=list' },
+        { label: 'Customer Requirements', path: '/professional/customers?tab=requirements' },
+        { label: 'Customer Approval History', path: '/professional/customers?tab=history' },
+      ],
+    },
+    {
+      id: 'messages',
+      label: '9. Communication & Collab',
+      path: '/professional/messages',
+      icon: MessageSquare,
+      sublinks: [
+        { label: 'Customer Messages', path: '/professional/messages?tab=customers' },
+        { label: 'Admin Messages', path: '/professional/messages?tab=admin' },
+        { label: 'Contractor & Consultant Desk', path: '/professional/messages?tab=consultants' },
+      ],
+    },
+    {
+      id: 'deliverables',
+      label: '10. Milestone & Deliverables',
+      path: '/professional/deliverables',
+      icon: Layers,
+      sublinks: [
+        { label: 'Project Milestones', path: '/professional/deliverables?tab=milestones' },
+        { label: 'Architecture Deliverables', path: '/professional/deliverables?tab=deliverables' },
+        { label: 'Pending Approvals', path: '/professional/deliverables?tab=pending' },
+      ],
+    },
+    {
+      id: 'billing',
+      label: '11. Billing & Payments',
+      path: '/professional/billing',
+      icon: CreditCard,
+      sublinks: [
+        { label: '11.1 My Earnings', path: '/professional/billing?tab=earnings' },
+        { label: '11.2 Payment Schedule', path: '/professional/billing?tab=schedule' },
+        { label: '11.3 Payment History', path: '/professional/billing?tab=history' },
+        { label: '11.4 Payout Management', path: '/professional/billing?tab=payouts' },
+        { label: '11.5 Invoices & Receipts', path: '/professional/billing?tab=invoices' },
+      ],
+    },
+    {
+      id: 'reports',
+      label: '12. Reports & Analytics',
+      path: '/professional/reports',
+      icon: BarChart3,
+      sublinks: [
+        { label: 'Quotation Reports', path: '/professional/reports?type=quotations' },
+        { label: 'Project Progress Reports', path: '/professional/reports?type=projects' },
+        { label: 'Design Deliverable Reports', path: '/professional/reports?type=designs' },
+        { label: 'Financial & Payout Reports', path: '/professional/reports?type=financial' },
+      ],
+    },
+    {
+      id: 'reviews',
+      label: '13. Reviews & Ratings',
+      path: '/professional/reviews',
+      icon: Star,
+    },
+    {
+      id: 'notifications',
+      label: '14. Notifications',
+      path: '/professional/notifications',
+      icon: Bell,
+    },
+    {
+      id: 'support',
+      label: '15. Support & Help Center',
+      path: '/professional/support',
+      icon: LifeBuoy,
+      sublinks: [
+        { label: 'Raise Support Ticket', path: '/professional/support?tab=create' },
+        { label: 'My Support Tickets', path: '/professional/support?tab=tickets' },
+        { label: 'FAQs & Articles', path: '/professional/support?tab=faqs' },
+      ],
+    },
+    {
+      id: 'settings',
+      label: '16. Settings',
+      path: '/professional/settings',
+      icon: Sliders,
+      sublinks: [
+        { label: '16.1 Account Settings', path: '/professional/settings?tab=account' },
+        { label: '16.2 Security & Sessions', path: '/professional/settings?tab=security' },
+        { label: '16.3 Notification Preferences', path: '/professional/settings?tab=notifications' },
+        { label: '16.4 Availability & Working Hours', path: '/professional/settings?tab=availability' },
+        { label: '16.5 Account Management', path: '/professional/settings?tab=management' },
+      ],
+    },
+    {
+      id: 'logout',
+      label: '17. Logout',
+      path: '#logout',
+      icon: LogOut,
+      isAction: true,
+    },
   ];
+
+  // Auto-expand menu containing active path
+  useEffect(() => {
+    navItems.forEach((item) => {
+      if (item.sublinks && item.sublinks.some((sub) => location.pathname === sub.path.split('?')[0])) {
+        setOpenMenus((prev) => ({ ...prev, [item.id]: true }));
+      }
+    });
+  }, [location.pathname]);
 
   if (archRecord) {
     if (archRecord.accountStatus === 'PROFILE_INCOMPLETE') {
@@ -1249,125 +1434,111 @@ export const ProfessionalLayout: React.FC = () => {
           <div className="p-3.5 space-y-1.5 overflow-y-auto max-h-[calc(100vh-10rem)] text-xs scrollbar-thin scrollbar-thumb-sky-200">
 
             <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-sky-800 flex items-center justify-between">
-
-              <span>{isArchitect ? "Architecture Panel (10 Keys)" : "Partner Navigation"}</span>
-
+              <span>{isArchitect ? "Architecture Panel (17 Modules)" : "Partner Navigation"}</span>
               <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-
-          </div>
-
-
+            </div>
 
             {navItems.map((item) => {
-
               const Icon = item.icon;
-
               const hasSublinks = Boolean(item.sublinks && item.sublinks.length > 0);
-
-              const isSublinkActive = hasSublinks && item.sublinks!.some((sub) => location.pathname === sub.path);
-
+              const isSublinkActive = hasSublinks && item.sublinks!.some((sub) => location.pathname === sub.path.split('?')[0]);
               const isActive = item.exact
-
                 ? location.pathname === item.path
-
                 : location.pathname === item.path || isSublinkActive;
+              const isMenuOpen = Boolean(openMenus[item.id]);
+              const isExpanded = isMenuOpen || isSublinkActive;
 
-
+              if (item.isAction) {
+                return (
+                  <div key={item.id} className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSidebarOpen(false);
+                        logout();
+                        navigate('/');
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-rose-600 hover:bg-rose-50 transition text-xs cursor-pointer text-left"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>{item.label}</span>
+                    </button>
+                  </div>
+                );
+              }
 
               return (
-
-                <div key={item.path} className="space-y-1">
-
-                  <Link
-
-                    to={item.path}
-
-                    onClick={() => setSidebarOpen(false)}
-
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold transition text-xs ${
-
+                <div key={item.id || item.path} className="space-y-1">
+                  <div
+                    className={`flex items-center justify-between px-3.5 py-2 rounded-xl font-bold transition text-xs cursor-pointer ${
                       isActive
-
                         ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md shadow-sky-600/25'
-
                         : 'text-slate-700 hover:bg-sky-50 hover:text-navy-950'
-
                     }`}
-
+                    onClick={(e) => {
+                      if (hasSublinks) {
+                        toggleMenu(item.id, e);
+                      } else {
+                        setSidebarOpen(false);
+                        navigate(item.path);
+                      }
+                    }}
                   >
-
-                    <div className="flex items-center gap-3">
-
+                    <Link
+                      to={item.path}
+                      onClick={(e) => {
+                        if (hasSublinks) {
+                          e.stopPropagation();
+                          setSidebarOpen(false);
+                        }
+                      }}
+                      className="flex items-center gap-2.5 min-w-0 flex-1"
+                    >
                       <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-sky-600'}`} />
-
-                      <span>{item.label}</span>
-
-          </div>
+                      <span className="truncate">{item.label}</span>
+                    </Link>
 
                     {hasSublinks && (
-
-                      <ChevronRight
-
-                        className={`w-3.5 h-3.5 transition-transform ${
-
-                          isActive ? 'text-sky-100 rotate-90' : 'text-slate-400'
-
-                        }`}
-
-                      />
-
+                      <button
+                        type="button"
+                        onClick={(e) => toggleMenu(item.id, e)}
+                        className="p-1 -mr-1 rounded-md hover:bg-black/10 transition cursor-pointer"
+                      >
+                        <ChevronRight
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isExpanded ? 'rotate-90 text-sky-100' : isActive ? 'text-sky-200' : 'text-slate-400'
+                          }`}
+                        />
+                      </button>
                     )}
+                  </div>
 
-                  </Link>
-
-
-
-                  {hasSublinks && isActive && (
-
-                    <div className="pl-8 pr-2 py-1 space-y-1">
-
+                  {hasSublinks && isExpanded && (
+                    <div className="pl-6 pr-1 py-1 space-y-0.5 border-l-2 border-sky-100 ml-3.5">
                       {item.sublinks!.map((sub) => {
-
-                        const isSubActive = location.pathname === sub.path;
+                        const isSubActive =
+                          (location.pathname + location.search === sub.path) ||
+                          (location.pathname === sub.path.split('?')[0] && !location.search);
 
                         return (
-
                           <Link
-
                             key={sub.path}
-
                             to={sub.path}
-
                             onClick={() => setSidebarOpen(false)}
-
                             className={`block px-3 py-1.5 rounded-lg text-[11px] font-semibold transition ${
-
                               isSubActive
-
                                 ? 'bg-sky-100 text-sky-950 font-bold'
-
                                 : 'text-slate-600 hover:bg-sky-50 hover:text-slate-900'
-
                             }`}
-
                           >
-
                             {sub.label}
-
                           </Link>
-
                         );
-
                       })}
-
-          </div>
-
+                    </div>
                   )}
-
-          </div>
-
+                </div>
               );
-
             })}
 
           </div>

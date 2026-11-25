@@ -72,6 +72,13 @@ import { ProfessionalReports } from './pages/professional/ProfessionalReports.js
 import { ProfessionalSupport } from './pages/professional/ProfessionalSupport.js';
 import { ProfessionalSettings } from './pages/professional/ProfessionalSettings.js';
 import { ProfessionalProfile } from './pages/professional/ProfessionalProfile.js';
+import { ArchitectDesignStudio } from './pages/professional/ArchitectDesignStudio.js';
+import { ArchitectBOQEstimator } from './pages/professional/ArchitectBOQEstimator.js';
+import { ArchitectSiteVisits } from './pages/professional/ArchitectSiteVisits.js';
+import { ArchitectDeliverables } from './pages/professional/ArchitectDeliverables.js';
+import { ArchitectReviews } from './pages/professional/ArchitectReviews.js';
+import { ArchitectMessages } from './pages/professional/ArchitectMessages.js';
+import { ArchitectNotifications } from './pages/professional/ArchitectNotifications.js';
 
 // Admin Control Center Pages
 import { AdminOverview } from './pages/admin/AdminOverview.js';
@@ -307,6 +314,13 @@ export const App: React.FC = () => {
           <Route path="projects" element={<ProfessionalProjects />} />
           <Route path="timeline" element={<TrackService />} />
           <Route path="customers" element={<ProfessionalCustomers />} />
+          <Route path="designs" element={<ArchitectDesignStudio />} />
+          <Route path="boq" element={<ArchitectBOQEstimator />} />
+          <Route path="site-visits" element={<ArchitectSiteVisits />} />
+          <Route path="deliverables" element={<ArchitectDeliverables />} />
+          <Route path="reviews" element={<ArchitectReviews />} />
+          <Route path="messages" element={<ArchitectMessages />} />
+          <Route path="notifications" element={<ArchitectNotifications />} />
           <Route path="billing" element={<ProfessionalBilling />} />
           <Route path="reports" element={<ProfessionalReports />} />
           <Route path="support" element={<ProfessionalSupport />} />
@@ -332,6 +346,13 @@ export const App: React.FC = () => {
         <Route path="/architect/bookings" element={<Navigate to="/professional/bookings" replace />} />
         <Route path="/architect/projects" element={<Navigate to="/professional/projects" replace />} />
         <Route path="/architect/customers" element={<Navigate to="/professional/customers" replace />} />
+        <Route path="/architect/designs" element={<Navigate to="/professional/designs" replace />} />
+        <Route path="/architect/boq" element={<Navigate to="/professional/boq" replace />} />
+        <Route path="/architect/site-visits" element={<Navigate to="/professional/site-visits" replace />} />
+        <Route path="/architect/deliverables" element={<Navigate to="/professional/deliverables" replace />} />
+        <Route path="/architect/reviews" element={<Navigate to="/professional/reviews" replace />} />
+        <Route path="/architect/messages" element={<Navigate to="/professional/messages" replace />} />
+        <Route path="/architect/notifications" element={<Navigate to="/professional/notifications" replace />} />
         <Route path="/architect/billing" element={<Navigate to="/professional/billing" replace />} />
         <Route path="/architect/reports" element={<Navigate to="/professional/reports" replace />} />
         <Route path="/architect/support" element={<Navigate to="/professional/support" replace />} />
