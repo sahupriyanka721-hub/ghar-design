@@ -3,6 +3,8 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../lib/api.js';
 import { PaymentRecord } from '@ghar-design/shared';
 import { formatINR, formatDate } from '../../lib/utils.js';
+import { useAuth } from '../../context/AuthContext.js';
+import { getExecutionProjects } from '../../data/projectExecutionStore.js';
 import {
   CreditCard,
   Download,
@@ -14,11 +16,56 @@ import {
 } from 'lucide-react';
 
 export const PaymentHistory: React.FC = () => {
+  const { user } = useAuth();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterPurpose, setFilterPurpose] = useState('ALL');
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
   const [searchParams] = useSearchParams();
+
+  const loadLocalPayments = () => {
+    const list: PaymentRecord[] = [];
+    try {
+      const projects = getExecutionProjects(user?.id, user?.phone);
+      for (const prj of projects) {
+        for (const m of (prj.paymentMilestones || [])) {
+          if (m.status === 'PAID') {
+            list.push({
+              id: `pay-ms-${m.id}`,
+              transactionCode: m.transactionId || `TXN-ESCROW-${m.id.slice(-6)}`,
+              amountPaise: m.amountPaise,
+              purpose: 'MILESTONE_PAYMENT' as any,
+              status: 'PAID' as any,
+              paymentMethod: 'Escrow Milestone Release (Razorpay)',
+              createdAt: m.paidAt || m.submittedAt || new Date().toISOString(),
+              notes: `${prj.name} - Milestone: ${m.title}`,
+              gatewayRef: `PAY-ID-${m.id}`,
+            });
+          }
+        }
+      }
+      const ordersJson = localStorage.getItem('material_orders');
+      if (ordersJson) {
+        const parsed = JSON.parse(ordersJson);
+        if (Array.isArray(parsed)) {
+          for (const ord of parsed) {
+            list.push({
+              id: `pay-ord-${ord.id}`,
+              transactionCode: `TXN-MAT-${ord.orderCode || ord.id.slice(-6)}`,
+              amountPaise: ord.totalAmountPaise || (ord.totalAmount * 100),
+              purpose: 'MATERIAL_PURCHASE' as any,
+              status: 'PAID' as any,
+              paymentMethod: ord.paymentMethod || 'Razorpay NetBanking / UPI',
+              createdAt: ord.orderDate || ord.createdAt || new Date().toISOString(),
+              notes: `Building Material Order: ${ord.orderCode}`,
+              gatewayRef: `RZP-ORD-${ord.id.slice(-8)}`,
+            });
+          }
+        }
+      }
+    } catch {}
+    setPayments(list);
+  };
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -35,10 +82,18 @@ export const PaymentHistory: React.FC = () => {
 
   useEffect(() => {
     apiRequest('/payments')
-      .then((res) => setPayments(res.data || []))
-      .catch(() => {})
+      .then((res) => {
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setPayments(res.data);
+        } else {
+          loadLocalPayments();
+        }
+      })
+      .catch(() => {
+        loadLocalPayments();
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.id, user?.phone]);
 
   const filtered = payments.filter((p) => {
     if (filterPurpose === 'ALL') return true;

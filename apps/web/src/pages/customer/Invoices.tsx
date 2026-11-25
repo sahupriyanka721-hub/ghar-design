@@ -14,6 +14,7 @@ import {
   Building,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
+import { getExecutionProjects } from '../../data/projectExecutionStore.js';
 
 export const Invoices: React.FC = () => {
   const { user } = useAuth();
@@ -79,6 +80,47 @@ export const Invoices: React.FC = () => {
       }
     } catch (e) {
       console.error('Error generating invoices from material orders:', e);
+    }
+
+    // 2. Load tax invoices generated from paid project execution milestones
+    try {
+      const projects = getExecutionProjects(user?.id, user?.phone);
+      for (const prj of projects) {
+        for (const m of (prj.paymentMilestones || [])) {
+          if (m.status === 'PAID') {
+            realInvoices.push({
+              id: `inv-ms-${m.id}`,
+              invoiceNumber: `GHR-TAX-${prj.workOrderNumber || 'WO'}-M${m.milestoneNumber || 1}`,
+              invoiceType: 'TAX_INVOICE',
+              issueDate: m.paidAt ? new Date(m.paidAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Verified Date',
+              dueDate: m.paidAt ? new Date(m.paidAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Verified Date',
+              relatedProject: `${prj.name} (Milestone: ${m.title})`,
+              issuerName: prj.contractorFirm || 'Engineering Execution Partner',
+              issuerGstin: '07AAAAA0000A1Z5',
+              customerName: user?.name || prj.customerName || 'Registered Homeowner',
+              customerBillingAddress: prj.propertyAddress || 'Project Site Location',
+              lineItems: [
+                {
+                  description: `${m.title} - ${m.description || 'Verified engineering milestone completion'}`,
+                  quantity: 1,
+                  unit: 'Stage',
+                  unitPricePaise: m.amountPaise,
+                  totalPaise: m.amountPaise,
+                },
+              ],
+              subtotalPaise: Math.round(m.amountPaise / 1.18),
+              discountPaise: 0,
+              taxPaise: Math.round(m.amountPaise - (m.amountPaise / 1.18)),
+              totalAmountPaise: m.amountPaise,
+              paidAmountPaise: m.amountPaise,
+              outstandingPaise: 0,
+              status: 'PAID',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error loading milestone invoices:', e);
     }
 
     setInvoices(realInvoices);
