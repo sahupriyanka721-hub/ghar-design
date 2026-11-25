@@ -237,6 +237,8 @@ export const App: React.FC = () => {
           <Route path="requests/:id" element={<RequestDetail />} />
           <Route path="requests/:id/quotations" element={<QuotationComparison />} />
           <Route path="quotations" element={<MyQuotations />} />
+          <Route path="quotations/compare" element={<QuotationComparison />} />
+          <Route path="quotations/compare/:id" element={<QuotationComparison />} />
           <Route path="quotations/:quoteId" element={<QuotationDetail />} />
           <Route path="accepted-quotations" element={<AcceptedQuotations />} />
 
@@ -248,7 +250,7 @@ export const App: React.FC = () => {
           <Route path="projects/active" element={<ProjectWorkspace />} />
           <Route path="project-payments" element={<ProjectPaymentsMilestones />} />
 
-          {/* 3. Booking Management */}
+          {/* 4. Booking Management */}
           <Route path="book-services" element={<BookServices />} />
           <Route path="bookings" element={<MyBookings />} />
           <Route path="booking-confirmed" element={<BookingConfirmation />} />
@@ -256,29 +258,35 @@ export const App: React.FC = () => {
           <Route path="timeline" element={<TrackService />} />
           <Route path="project-timeline" element={<TrackService />} />
 
-          {/* 4. Material Management */}
+          {/* 5. Material Management */}
           <Route path="materials" element={<BuyMaterials />} />
+          <Route path="materials/buy" element={<BuyMaterials />} />
           <Route path="material-purchases" element={<MyPurchases />} />
+          <Route path="purchases" element={<MyPurchases />} />
 
-          {/* 5. Billing & Payment Management */}
+          {/* 6. Billing & Payment Management */}
+          <Route path="billing" element={<Invoices />} />
           <Route path="payments" element={<PaymentHistory />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="final-settlements" element={<FinalSettlements />} />
 
-          {/* 6. Reports & Analytics */}
+          {/* 7. Reports & Analytics */}
           <Route path="reports" element={<ReportsAnalytics />} />
 
-          {/* 7. Settings */}
+          {/* 8. Settings */}
           <Route path="settings" element={<ProfileSettings />} />
+          <Route path="addresses" element={<SavedAddresses />} />
           <Route path="saved-addresses" element={<SavedAddresses />} />
           <Route path="security" element={<AccountSecurity />} />
           <Route path="notification-preferences" element={<NotificationPreferences />} />
 
-          {/* 8. Help & Support */}
+          {/* 9. Communication & Support */}
+          <Route path="messages" element={<HelpSupportTickets initialTab="messages" />} />
           <Route path="help" element={<HelpSupportTickets />} />
 
-          {/* 9. Notifications */}
+          {/* 10. Notifications */}
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="notifications/preferences" element={<NotificationPreferences />} />
 
           {/* Additional Customer Modules */}
           <Route path="documents" element={<ProjectDocuments />} />

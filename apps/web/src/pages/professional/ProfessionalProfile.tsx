@@ -21,6 +21,9 @@ import {
   Globe,
   Camera,
   Trash2,
+  CreditCard,
+  Clock,
+  Upload,
 } from 'lucide-react';
 import {
   getProfessionalByPhone,
@@ -31,10 +34,13 @@ import {
 import {
   getArchitectByPhone,
   saveArchitectAccount,
+  saveArchitectBankDetails,
+  resolveArchitectBankDetails,
   formatArchitectId,
   ArchitectAccount,
   ALL_ARCHITECTURAL_SERVICES,
 } from '../../data/architectStore.js';
+import { lookupIfscCode } from '../../lib/ifscLookup.js';
 
 export const ProfessionalProfile: React.FC = () => {
   const { user } = useAuth();
@@ -42,9 +48,25 @@ export const ProfessionalProfile: React.FC = () => {
 
   const [professional, setProfessional] = useState<ProfessionalAccount | null>(null);
   const [architect, setArchitect] = useState<ArchitectAccount | null>(null);
-  const [activeTab, setActiveTab] = useState<'PERSONAL' | 'BUSINESS' | 'SERVICES' | 'PORTFOLIO' | 'DOCUMENTS' | 'AREAS'>('PERSONAL');
+  const [activeTab, setActiveTab] = useState<'PERSONAL' | 'BUSINESS' | 'SERVICES' | 'PORTFOLIO' | 'DOCUMENTS' | 'BANK' | 'AREAS'>('PERSONAL');
 
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const chequeInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Bank Form State
+  const [bankData, setBankData] = useState({
+    bankName: '',
+    accountHolderName: '',
+    accountNumber: '',
+    ifscCode: '',
+    accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS',
+    branch: '',
+    cancelledChequeUrl: '',
+    cancelledChequeFileName: '',
+    isChequeAccepted: false,
+    isVerified: false,
+  });
+  const [isSavingBank, setIsSavingBank] = useState(false);
 
   // New Portfolio Project Modal
   const [showAddProject, setShowAddProject] = useState(false);
@@ -62,6 +84,21 @@ export const ProfessionalProfile: React.FC = () => {
 
       const foundArch = getArchitectByPhone(clean);
       setArchitect(foundArch || null);
+      if (foundArch) {
+        const resolved = resolveArchitectBankDetails(foundArch);
+        setBankData({
+          bankName: resolved.bankName || '',
+          accountHolderName: resolved.accountHolderName || foundArch.name || '',
+          accountNumber: resolved.accountNumber || '',
+          ifscCode: resolved.ifscCode || '',
+          accountType: (resolved.accountType as any) || 'CURRENT',
+          branch: resolved.branch || foundArch.city || '',
+          cancelledChequeUrl: resolved.cancelledChequeUrl || '',
+          cancelledChequeFileName: resolved.cancelledChequeFileName || '',
+          isChequeAccepted: Boolean(resolved.isChequeAccepted),
+          isVerified: Boolean(resolved.isVerified),
+        });
+      }
       return;
     }
     setProfessional(null);
@@ -222,6 +259,86 @@ export const ProfessionalProfile: React.FC = () => {
     success('New project added to portfolio!');
   };
 
+  const handleIfscCodeChange = async (val: string) => {
+    const clean = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    setBankData((prev) => ({ ...prev, ifscCode: clean }));
+    if (clean.length === 11) {
+      try {
+        const res = await lookupIfscCode(clean);
+        if (res.isSuccess) {
+          setBankData((prev) => ({
+            ...prev,
+            ifscCode: clean,
+            bankName: res.bankName || prev.bankName,
+            branch: res.fullBranchText || prev.branch,
+          }));
+        } else if (res.bankName) {
+          setBankData((prev) => ({
+            ...prev,
+            ifscCode: clean,
+            bankName: res.bankName || prev.bankName,
+          }));
+        }
+      } catch {}
+    }
+  };
+
+  const handleChequeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        setBankData((prev) => ({
+          ...prev,
+          cancelledChequeUrl: url,
+          cancelledChequeFileName: file.name,
+        }));
+        success(`Cancelled cheque "${file.name}" uploaded successfully!`);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      error('Failed to read cheque file');
+    }
+  };
+
+  const handleSaveBank = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!architect && !user?.phone) {
+      error('Unable to locate partner profile');
+      return;
+    }
+    const cleanPhone = (user?.phone || architect?.phone || '').replace(/\D/g, '').slice(-10);
+    const archId = architect?.id || `arch-${cleanPhone}`;
+    setIsSavingBank(true);
+    try {
+      const savedArch = saveArchitectBankDetails(
+        archId,
+        {
+          ...bankData,
+          ifscCode: bankData.ifscCode.trim().toUpperCase(),
+        },
+        cleanPhone
+      );
+      if (cleanPhone) {
+        localStorage.setItem(`arch_bank_${cleanPhone}`, JSON.stringify(bankData));
+      }
+      if (savedArch) {
+        setArchitect(savedArch);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('architect_store_updated', { detail: savedArch }));
+      }
+      success('Bank & Escrow account details saved successfully! Submitted to Admin for verification.');
+    } catch (err: any) {
+      error(err.message || 'Failed to save bank details');
+    } finally {
+      setIsSavingBank(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Profile Hero Card */}
@@ -363,6 +480,24 @@ export const ProfessionalProfile: React.FC = () => {
             }`}
           >
             Documents & KYC ({architect?.documents?.length || professional?.documents?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('BANK')}
+            className={`pb-3 border-b-2 transition shrink-0 flex items-center gap-1.5 ${
+              activeTab === 'BANK' ? 'border-sky-600 text-sky-800' : 'border-transparent text-slate-500'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Bank & Escrow</span>
+            {bankData.isVerified ? (
+              <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">
+                Verified ✓
+              </span>
+            ) : bankData.accountNumber ? (
+              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
+                Pending Review
+              </span>
+            ) : null}
           </button>
           <button
             onClick={() => setActiveTab('AREAS')}
@@ -588,6 +723,174 @@ export const ProfessionalProfile: React.FC = () => {
                 </span>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Tab 7: Bank & Escrow Details */}
+        {activeTab === 'BANK' && (
+          <div className="pt-6 space-y-6 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <div>
+                <div className="font-extrabold text-navy-950 text-sm flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-emerald-600" />
+                  <span>Architect Bank Account &amp; Milestone Escrow Settlement</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Your official bank account used by GharDesign platform to disburse milestone payments released by homeowners upon deliverable sign-offs.
+                </p>
+              </div>
+              <div className="shrink-0">
+                {bankData.isVerified ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Escrow Account Verified ✓</span>
+                  </span>
+                ) : bankData.accountNumber ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Pending Super Admin Verification</span>
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>No Bank Account Added</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveBank} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    Bank Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankData.bankName}
+                    onChange={(e) => setBankData({ ...bankData, bankName: e.target.value })}
+                    placeholder="e.g. State Bank of India, HDFC Bank"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    Account Holder Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankData.accountHolderName}
+                    onChange={(e) => setBankData({ ...bankData, accountHolderName: e.target.value })}
+                    placeholder={fullName}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    Account Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankData.accountNumber}
+                    onChange={(e) => setBankData({ ...bankData, accountNumber: e.target.value })}
+                    placeholder="Enter Account Number"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono font-semibold text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    IFSC Code <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={11}
+                    value={bankData.ifscCode}
+                    onChange={(e) => handleIfscCodeChange(e.target.value)}
+                    placeholder="e.g. SBIN0001234"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono font-bold text-xs uppercase text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    Account Type
+                  </label>
+                  <select
+                    value={bankData.accountType}
+                    onChange={(e) => setBankData({ ...bankData, accountType: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  >
+                    <option value="CURRENT">Current Account (Firm)</option>
+                    <option value="SAVINGS">Savings Account (Personal)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase block mb-1.5">
+                    Branch Name &amp; City
+                  </label>
+                  <input
+                    type="text"
+                    value={bankData.branch}
+                    onChange={(e) => setBankData({ ...bankData, branch: e.target.value })}
+                    placeholder="e.g. Arera Hills Branch, Bhopal"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-900 focus:outline-none focus:border-sky-500 shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* Cancelled Cheque Upload */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 text-xs block">Bank Cancelled Cheque / Passbook Copy</span>
+                    <span className="text-[11px] text-slate-500">
+                      Upload a clear image of your firm or principal architect cancelled cheque for RTGS verification.
+                    </span>
+                  </div>
+                  <input
+                    ref={chequeInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={handleChequeUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => chequeInputRef.current?.click()}
+                    className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl font-bold text-xs text-slate-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{bankData.cancelledChequeUrl ? 'Replace Cheque' : 'Upload Cheque'}</span>
+                  </button>
+                </div>
+
+                {bankData.cancelledChequeFileName && (
+                  <div className="flex items-center gap-2 text-xs font-mono text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{bankData.cancelledChequeFileName}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingBank}
+                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4 text-white" />
+                  <span>{isSavingBank ? 'Saving...' : 'Save Bank Details'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

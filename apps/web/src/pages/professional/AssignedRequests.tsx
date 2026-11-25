@@ -122,10 +122,14 @@ export const AssignedRequests: React.FC = () => {
       myPossibleIds.add(matchedArch.id.toLowerCase());
       myPossibleIds.add(matchedArch.id.replace(/\s+/g, ''));
       myPossibleIds.add(matchedArch.id.toLowerCase().replace(/\s+/g, ''));
+      myPossibleIds.add(matchedArch.id.replace(/[\[\]]/g, ''));
+      myPossibleIds.add(matchedArch.id.toLowerCase().replace(/[^a-z0-9]/g, ''));
     }
     if (matchedArch?.applicationNumber) {
       myPossibleIds.add(matchedArch.applicationNumber);
       myPossibleIds.add(matchedArch.applicationNumber.toLowerCase());
+      myPossibleIds.add(matchedArch.applicationNumber.replace(/[\[\]]/g, ''));
+      myPossibleIds.add(matchedArch.applicationNumber.toLowerCase().replace(/[^a-z0-9]/g, ''));
     }
     if (matchedArch?.firmName) {
       myPossibleIds.add(matchedArch.firmName);
@@ -272,6 +276,17 @@ export const AssignedRequests: React.FC = () => {
 
     window.addEventListener('storage', loadAssignments);
 
+    const handleFocus = () => {
+      loadAssignments();
+    };
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        loadAssignments();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const onSync = (event: MessageEvent) => {
       if (
         event.data?.type === 'PROJECT_REQUESTS_UPDATED' ||
@@ -287,6 +302,8 @@ export const AssignedRequests: React.FC = () => {
 
     return () => {
       window.removeEventListener('storage', loadAssignments);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (syncChannel) {
         syncChannel.removeEventListener('message', onSync);
       }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
 import { SupportTicket } from '@ghar-design/shared';
@@ -17,11 +17,21 @@ import {
   ShieldCheck,
   X,
   FileText,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 
-export const HelpSupportTickets: React.FC = () => {
+export const HelpSupportTickets: React.FC<{ initialTab?: string }> = ({ initialTab }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { success, error } = useToast();
+
+  const activeTab = searchParams.get('tab') || initialTab || 'tickets';
+  const setActiveTab = (tab: string) => {
+    setSearchParams({ tab });
+  };
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
@@ -208,8 +218,131 @@ export const HelpSupportTickets: React.FC = () => {
         </button>
       </div>
 
-      {tickets.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-2xs space-y-3 max-w-md mx-auto">
+      {/* 9-Section Navigation Tabs (Master Prompt) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-1.5 flex items-center gap-1 overflow-x-auto text-xs font-semibold">
+        {[
+          { id: 'messages', label: '9.1 Project Messages' },
+          { id: 'tickets', label: `9.2 Support Tickets (${tickets.length})` },
+          { id: 'complaints', label: '9.3 Complaints & Disputes' },
+          { id: 'faqs', label: '9.4 Help Center & FAQs' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              activeTab === t.id
+                ? 'bg-navy-950 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'faqs' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6 text-xs">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+            <BookOpen className="w-5 h-5 text-blue-600" />
+            <div>
+              <h2 className="text-base font-bold text-navy-950 font-display">9.4 Help Center & Knowledge Base</h2>
+              <p className="text-slate-500">Frequently asked questions regarding BuildGhar escrow, site supervision, and BOQ revisions.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: 'How does BuildGhar Escrow Protection work for homeowners?',
+                a: 'All project milestone payments are held securely in a dedicated bank escrow account. Funds are released to your assigned contractor or architect firm only after you inspect and approve each stage completion on your project dashboard.',
+              },
+              {
+                q: 'What should I do if a contractor or vendor delays work?',
+                a: 'Navigate to "9.3 Complaints & Disputes" to lodge a formal delay report. BuildGhar platform administrators will review daily site reports and enforce the agreed contract timeline and penalty terms.',
+              },
+              {
+                q: 'How are architectural drawings and 3D elevations approved?',
+                a: 'Your architect uploads CAD working blueprints, structural layouts, and 3D models to your "7. Design & Documents" portal. You can review, download PDF packages, and digitally approve or request specific revisions.',
+              },
+              {
+                q: 'Can I return building materials ordered through the Material Store?',
+                a: 'Yes. Unopened and intact building materials can be returned within 48 hours of on-site delivery. Check "6.6 Return & Refund" under Material Management to initiate a collection request.',
+              },
+            ].map((faq, idx) => (
+              <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                <div className="font-bold text-navy-950 text-sm">{faq.q}</div>
+                <p className="text-slate-600 leading-relaxed text-xs">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'complaints' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6 text-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <div>
+                <h2 className="text-base font-bold text-navy-950 font-display">9.3 Formal Complaints & Technical Disputes</h2>
+                <p className="text-slate-500">Direct escalation channel to Super Admin Governance Desk for defect liability and delay resolution.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setCategory('PROJECT_EXECUTION');
+                setPriority('URGENT');
+                setNewTicketModalOpen(true);
+              }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <AlertCircle className="w-4 h-4" />
+              <span>File Formal Dispute</span>
+            </button>
+          </div>
+
+          <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+            <ShieldCheck className="w-8 h-8 text-emerald-600 mx-auto" />
+            <div className="font-bold text-slate-800 text-sm">Escrow Dispute Protection Active</div>
+            <p className="text-slate-500 max-w-md mx-auto leading-relaxed">
+              When a formal dispute is opened, milestone payments for the disputed stage are immediately frozen in escrow until technical resolution by BuildGhar Chief Engineer.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'messages' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6 text-xs">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+            <MessageSquare className="w-5 h-5 text-indigo-600" />
+            <div>
+              <h2 className="text-base font-bold text-navy-950 font-display">9.1 Direct Project Messages</h2>
+              <p className="text-slate-500">Real-time messaging with your assigned architect, contractor, and site supervisor.</p>
+            </div>
+          </div>
+
+          <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+            <MessageSquare className="w-10 h-10 text-slate-300 mx-auto" />
+            <div className="font-bold text-slate-700 text-sm">Direct Project Message Threads</div>
+            <p className="max-w-md mx-auto">
+              Real-time message threads are linked to your active project workspace.
+            </p>
+            <div className="pt-2">
+              <Link
+                to="/dashboard/projects/active?tab=messages"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-950 text-gold-400 font-bold rounded-xl text-xs"
+              >
+                <span>Open Project Chat Room</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'tickets' && (
+        tickets.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-2xs space-y-3 max-w-md mx-auto">
           <HelpCircle className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="font-bold text-slate-800 text-sm font-display">No Active Support Tickets</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
@@ -337,6 +470,7 @@ export const HelpSupportTickets: React.FC = () => {
             </div>
           )}
         </div>
+        )
       )}
 
       {/* New Ticket Modal */}

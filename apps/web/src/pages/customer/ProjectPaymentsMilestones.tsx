@@ -190,20 +190,24 @@ export const ProjectPaymentsMilestones: React.FC = () => {
           { id: 'pending', label: `Pending Approvals (${pendingMilestones.length})` },
           { id: 'due', label: 'Payments Due' },
           { id: 'history', label: `Payment History (${paidMilestones.length})` },
+          { id: 'payouts', label: 'Contractor Payout Status' },
           { id: 'settlement', label: 'Final Settlement' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2 rounded-xl transition ${
-              activeTab === t.id
-                ? 'bg-navy-950 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        ].map((t) => {
+          const isCurrent = activeTab === t.id || (t.id === 'pending' && activeTab === 'approvals');
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+                isCurrent
+                  ? 'bg-navy-950 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* TAB CONTENT */}
@@ -330,6 +334,66 @@ export const ProjectPaymentsMilestones: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'payouts' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 text-xs">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-base font-bold text-navy-950 font-display">Contractor Payout Status</h2>
+              <p className="text-slate-500 mt-0.5">
+                Real-time tracking of escrow disbursements to the assigned contractor and architectural firm.
+              </p>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              Escrow Guaranteed
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">Assigned Contractor</span>
+              <div className="font-bold text-navy-950 text-sm">{activeProject.contractorFirm || activeProject.contractorName}</div>
+              <div className="text-[11px] text-slate-500 font-mono">Phone: {activeProject.contractorPhone || 'Registered Firm'}</div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">Total Released Payouts</span>
+              <div className="font-bold text-emerald-700 text-sm font-mono">{formatINR(activeProject.totalPaidPaise)}</div>
+              <div className="text-[11px] text-emerald-800">Direct NEFT/RTGS to Verified Firm Bank Account</div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">Held in Escrow</span>
+              <div className="font-bold text-amber-700 text-sm font-mono">{formatINR(activeProject.amountDuePaise + activeProject.retentionPaise)}</div>
+              <div className="text-[11px] text-amber-800">Protected until milestone sign-off &amp; final inspection</div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <div className="font-bold text-slate-800 mb-2">Disbursement Tranche Records:</div>
+            {paidMilestones.length === 0 ? (
+              <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                No contractor payouts triggered yet. Payouts are triggered immediately upon customer milestone release.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {paidMilestones.map((m) => (
+                  <div key={m.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-navy-950">{m.title}</span>
+                      <div className="text-[11px] text-slate-500 font-mono">UTR: {m.transactionId} • Disbursed: {m.paidAt?.split('T')[0] || 'Processed'}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold font-mono text-emerald-700">{formatINR(m.amountPaise)}</div>
+                      <span className="text-[10px] text-slate-500">Net payout after statutory TDS</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

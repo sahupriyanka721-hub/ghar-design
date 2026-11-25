@@ -329,11 +329,15 @@ export const AdminRequestDetail: React.FC = () => {
       selectedProIds.forEach((proId) => {
         allAssignedTokens.add(proId);
         allAssignedTokens.add(proId.replace(/\s+/g, ''));
+        allAssignedTokens.add(proId.replace(/[\[\]]/g, ''));
+        allAssignedTokens.add(proId.toLowerCase().replace(/[^a-z0-9]/g, ''));
         const matched = professionals.find((p) => p.id === proId || p.userId === proId);
         if (matched) {
           if (matched.id) {
             allAssignedTokens.add(matched.id);
             allAssignedTokens.add(matched.id.replace(/\s+/g, ''));
+            allAssignedTokens.add(matched.id.replace(/[\[\]]/g, ''));
+            allAssignedTokens.add(matched.id.toLowerCase().replace(/[^a-z0-9]/g, ''));
           }
           if (matched.userId) allAssignedTokens.add(matched.userId);
           if (matched.firmName) {
@@ -364,6 +368,12 @@ export const AdminRequestDetail: React.FC = () => {
           if (archMatched.id) {
             allAssignedTokens.add(archMatched.id);
             allAssignedTokens.add(archMatched.id.replace(/\s+/g, ''));
+            allAssignedTokens.add(archMatched.id.replace(/[\[\]]/g, ''));
+            allAssignedTokens.add(archMatched.id.toLowerCase().replace(/[^a-z0-9]/g, ''));
+          }
+          if (archMatched.applicationNumber) {
+            allAssignedTokens.add(archMatched.applicationNumber);
+            allAssignedTokens.add(archMatched.applicationNumber.replace(/[\[\]]/g, ''));
           }
           if (archMatched.firmName) {
             allAssignedTokens.add(archMatched.firmName);

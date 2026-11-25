@@ -1284,8 +1284,8 @@ export const AdminArchitects: React.FC = () => {
                 </tr>
               ) : (
                 filtered.map((arch) => {
-                  const isApproved = arch.accountStatus === 'APPROVED';
-                  const isPending = arch.accountStatus === 'PENDING_APPROVAL';
+                  const isApproved = arch.accountStatus === 'APPROVED' && Boolean(arch.adminReviewedBy);
+                  const isPending = arch.accountStatus === 'PENDING_APPROVAL' || (!arch.adminReviewedBy && arch.accountStatus === 'APPROVED');
                   const isChanges = arch.accountStatus === 'CHANGES_REQUESTED';
                   const isSuspended = arch.accountStatus === 'SUSPENDED';
                   const review = arch.adminReview;
@@ -1460,7 +1460,7 @@ export const AdminArchitects: React.FC = () => {
                                  resolvedBank.ifscCode ||
                                  resolvedBank.cancelledChequeUrl)
                               );
-                              const isBankVerified = Boolean(resolvedBank?.isVerified);
+                              const isBankVerified = Boolean(hasBankData && resolvedBank?.isVerified);
 
                               if (isBankVerified) {
                                 return (
@@ -2148,15 +2148,20 @@ export const AdminArchitects: React.FC = () => {
                               <span>Bank Details &amp; Cheque Verification</span>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              {isBankVerified ? (
+                              {hasBankInfo && isBankVerified ? (
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                   <span>Verified ✓</span>
                                 </span>
-                              ) : (
+                              ) : hasBankInfo ? (
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                  <span>Pending Review</span>
+                                  <span>Pending Verification</span>
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>No Bank Details Added</span>
                                 </span>
                               )}
                             </div>

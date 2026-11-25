@@ -343,35 +343,37 @@ export const DashboardLayout: React.FC = () => {
             </div>
 
                 {/* 1. Dashboard */}
-                <Link
-                  to="/dashboard"
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
-                    location.pathname === '/dashboard'
-                      ? 'bg-navy-950 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <LayoutDashboard className={`w-4 h-4 ${location.pathname === '/dashboard' ? 'text-gold-400' : 'text-slate-400'}`} />
-                  <span className="flex-1">1. Dashboard</span>
-                </Link>
+                <div className="space-y-0.5">
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
+                      location.pathname === '/dashboard' && !location.search
+                        ? 'bg-navy-950 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <LayoutDashboard className={`w-4 h-4 ${location.pathname === '/dashboard' && !location.search ? 'text-gold-400' : 'text-slate-400'}`} />
+                    <span className="flex-1">1. Dashboard</span>
+                  </Link>
 
-                {/* Smart Cost & Material Estimator Tool */}
-                <Link
-                  to="/dashboard/calculator"
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
-                    location.pathname === '/dashboard/calculator'
-                      ? 'bg-navy-950 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Calculator className={`w-4 h-4 ${location.pathname === '/dashboard/calculator' ? 'text-gold-400' : 'text-slate-400'}`} />
-                  <span className="flex-1">Cost & Material Estimator</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gold-500/20 text-gold-700 border border-gold-300">
-                    Smart
-                  </span>
-                </Link>
+                  {/* Smart Cost & Material Estimator Tool */}
+                  <Link
+                    to="/dashboard/calculator"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
+                      location.pathname === '/dashboard/calculator'
+                        ? 'bg-navy-950 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Calculator className={`w-4 h-4 ${location.pathname === '/dashboard/calculator' ? 'text-gold-400' : 'text-slate-400'}`} />
+                    <span className="flex-1">Cost & Material Estimator</span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gold-500/20 text-gold-700 border border-gold-300">
+                      Smart
+                    </span>
+                  </Link>
+                </div>
 
                 {/* 2. Quotation Management */}
                 <div className="pt-1">
@@ -400,47 +402,47 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        <span>Get New Quotation</span>
+                        <span>2.1 Get New Quotation</span>
                         <PlusCircle className="w-3.5 h-3.5 text-gold-600" />
                       </Link>
                       <Link
                         to="/dashboard/quotations"
                         onClick={() => setSidebarOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md transition ${
-                          location.pathname === '/dashboard/quotations' && !location.search.includes('compare')
+                          location.pathname === '/dashboard/quotations' && !location.pathname.includes('/compare')
                             ? 'bg-navy-900 text-white font-semibold'
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        My Quotations
+                        2.2 My Quotations
                       </Link>
                       <Link
-                        to="/dashboard/quotations?compare=1"
+                        to="/dashboard/quotations/compare"
                         onClick={() => setSidebarOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md transition ${
-                          location.pathname === '/dashboard/quotations' && location.search.includes('compare')
+                          location.pathname.includes('/compare')
                             ? 'bg-navy-900 text-white font-semibold'
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Compare Quotations
+                        2.3 Compare Quotations
                       </Link>
                       <Link
-                        to="/dashboard/accepted-quotations"
+                        to="/dashboard/quotations?tab=history"
                         onClick={() => setSidebarOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md transition ${
-                          location.pathname === '/dashboard/accepted-quotations'
+                          location.search.includes('history')
                             ? 'bg-navy-900 text-white font-semibold'
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Accepted Quotations
+                        2.4 Quotation History
                       </Link>
                     </div>
                   )}
                 </div>
 
-                {/* 3. My Projects (Spec Part 1 & Part 3) */}
+                {/* 3. My Projects (Spec Master Prompt) */}
                 <div className="pt-1">
                   <button
                     onClick={() => setProjectsMenuOpen(!projectsMenuOpen)}
@@ -467,7 +469,7 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        All Projects
+                        3.1 All Projects
                       </Link>
                       <Link
                         to="/dashboard/projects/kickoff"
@@ -478,83 +480,83 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Start Work / Kickoff
+                        3.2 Project Kickoff
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=overview"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Project Overview
+                        3.3 Project Overview
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=work-plan"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Work Plan & Timeline
+                        3.4 Work Plan & Timeline
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=progress"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Work Progress Tracking
+                        3.5 Work Progress Tracking
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=daily-reports"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Daily Site Reports
+                        3.6 Daily Site Reports
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=tasks"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Project Tasks
+                        3.7 Task Management
                       </Link>
                       <Link
-                        to="/dashboard/track-service"
+                        to="/dashboard/projects/active?tab=milestones"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Stage & Milestone Tracking
+                        3.8 Milestone Management
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=drawings"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Design & Work Approvals
+                        3.9 Design & Work Approvals
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=issues"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Issues & Delays
+                        3.10 Issues & Complaints
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=documents"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Project Documents
+                        3.11 Project Documents
                       </Link>
                       <Link
                         to="/dashboard/projects/active?tab=handover"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Final Inspection & Handover
+                        3.12 Final Inspection & Handover
                       </Link>
                     </div>
                   )}
                 </div>
 
-                {/* 4. Project Payments & Milestones (Spec Part 1 & Part 7) */}
+                {/* 4. Project Payments & Milestones */}
                 <div className="pt-1">
                   <button
                     onClick={() => setProjectPaymentsMenuOpen(!projectPaymentsMenuOpen)}
@@ -577,35 +579,42 @@ export const DashboardLayout: React.FC = () => {
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Payment Schedule
+                        4.1 Payment Schedule
                       </Link>
                       <Link
-                        to="/dashboard/project-payments?tab=pending"
+                        to="/dashboard/project-payments?tab=approvals"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Pending Milestone Approvals
+                        4.2 Pending Milestone Approvals
                       </Link>
                       <Link
                         to="/dashboard/project-payments?tab=due"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Payments Due
+                        4.3 Payments Due
                       </Link>
                       <Link
                         to="/dashboard/project-payments?tab=history"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Payment History
+                        4.4 Payment History
+                      </Link>
+                      <Link
+                        to="/dashboard/project-payments?tab=payouts"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        4.5 Contractor Payout Status
                       </Link>
                       <Link
                         to="/dashboard/project-payments?tab=settlement"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Final Settlement
+                        4.6 Final Settlement
                       </Link>
                     </div>
                   )}
@@ -638,7 +647,7 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Book Services
+                        5.1 Book Services
                       </Link>
                       <Link
                         to="/dashboard/bookings"
@@ -649,20 +658,27 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Booking List
+                        5.2 Booking List
                       </Link>
                       <Link
-                        to="/dashboard/bookings"
+                        to="/dashboard/bookings?tab=visits"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Site Visits & Appointments
+                        5.3 Site Visits & Appointments
+                      </Link>
+                      <Link
+                        to="/dashboard/bookings?tab=professionals"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        5.4 Professional Details
                       </Link>
                     </div>
                   )}
                 </div>
 
-                {/* 6. Material Management */}
+                {/* 6. Material Management (Full E-Commerce) */}
                 <div className="pt-1">
                   <button
                     onClick={() => setMaterialMenuOpen(!materialMenuOpen)}
@@ -689,14 +705,14 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Buy Materials
+                        6.1 Buy Materials (Store)
                       </Link>
                       <Link
                         to="/dashboard/materials"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Shopping Cart
+                        6.2 Shopping Cart
                       </Link>
                       <Link
                         to="/dashboard/material-purchases"
@@ -707,14 +723,28 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        My Purchase
+                        6.4 My Purchase
                       </Link>
                       <Link
-                        to="/dashboard/material-purchases"
+                        to="/dashboard/material-purchases?tab=tracking"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Delivery Tracking
+                        6.5 Delivery Tracking
+                      </Link>
+                      <Link
+                        to="/dashboard/material-purchases?tab=refunds"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        6.6 Return & Refund
+                      </Link>
+                      <Link
+                        to="/dashboard/materials?tab=saved"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        6.7 Saved Products
                       </Link>
                     </div>
                   )}
@@ -739,52 +769,38 @@ export const DashboardLayout: React.FC = () => {
                   {designDocsMenuOpen && (
                     <div className="pl-7 pr-2 py-1 space-y-0.5 border-l-2 border-slate-100 ml-4">
                       <Link
-                        to="/dashboard/documents"
+                        to="/dashboard/documents?category=architectural"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Engineering Drawings
+                        7.1 Architectural Design
                       </Link>
                       <Link
-                        to="/dashboard/documents"
+                        to="/dashboard/documents?category=interior"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Interior Design
-                      </Link>
-                      <Link
-                        to="/dashboard/design-approvals"
-                        onClick={() => setSidebarOpen(false)}
-                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
-                      >
-                        Design Approvals
+                        7.2 Interior Design
                       </Link>
                       <Link
                         to="/dashboard/design-approvals"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Revisions
+                        7.3 Design Approval
                       </Link>
                       <Link
                         to="/dashboard/documents"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        BOQ & Estimates
-                      </Link>
-                      <Link
-                        to="/dashboard/documents"
-                        onClick={() => setSidebarOpen(false)}
-                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
-                      >
-                        Contracts & Agreements
+                        7.4 Documents & Contracts
                       </Link>
                     </div>
                   )}
                 </div>
 
-                {/* 8. Billing & Payments (Financial History) */}
+                {/* 8. Billing & Payments (Financial Records) */}
                 <div className="pt-1">
                   <button
                     onClick={() => setBillingMenuOpen(!billingMenuOpen)}
@@ -822,17 +838,24 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Invoices
+                        Invoices & Tax Invoices
                       </Link>
                       <Link
-                        to="/dashboard/payments"
+                        to="/dashboard/payments?tab=receipts"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Refunds
+                        Receipts & Records
                       </Link>
                       <Link
-                        to="/dashboard/payments"
+                        to="/dashboard/payments?tab=refunds"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        Refunds & Escrow
+                      </Link>
+                      <Link
+                        to="/dashboard/payments?tab=dues"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
@@ -861,7 +884,7 @@ export const DashboardLayout: React.FC = () => {
                   >
                     <div className="flex items-center gap-3">
                       <MessageSquare className="w-4 h-4 text-slate-400" />
-                      <span>9. Communication</span>
+                      <span>9. Communication & Support</span>
                     </div>
                     <ChevronDown
                       className={`w-3.5 h-3.5 text-slate-400 transform transition-transform ${
@@ -876,28 +899,28 @@ export const DashboardLayout: React.FC = () => {
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Project Messages
+                        9.1 Messages
                       </Link>
                       <Link
-                        to="/dashboard/projects/active?tab=messages"
+                        to="/dashboard/help?tab=tickets"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Contractor Communication
+                        9.2 Support Tickets
                       </Link>
                       <Link
-                        to="/dashboard/help"
+                        to="/dashboard/help?tab=complaints"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Help & Support
+                        9.3 Complaints & Disputes
                       </Link>
                       <Link
-                        to="/dashboard/help"
+                        to="/dashboard/help?tab=faqs"
                         onClick={() => setSidebarOpen(false)}
                         className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
                       >
-                        Complaints & Disputes
+                        9.4 Help Center & FAQs
                       </Link>
                     </div>
                   )}
@@ -931,9 +954,6 @@ export const DashboardLayout: React.FC = () => {
                     <Bell className={`w-4 h-4 ${location.pathname === '/dashboard/notifications' ? 'text-gold-400' : 'text-slate-400'}`} />
                     <span>11. Notifications</span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
-                    3
-                  </span>
                 </Link>
 
                 {/* 12. Settings */}
@@ -958,12 +978,12 @@ export const DashboardLayout: React.FC = () => {
                         to="/dashboard/settings"
                         onClick={() => setSidebarOpen(false)}
                         className={`block px-2.5 py-1.5 rounded-md transition ${
-                          location.pathname === '/dashboard/settings'
+                          location.pathname === '/dashboard/settings' && !location.search
                             ? 'bg-navy-900 text-white font-semibold'
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Profile Settings
+                        12.1 Profile Settings
                       </Link>
                       <Link
                         to="/dashboard/saved-addresses"
@@ -974,7 +994,7 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Saved Addresses & Properties
+                        12.2 Address Management
                       </Link>
                       <Link
                         to="/dashboard/security"
@@ -985,7 +1005,7 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Change Password / Security
+                        12.3 Account Security
                       </Link>
                       <Link
                         to="/dashboard/notification-preferences"
@@ -996,7 +1016,14 @@ export const DashboardLayout: React.FC = () => {
                             : 'text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Notification Preferences
+                        12.4 Preferences
+                      </Link>
+                      <Link
+                        to="/dashboard/settings?tab=account"
+                        onClick={() => setSidebarOpen(false)}
+                        className="block px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        12.5 Account Management
                       </Link>
                     </div>
                   )}

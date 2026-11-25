@@ -631,18 +631,22 @@ export const resolveArchitectBankDetails = (
     (d) => d.id === 'doc-cheque' || d.id === 'doc-cancelled-cheque' || (d as any).documentType === 'CANCELLED_CHEQUE'
   );
 
-  const anyVerified = Boolean(
-    arch?.accountStatus === 'APPROVED' ||
-    (existing && typeof existing.isVerified === 'boolean'
-      ? existing.isVerified
-      : (chosen && typeof chosen.isVerified === 'boolean' ? chosen.isVerified : false))
+  const hasRealAccount = Boolean(
+    (chosen.accountNumber && chosen.accountNumber.trim().length > 4) ||
+    (existing?.accountNumber && existing.accountNumber.trim().length > 4)
   );
+
+  // Bank is strictly verified ONLY if valid account number is provided AND explicitly marked verified
+  const anyVerified = Boolean(
+    hasRealAccount &&
+    ((existing && typeof existing.isVerified === 'boolean' && existing.isVerified) ||
+     (chosen && typeof chosen.isVerified === 'boolean' && chosen.isVerified))
+  );
+
   const anyChequeAccepted = Boolean(
-    arch?.accountStatus === 'APPROVED' ||
     chequeDoc?.status === 'VERIFIED' ||
-    (existing && typeof existing.isChequeAccepted === 'boolean'
-      ? existing.isChequeAccepted
-      : (chosen && typeof chosen.isChequeAccepted === 'boolean' ? chosen.isChequeAccepted : false))
+    (existing && typeof existing.isChequeAccepted === 'boolean' && existing.isChequeAccepted) ||
+    (chosen && typeof chosen.isChequeAccepted === 'boolean' && chosen.isChequeAccepted)
   );
 
   return {
@@ -866,7 +870,22 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
   const mergedMap = new Map<string, ArchitectKycDocument>();
   compiled.forEach((cDoc) => mergedMap.set(cDoc.id, cDoc));
 
-  existingDocs.forEach((eDoc) => {
+  // Also read stored KYC records for this phone to ensure verified documents are never lost
+  let storedPhoneDocs: ArchitectKycDocument[] = [];
+  if (cleanPhone) {
+    try {
+      const storedRaw = localStorage.getItem(`arch_kyc_${cleanPhone}`);
+      if (storedRaw) {
+        const parsed = JSON.parse(storedRaw);
+        if (Array.isArray(parsed)) storedPhoneDocs = parsed;
+      }
+    } catch {}
+  }
+
+  const allSourceDocs = [...existingDocs, ...storedPhoneDocs];
+
+  allSourceDocs.forEach((eDoc) => {
+    if (!eDoc) return;
     let matchedKey: string | undefined = undefined;
     if (mergedMap.has(eDoc.id)) {
       matchedKey = eDoc.id;
@@ -877,7 +896,14 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
         if (
           normEId === normCKey ||
           (eDoc.title && cDoc.title && eDoc.title.trim().toLowerCase() === cDoc.title.trim().toLowerCase()) ||
-          (eDoc.documentType && cDoc.documentType === eDoc.documentType && !cDoc.documentType.includes('DIRECTOR'))
+          (eDoc.documentType && cDoc.documentType === eDoc.documentType && !cDoc.documentType.includes('DIRECTOR')) ||
+          (eDoc.documentType === 'PAN_CARD' && cDoc.documentType === 'PAN_CARD') ||
+          (eDoc.documentType === 'AADHAAR_CARD' && cDoc.documentType === 'AADHAAR_CARD') ||
+          (eDoc.documentType === 'COA_CERTIFICATE' && cDoc.documentType === 'COA_CERTIFICATE') ||
+          (eDoc.documentType === 'FIRM_PAN' && cDoc.documentType === 'FIRM_PAN') ||
+          (eDoc.documentType === 'GSTIN_CERTIFICATE' && cDoc.documentType === 'GSTIN_CERTIFICATE') ||
+          (eDoc.documentType === 'FIRM_REGISTRATION' && cDoc.documentType === 'FIRM_REGISTRATION') ||
+          (eDoc.documentType === 'CANCELLED_CHEQUE' && cDoc.documentType === 'CANCELLED_CHEQUE')
         ) {
           matchedKey = key;
           break;
@@ -1099,8 +1125,8 @@ export const getArchitectAccounts = (): ArchitectAccount[] => {
 
       const rawAId = (a.id || a.applicationNumber || '').trim();
 
-      // If an architect has no adminReviewedBy and was marked approved with legacy unverified ID, reset to genuine PENDING_APPROVAL
-      if (!a.adminReviewedBy && a.accountStatus === 'APPROVED' && !a.isVerified) {
+      // If an architect has no explicit admin reviewer, they are strictly PENDING_APPROVAL and unverified
+      if (!a.adminReviewedBy) {
         a.accountStatus = 'PENDING_APPROVAL';
         a.isVerified = false;
       }
@@ -1157,14 +1183,13 @@ export const getArchitectAccounts = (): ArchitectAccount[] => {
         deduplicated.push(cleanA);
       } else {
         const existing = deduplicated[existingIdx];
-        // An architect is approved if either cleanA or existing was approved by admin
-        const isApproved =
-          (cleanA.accountStatus === 'APPROVED' && Boolean(cleanA.adminReviewedBy)) ||
-          (existing.accountStatus === 'APPROVED' && Boolean(existing.adminReviewedBy)) ||
-          cleanA.accountStatus === 'APPROVED' ||
-          existing.accountStatus === 'APPROVED';
+        // An architect is approved ONLY if admin explicitly verified and approved them
+        const isApproved = Boolean(
+          (cleanA.accountStatus === 'APPROVED' && cleanA.adminReviewedBy) ||
+          (existing.accountStatus === 'APPROVED' && existing.adminReviewedBy)
+        );
 
-        const finalStatus = isApproved ? 'APPROVED' : (cleanA.accountStatus || existing.accountStatus || 'PENDING_APPROVAL');
+        const finalStatus = isApproved ? 'APPROVED' : (cleanA.accountStatus === 'APPROVED' && !cleanA.adminReviewedBy ? 'PENDING_APPROVAL' : cleanA.accountStatus || existing.accountStatus || 'PENDING_APPROVAL');
         const finalReviewedBy = isApproved ? (cleanA.adminReviewedBy || existing.adminReviewedBy || 'Super Admin Review Desk') : undefined;
 
         const { name: finalMergedName, firmName: finalMergedFirm } = cleanPersonAndFirm(
@@ -1172,11 +1197,25 @@ export const getArchitectAccounts = (): ArchitectAccount[] => {
           cleanA.firmName || existing.firmName
         );
 
-        const mergedDocs = (cleanA.documents && cleanA.documents.length > 0)
-          ? cleanA.documents
-          : (existing.documents && existing.documents.length > 0)
-          ? existing.documents
-          : [];
+        // Merge documents properly so that verified statuses are preserved
+        const docMap = new Map<string, ArchitectKycDocument>();
+        (existing.documents || []).forEach((d) => docMap.set(d.id, d));
+        (cleanA.documents || []).forEach((d) => {
+          if (docMap.has(d.id)) {
+            const ex = docMap.get(d.id)!;
+            const keepVerified = ex.status === 'VERIFIED' || d.status === 'VERIFIED';
+            const keepRejected = !keepVerified && (ex.status === 'REJECTED' || d.status === 'REJECTED');
+            docMap.set(d.id, {
+              ...ex,
+              ...d,
+              status: keepVerified ? 'VERIFIED' : keepRejected ? 'REJECTED' : (d.status || ex.status || 'PENDING'),
+              fileUrl: (d.fileUrl && d.fileUrl.length > 20) ? d.fileUrl : ex.fileUrl,
+            });
+          } else {
+            docMap.set(d.id, d);
+          }
+        });
+        const mergedDocs = Array.from(docMap.values());
 
         const mergedServices = (cleanA.services && cleanA.services.length > 0)
           ? cleanA.services
@@ -1973,6 +2012,9 @@ export const updateArchitectDocumentStatus = (
   arch.updatedAt = new Date().toISOString();
   current[idx] = arch;
   safePersistArchitects(current);
+  try {
+    localStorage.setItem('gd_architect_accounts', JSON.stringify(current));
+  } catch {}
 
   const cleanPhone = (arch.phone || '').replace(/\D/g, '').slice(-10);
   if (cleanPhone) {

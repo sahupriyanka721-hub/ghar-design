@@ -133,7 +133,7 @@ export const ProjectWorkspace: React.FC = () => {
     };
 
     reload();
-    const interval = setInterval(reload, 2500);
+    const interval = setInterval(reload, 30000);
     window.addEventListener('storage', reload);
     return () => {
       clearInterval(interval);
