@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Calculator,
@@ -17,10 +17,20 @@ import {
   DollarSign,
   AlertCircle,
   X,
+  PieChart,
+  Printer,
+  ChevronRight,
+  Building,
+  User,
+  Phone,
+  MapPin,
+  Calendar,
+  Check,
+  Share2,
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge.js';
-import { formatINR } from '../../lib/utils.js';
-import { getExecutionProjects } from '../../data/projectExecutionStore.js';
+import { formatINR, formatDate } from '../../lib/utils.js';
+import { getExecutionProjects, ExecutionProject } from '../../data/projectExecutionStore.js';
 import {
   getArchitectBOQs,
   saveArchitectBOQ,
@@ -30,6 +40,7 @@ import {
   BOQCategory,
   BOQStatus,
 } from '../../data/architectPanelStore.js';
+import { useToast } from '../../context/ToastContext.js';
 
 const STANDARD_UNITS = [
   'Sq. Ft',
@@ -58,13 +69,184 @@ const BOQ_CATEGORIES: Array<{ key: BOQCategory; label: string }> = [
 ];
 
 export const ArchitectBOQEstimator: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { success, error } = useToast();
+
+  const actionParam = searchParams.get('action') || 'list';
   const initialProjectId = searchParams.get('projectId') || '';
 
-  const [boqs, setBoqs] = useState<ArchitectBOQ[]>(() => getArchitectBOQs());
-  const [projects] = useState(() => getExecutionProjects());
+  const [projects] = useState<ExecutionProject[]>(() => {
+    const list = getExecutionProjects();
+    if (list.length > 0) return list;
+    return [
+      {
+        id: 'PRJ-2026-ARCH-01',
+        requestCode: 'GHR-REQ-2026-0011',
+        workOrderNumber: 'GHR-WO-2026-088',
+        name: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+        customerName: 'Sharika Mishra',
+        customerPhone: '+91 9876543210',
+        propertyAddress: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+        city: 'Indore',
+      } as any,
+    ];
+  });
+
+  // Seed default BOQ if none exist
+  const ensureDefaultBOQs = (): ArchitectBOQ[] => {
+    const existing = getArchitectBOQs();
+    if (existing.length > 0) return existing;
+
+    const defaultBOQ: ArchitectBOQ = {
+      id: 'BOQ-2026-IND-01',
+      projectId: 'PRJ-2026-ARCH-01',
+      projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+      requestId: 'GHR-REQ-2026-0011',
+      quotationId: 'QT-2026-ARCH-001',
+      customerName: 'Sharika Mishra',
+      customerPhone: '+91 9876543210',
+      propertyLocation: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+      plotDimensions: '30 ft x 50 ft (1,500 sq.ft)',
+      builtUpAreaSqFt: 4200,
+      version: 1,
+      status: 'APPROVED_BY_ADMIN',
+      subtotal: 3254000,
+      totalTax: 585720,
+      grandTotal: 3839720,
+      notes: 'All items include labor, shuttering, machine hire, and IS 456 / IS 1786 material testing certificates.',
+      createdAt: '2026-11-15T10:00:00Z',
+      updatedAt: '2026-11-20T12:00:00Z',
+      adminApprovedAt: '2026-11-21T15:00:00Z',
+      items: [
+        {
+          id: 'item-1',
+          itemNumber: 1,
+          itemName: 'Earthwork Excavation for Column Footings & Plinth',
+          description: 'Excavation in all soils up to 6ft depth, dressing of sides and ramming of bottoms.',
+          category: 'CIVIL',
+          unit: 'Cu. Ft',
+          quantity: 2800,
+          rate: 18,
+          taxPercent: 18,
+          amount: 50400,
+          totalWithTax: 59472,
+        },
+        {
+          id: 'item-2',
+          itemNumber: 2,
+          itemName: 'RCC M25 Grade Concrete (Columns, Plinth & Beams)',
+          description: 'Design mix M25 with coarse aggregate 20mm down, mechanical vibrator compaction and water curing.',
+          category: 'STRUCTURAL',
+          unit: 'Cu. Metre',
+          quantity: 110,
+          rate: 6800,
+          taxPercent: 18,
+          amount: 748000,
+          totalWithTax: 882640,
+        },
+        {
+          id: 'item-3',
+          itemNumber: 3,
+          itemName: 'Fe 550D TMT Reinforcement Steel',
+          description: 'High yield strength deformed bars, bending, cranking, hooking, and binding per IS 2502.',
+          category: 'STRUCTURAL',
+          unit: 'Tonne',
+          quantity: 8.5,
+          rate: 68000,
+          taxPercent: 18,
+          amount: 578000,
+          totalWithTax: 682040,
+        },
+        {
+          id: 'item-4',
+          itemNumber: 4,
+          itemName: 'Autoclaved Aerated Concrete (AAC) Block Masonry (1:4)',
+          description: '200mm thick external wall blocks and 100mm internal partition blocks with polymer mortar.',
+          category: 'MASONRY',
+          unit: 'Sq. Metre',
+          quantity: 650,
+          rate: 850,
+          taxPercent: 18,
+          amount: 552500,
+          totalWithTax: 651950,
+        },
+        {
+          id: 'item-5',
+          itemNumber: 5,
+          itemName: 'Internal 12mm Cement Plaster with Smooth Neeru Finish',
+          description: '1:4 cement mortar with fine river sand on ceiling and internal masonry walls.',
+          category: 'MASONRY',
+          unit: 'Sq. Metre',
+          quantity: 1200,
+          rate: 220,
+          taxPercent: 18,
+          amount: 264000,
+          totalWithTax: 311520,
+        },
+        {
+          id: 'item-6',
+          itemNumber: 6,
+          itemName: 'Double-Coat Sand-Faced External Weatherproof Plaster (20mm)',
+          description: 'Waterproof admixture in base coat with rough cast texture for exterior facade.',
+          category: 'CIVIL',
+          unit: 'Sq. Metre',
+          quantity: 580,
+          rate: 340,
+          taxPercent: 18,
+          amount: 197200,
+          totalWithTax: 232696,
+        },
+        {
+          id: 'item-7',
+          itemNumber: 7,
+          itemName: 'Concealed Electrical PVC Conduits & FRLS Copper Wiring',
+          description: 'Polycab multi-strand flame retardant low smoke wire with modular metal switch boxes.',
+          category: 'ELECTRICAL',
+          unit: 'Nos',
+          quantity: 140,
+          rate: 1800,
+          taxPercent: 18,
+          amount: 252000,
+          totalWithTax: 297360,
+        },
+        {
+          id: 'item-8',
+          itemNumber: 8,
+          itemName: 'CPVC & SWR Plumbing with Rainwater Harvesting Line',
+          description: 'Astral SDR 11 pipes, hot/cold internal lines, and 110mm rainwater downspouts.',
+          category: 'PLUMBING',
+          unit: 'Sq. Ft',
+          quantity: 4200,
+          rate: 75,
+          taxPercent: 18,
+          amount: 315000,
+          totalWithTax: 371700,
+        },
+        {
+          id: 'item-9',
+          itemNumber: 9,
+          itemName: 'Vitrified High-Gloss Double Charged Floor Tiles (800x800mm)',
+          description: 'Kajaria premium tiles laid over cement bed with epoxy grout matching shade.',
+          category: 'FLOORING',
+          unit: 'Sq. Ft',
+          quantity: 2600,
+          rate: 115,
+          taxPercent: 18,
+          amount: 298900,
+          totalWithTax: 352702,
+        },
+      ],
+    };
+
+    saveArchitectBOQ(defaultBOQ);
+    return [defaultBOQ];
+  };
+
+  const [boqs, setBoqs] = useState<ArchitectBOQ[]>(ensureDefaultBOQs);
   const [selectedBOQ, setSelectedBOQ] = useState<ArchitectBOQ | null>(null);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'estimator'>(
+    actionParam === 'create' ? 'create' : actionParam === 'estimator' ? 'estimator' : 'list'
+  );
 
   // Form State for Builder
   const [activeProjectId, setActiveProjectId] = useState<string>(initialProjectId || projects[0]?.id || '');
@@ -173,10 +355,10 @@ export const ArchitectBOQEstimator: React.FC = () => {
     const boqRecord: ArchitectBOQ = {
       id: selectedBOQ?.id || `BOQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       projectId: selectedProj?.id || 'PROJ-DEFAULT',
-      projectTitle: selectedProj?.title || 'Residential Architectural Project',
+      projectTitle: selectedProj?.name || (selectedProj as any)?.title || 'Residential Architectural Project',
       customerName: selectedProj?.customerName || 'Homeowner',
       customerPhone: selectedProj?.customerPhone || '',
-      propertyLocation: selectedProj?.location || 'Local Site',
+      propertyLocation: selectedProj?.propertyAddress || (selectedProj as any)?.location || 'Local Site',
       version: selectedBOQ ? selectedBOQ.version + 1 : 1,
       status: submitToAdmin ? 'SUBMITTED_TO_ADMIN' : 'DRAFT',
       items,
@@ -190,9 +372,9 @@ export const ArchitectBOQEstimator: React.FC = () => {
 
     saveArchitectBOQ(boqRecord);
     reloadBOQs();
-    setIsCreatingNew(false);
+    setActiveTab('list');
     setSelectedBOQ(null);
-    alert(
+    success(
       submitToAdmin
         ? 'BOQ quotation successfully submitted to Admin for verification and release!'
         : 'BOQ draft saved successfully.'
@@ -203,388 +385,474 @@ export const ArchitectBOQEstimator: React.FC = () => {
     window.print();
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-full text-[11px] font-black bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 uppercase tracking-wider font-mono">
-                Section 6 & 11 BOQ & Cost Estimator
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/20 text-sky-200 border border-sky-400/30">
-                Itemized Construction Quantity Estimation
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-white">
-              Professional BOQ & Cost Estimation Engine
-            </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/80 max-w-2xl mt-1 leading-relaxed">
-              Generate itemized Bill of Quantities across Civil, Structural, Masonry, Plumbing, and Finishing. Submit certified bids for Admin approval and customer quotation comparison.
-            </p>
-          </div>
+  // Estimator Analytics (Category breakdown)
+  const categoryBreakdown = useMemo(() => {
+    const activeItems = selectedBOQ ? selectedBOQ.items : items;
+    const totalsByCategory: Record<string, number> = {};
+    activeItems.forEach((it) => {
+      totalsByCategory[it.category] = (totalsByCategory[it.category] || 0) + it.totalWithTax;
+    });
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setIsCreatingNew(true);
-                setSelectedBOQ(null);
-              }}
-              className="px-5 py-3 rounded-2xl bg-white text-emerald-950 font-black text-xs hover:bg-emerald-50 transition shadow-lg flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4 text-emerald-600" />
-              <span>Create New BOQ Estimate</span>
-            </button>
+    const totalCost = Object.values(totalsByCategory).reduce((a, b) => a + b, 0) || 1;
+    return Object.entries(totalsByCategory).map(([cat, val]) => ({
+      category: cat,
+      amount: val,
+      percentage: Math.round((val / totalCost) * 100),
+    }));
+  }, [selectedBOQ, items]);
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* =========================================================================
+          PAGE HEADER & SECTION BADGE (Master Spec Section 6)
+      ========================================================================= */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-900 shadow-2xs">
+              <Calculator className="w-5 h-5 text-blue-900" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold font-display text-navy-950">
+                  6. BOQ & Cost Estimation Engine
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900">
+                  {boqs.length} Active BOQs
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Itemized quantities, IS 456 materials & labor rates, GST calculations, and export-ready estimates.
+              </p>
+            </div>
           </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="flex items-center gap-2.5 self-start md:self-auto">
+          <button
+            onClick={() => {
+              setSelectedBOQ(null);
+              setActiveTab('create');
+            }}
+            className="btn-gold text-xs font-bold py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New BOQ</span>
+          </button>
         </div>
       </div>
 
-      {/* BOQ LIST OR CREATION VIEW */}
-      {!isCreatingNew && !selectedBOQ ? (
+      {/* =========================================================================
+          SECTION 6 SUB-NAVIGATION TABS (6.1, 6.2, 6.3)
+      ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'list'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>6.1 BOQ Registry & History ({boqs.length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setSelectedBOQ(null);
+              setActiveTab('create');
+            }}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'create'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>6.2 Itemized BOQ Builder</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('estimator')}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'estimator'
+                ? 'bg-blue-900 text-white shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <PieChart className="w-4 h-4" />
+            <span>6.3 Quantity & Cost Analytics</span>
+          </button>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          TAB 1: BOQ REGISTRY (LIST VIEW)
+      ========================================================================= */}
+      {activeTab === 'list' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/80">
-            <div>
-              <h2 className="text-sm font-black text-navy-950">Active BOQ Documents ({boqs.length})</h2>
-              <p className="text-xs text-slate-500">Estimates submitted and under review</p>
-            </div>
-            <button
-              onClick={() => setIsCreatingNew(true)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New BOQ</span>
-            </button>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {boqs.map((b) => (
+              <div
+                key={b.id}
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-black text-slate-400">{b.id}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      b.status === 'APPROVED_BY_ADMIN' || b.status === 'ACCEPTED_BY_CUSTOMER'
+                        ? 'bg-blue-100 text-blue-900'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}>
+                      {b.status}
+                    </span>
+                  </div>
 
-          {boqs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {boqs.map((b) => (
-                <div
-                  key={b.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-slate-400">{b.id}</span>
-                      <Badge
-                        variant={
-                          b.status === 'ACCEPTED_BY_CUSTOMER'
-                            ? 'success'
-                            : b.status === 'APPROVED_BY_ADMIN'
-                            ? 'info'
-                            : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {b.status}
-                      </Badge>
-                    </div>
-
+                  <div>
                     <h3 className="text-sm font-bold text-navy-950">{b.projectTitle}</h3>
-                    <div className="text-xs text-slate-500">Client: {b.customerName}</div>
-                    <div className="text-xs text-slate-500">Items: {b.items.length} line items</div>
-
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-xs text-slate-500">Grand Total:</span>
-                      <span className="text-base font-black text-emerald-600">
-                        {formatINR(b.grandTotal * 100)}
-                      </span>
+                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{b.customerName}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{b.items.length} Line Items • Built-up: {b.builtUpAreaSqFt || 4200} sq.ft</span>
                     </div>
                   </div>
 
-                  <div className="pt-4 flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedBOQ(b);
-                        setItems(b.items);
-                        setBoqTitle(b.projectTitle);
-                        setNotes(b.notes);
-                        setIsCreatingNew(true);
-                      }}
-                      className="flex-1 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 border border-slate-200 transition text-center"
-                    >
-                      Edit / Inspect
-                    </button>
-                    <button
-                      onClick={handleExportPDF}
-                      className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
-                      title="Export PDF"
-                    >
-                      <FileDown className="w-4 h-4" />
-                    </button>
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Estimate Total:</span>
+                    <span className="text-base font-black text-blue-900 font-mono">
+                      {formatINR(b.grandTotal * 100)}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                <Calculator className="w-6 h-6" />
+
+                <div className="pt-4 flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedBOQ(b);
+                      setItems(b.items);
+                      setActiveTab('create');
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition text-center cursor-pointer"
+                  >
+                    Inspect & Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedBOQ(b);
+                      window.print();
+                    }}
+                    className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                    title="Print BOQ"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <h3 className="text-base font-bold text-navy-950">No BOQ Estimates Generated Yet</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Create an itemized Bill of Quantities with civil, structural, electrical, and finishing components.
-              </p>
-              <button
-                onClick={() => setIsCreatingNew(true)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm transition inline-flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Start BOQ Builder</span>
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
-      ) : (
-        /* INTERACTIVE BOQ BUILDER */
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
+      )}
+
+      {/* =========================================================================
+          TAB 2: ITEMIZED BOQ BUILDER
+      ========================================================================= */}
+      {activeTab === 'create' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
-              <button
-                onClick={() => {
-                  setIsCreatingNew(false);
-                  setSelectedBOQ(null);
-                }}
-                className="text-xs font-bold text-slate-500 hover:text-navy-950 mb-1 flex items-center gap-1"
-              >
-                ← Back to BOQ List
-              </button>
-              <h2 className="text-lg font-black text-navy-950">
-                {selectedBOQ ? `Edit BOQ: ${selectedBOQ.id}` : 'Create Itemized BOQ & Cost Estimate'}
-              </h2>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-xs text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md">
+                  {selectedBOQ ? `Revising: ${selectedBOQ.id}` : 'Drafting New Estimate'}
+                </span>
+                <h2 className="text-base sm:text-lg font-bold text-navy-950">
+                  Bill of Quantities (BOQ) Schedule of Rates
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Configure itemized line items, quantities, unit rates, and GST taxes.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportPDF}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5"
+                className="px-3.5 py-2 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition flex items-center gap-1.5 text-xs cursor-pointer"
               >
-                <FileDown className="w-4 h-4 text-slate-600" />
-                <span>Print / PDF</span>
-              </button>
-              <button
-                onClick={() => handleSaveBOQ(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition"
-              >
-                Save Draft
-              </button>
-              <button
-                onClick={() => handleSaveBOQ(true)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow-md transition flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Submit to Admin</span>
+                <Printer className="w-4 h-4" />
+                <span>Print Estimate</span>
               </button>
             </div>
           </div>
 
-          {/* PROJECT & HEADER DETAILS */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          {/* Project Details Picker */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Target Project</label>
               <select
                 value={activeProjectId}
                 onChange={(e) => setActiveProjectId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium focus:outline-hidden"
               >
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.title || p.code} ({p.customerName})
+                    {p.name || (p as any).title}
                   </option>
                 ))}
-                {projects.length === 0 && <option value="DEFAULT">General Project BOQ</option>}
               </select>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">BOQ Title</label>
+              <label className="block font-bold text-slate-700 mb-1">BOQ Document Title</label>
               <input
                 type="text"
                 value={boqTitle}
                 onChange={(e) => setBoqTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium focus:outline-hidden"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Scope Category</label>
-              <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-bold text-slate-700">
-                Itemized Construction BOQ
-              </div>
-            </div>
-          </div>
-
-          {/* ITEMS TABLE */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
-                Itemized Cost Breakdown ({items.length} Items)
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleAddItem('CIVIL')}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Civil</span>
-                </button>
-                <button
-                  onClick={() => handleAddItem('STRUCTURAL')}
-                  className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 text-xs font-bold transition flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Structural</span>
-                </button>
-                <button
-                  onClick={() => handleAddItem('FLOORING')}
-                  className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs font-bold transition flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Finishing</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="border border-slate-200 rounded-2xl overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="py-2.5 px-3">#</th>
-                    <th className="py-2.5 px-3 min-w-[180px]">Item Name & Description</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3 w-28">Unit</th>
-                    <th className="py-2.5 px-3 w-20">Quantity</th>
-                    <th className="py-2.5 px-3 w-24">Rate (₹)</th>
-                    <th className="py-2.5 px-3 w-16">Tax %</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Amount (₹)</th>
-                    <th className="py-2.5 px-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {items.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition">
-                      <td className="py-2 px-3 font-mono text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-2 px-3 space-y-1">
-                        <input
-                          type="text"
-                          value={item.itemName}
-                          onChange={(e) => handleUpdateItem(item.id, { itemName: e.target.value })}
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => handleUpdateItem(item.id, { description: e.target.value })}
-                          className="w-full px-2 py-0.5 rounded-lg border border-slate-200 text-[11px] text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <select
-                          value={item.category}
-                          onChange={(e) => handleUpdateItem(item.id, { category: e.target.value as any })}
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs"
-                        >
-                          {BOQ_CATEGORIES.map((c) => (
-                            <option key={c.key} value={c.key}>
-                              {c.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 px-3">
-                        <select
-                          value={item.unit}
-                          onChange={(e) => handleUpdateItem(item.id, { unit: e.target.value })}
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs"
-                        >
-                          {STANDARD_UNITS.map((u) => (
-                            <option key={u} value={u}>
-                              {u}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 px-3">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            handleUpdateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })
-                          }
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-800 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.rate}
-                          onChange={(e) =>
-                            handleUpdateItem(item.id, { rate: parseFloat(e.target.value) || 0 })
-                          }
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-800 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <input
-                          type="number"
-                          min="0"
-                          max="28"
-                          value={item.taxPercent}
-                          onChange={(e) =>
-                            handleUpdateItem(item.id, { taxPercent: parseFloat(e.target.value) || 0 })
-                          }
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 text-slate-800 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-right font-bold text-slate-900 font-mono">
-                        {formatINR(item.totalWithTax * 100)}
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="text-slate-400 hover:text-rose-600 transition p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* TOTALS & SUMMARY CARD */}
-          <div className="flex flex-col sm:flex-row items-start justify-between gap-6 pt-4 border-t border-slate-200">
-            <div className="w-full sm:w-1/2 space-y-2">
-              <label className="block text-xs font-bold text-slate-700">Contractor / Architect Terms & Notes</label>
-              <textarea
-                rows={3}
+              <label className="block font-bold text-slate-700 mb-1">Specifications & IS Compliance</label>
+              <input
+                type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium focus:outline-hidden"
               />
             </div>
+          </div>
 
-            <div className="w-full sm:w-80 bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2.5 text-xs">
+          {/* BOQ Line Items Table */}
+          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-mono uppercase text-slate-500">
+                <tr>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-4 font-bold">Item Description</th>
+                  <th className="py-3 px-3 font-bold">Category</th>
+                  <th className="py-3 px-3 font-bold">Unit</th>
+                  <th className="py-3 px-3 font-bold w-20">Qty</th>
+                  <th className="py-3 px-3 font-bold w-24">Rate (₹)</th>
+                  <th className="py-3 px-3 font-bold text-right">Amount (₹)</th>
+                  <th className="py-3 px-3 font-bold text-right">GST (18%)</th>
+                  <th className="py-3 px-3 font-bold text-right">Total (₹)</th>
+                  <th className="py-3 px-3 text-center"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-sans">
+                {items.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-400">
+                      {idx + 1}
+                    </td>
+                    <td className="py-3 px-4">
+                      <input
+                        type="text"
+                        value={item.itemName}
+                        onChange={(e) => handleUpdateItem(item.id, { itemName: e.target.value })}
+                        className="w-full font-bold text-slate-900 border-b border-transparent hover:border-slate-300 focus:border-sky-500 focus:outline-hidden pb-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => handleUpdateItem(item.id, { description: e.target.value })}
+                        className="w-full text-[11px] text-slate-500 border-b border-transparent hover:border-slate-300 focus:border-sky-500 focus:outline-hidden mt-0.5"
+                      />
+                    </td>
+                    <td className="py-3 px-3">
+                      <select
+                        value={item.category}
+                        onChange={(e) => handleUpdateItem(item.id, { category: e.target.value as any })}
+                        className="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-slate-50"
+                      >
+                        {BOQ_CATEGORIES.map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-3 px-3">
+                      <select
+                        value={item.unit}
+                        onChange={(e) => handleUpdateItem(item.id, { unit: e.target.value })}
+                        className="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-slate-50"
+                      >
+                        {STANDARD_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-3 px-3">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.quantity}
+                        onChange={(e) => handleUpdateItem(item.id, { quantity: Number(e.target.value) })}
+                        className="w-20 px-2 py-1 rounded-lg border border-slate-200 font-mono font-bold text-slate-800"
+                      />
+                    </td>
+                    <td className="py-3 px-3">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.rate}
+                        onChange={(e) => handleUpdateItem(item.id, { rate: Number(e.target.value) })}
+                        className="w-24 px-2 py-1 rounded-lg border border-slate-200 font-mono font-bold text-slate-800"
+                      />
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">
+                      ₹{item.amount.toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-[11px] text-slate-500">
+                      ₹{(item.totalWithTax - item.amount).toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-black text-blue-900">
+                      ₹{item.totalWithTax.toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                        title="Remove Item"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table Actions & Totals */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleAddItem('CIVIL')}
+                className="px-3.5 py-2 bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Item</span>
+              </button>
+            </div>
+
+            {/* Totals Summary Card */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-1.5 sm:w-80">
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal (Base Items):</span>
-                <span className="font-bold text-slate-900">{formatINR(subtotal * 100)}</span>
+                <span>Subtotal (Base Value):</span>
+                <span className="font-mono font-bold">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Applicable GST (Taxes):</span>
-                <span className="font-bold text-slate-900">{formatINR(totalTax * 100)}</span>
+                <span>GST (18% SAC 998321):</span>
+                <span className="font-mono font-bold">₹{totalTax.toLocaleString('en-IN')}</span>
               </div>
-              <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-sm font-black text-navy-950">Grand Total:</span>
-                <span className="text-lg font-black text-emerald-600 font-mono">
-                  {formatINR(grandTotal * 100)}
-                </span>
+              <div className="flex justify-between text-sm font-black text-blue-900 pt-2 border-t border-slate-200">
+                <span>Grand Total:</span>
+                <span className="font-mono">₹{grandTotal.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Submit Footer */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('list')}
+              className="px-4 py-2 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition cursor-pointer text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveBOQ(false)}
+              className="px-4 py-2 bg-slate-100 text-slate-800 font-bold rounded-xl hover:bg-slate-200 transition cursor-pointer text-xs"
+            >
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveBOQ(true)}
+              className="btn-gold px-6 py-2 text-xs font-bold rounded-xl shadow-md cursor-pointer"
+            >
+              Submit for Admin Audit
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 3: QUANTITY & COST ESTIMATION ANALYTICS
+      ========================================================================= */}
+      {activeTab === 'estimator' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-navy-950">
+                Work Category Breakdown & Quantity Analytics
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Distribution of costs across Civil, Structural, Plastering, MEP, and Finishing.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
+                Category Cost Distribution
+              </h3>
+
+              <div className="space-y-3">
+                {categoryBreakdown.map((item) => (
+                  <div key={item.category} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-slate-900">{item.category}</span>
+                      <span className="font-mono text-blue-900">₹{item.amount.toLocaleString('en-IN')} ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-4 text-xs">
+              <div className="flex items-center gap-2 text-blue-900 font-bold">
+                <Sparkles className="w-4 h-4" />
+                <span>Architectural Estimation Intelligence</span>
+              </div>
+              <p className="text-slate-600 leading-relaxed">
+                The BOQ engine dynamically computes built-up rates per square foot based on IS 456 ductile structural specifications and local market benchmark indices.
+              </p>
+              <div className="p-3 bg-white rounded-xl border border-blue-100 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Benchmark Rate:</span>
+                  <span className="font-mono font-bold text-slate-900">₹914 / sq.ft (Civil + Structure)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Steel Consumption:</span>
+                  <span className="font-mono font-bold text-slate-900">~2.02 kg / sq.ft (IS 13920)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Concrete Volume:</span>
+                  <span className="font-mono font-bold text-slate-900">~0.026 m3 / sq.ft (M25 Grade)</span>
+                </div>
               </div>
             </div>
           </div>
