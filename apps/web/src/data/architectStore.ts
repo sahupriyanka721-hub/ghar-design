@@ -6,12 +6,19 @@ import { pushToCloud } from './cloudSync.js';
  */
 
 export type ArchitectAccountStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
   | 'PROFILE_INCOMPLETE'
+  | 'PENDING_REVIEW'
+  | 'UNDER_VERIFICATION'
+  | 'DOCUMENTS_REQUIRED'
+  | 'RESUBMISSION_REQUIRED'
   | 'PENDING_APPROVAL'
   | 'CHANGES_REQUESTED'
   | 'APPROVED'
   | 'REJECTED'
-  | 'SUSPENDED';
+  | 'SUSPENDED'
+  | 'DEACTIVATED';
 
 export type ArchitectBusinessType =
   | 'Individual'
@@ -114,12 +121,24 @@ export interface ArchitectAccount {
   name: string;
   phone: string;
   email: string;
+  dob?: string;
+  alternatePhone?: string;
+  gender?: string;
   profilePhoto?: string;
   designation: string;
   experienceYears: number;
   bio: string;
 
-  // Business Details
+  // Professional Information (Section 3.2 Step 3)
+  qualification?: string;
+  degree?: string;
+  university?: string;
+  graduationYear?: number;
+  specialization?: string;
+  languages?: string[];
+  skills?: string[];
+
+  // Business Details (Section 3.2 Step 2)
   firmName: string;
   businessType: ArchitectBusinessType;
   firmRegistrationNumber?: string;
@@ -127,18 +146,23 @@ export interface ArchitectAccount {
   teamSize: number;
   architectsCount: number;
   website?: string;
+  businessEmail?: string;
+  businessPhone?: string;
   gstin?: string;
   panNumber: string;
   coaNumber?: string;
 
-  // Address
+  // Address & Service Areas (Section 3.2 Step 7)
   address: string;
   district?: string;
   city: string;
   state: string;
+  country?: string;
   nearbyStates?: string[];
   pincode: string;
   serviceCities: string[];
+  servicePincodes?: string[];
+  remoteConsultation?: boolean;
 
   // Professional Services Offered (from the 21 master prompt categories)
   services: string[];

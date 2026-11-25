@@ -33,6 +33,11 @@ import {
   Download,
   ExternalLink,
   Loader2,
+  GraduationCap,
+  Globe,
+  Languages,
+  Calendar,
+  PhoneCall,
 } from 'lucide-react';
 import { lookupIfscCode } from '../../lib/ifscLookup.js';
 import { BrandLogo } from '../../components/common/BrandLogo.js';
@@ -357,6 +362,9 @@ export const ArchitectProfileWizard: React.FC = () => {
     name: initialName,
     phone: user?.phone || initialUser?.phone || initialPhone,
     email: user?.email || initialUser?.email || '',
+    dob: '',
+    gender: 'Male',
+    alternatePhone: '',
     profilePhoto: (() => {
       const stored = initialPhone ? localStorage.getItem(`arch_photo_${initialPhone}`) : '';
       if (stored && isRealUserPhoto(stored)) return stored;
@@ -366,6 +374,13 @@ export const ArchitectProfileWizard: React.FC = () => {
     })(),
     designation: '',
     experienceYears: '' as any,
+    qualification: 'B.Arch',
+    degree: 'Bachelor of Architecture',
+    university: '',
+    graduationYear: '' as any,
+    specialization: 'Residential Architecture',
+    languages: ['English', 'Hindi'] as string[],
+    skills: ['AutoCAD', 'Revit BIM', 'SketchUp', '3ds Max'] as string[],
     bio: '',
   });
 
@@ -377,6 +392,8 @@ export const ArchitectProfileWizard: React.FC = () => {
     teamSize: '' as any,
     architectsCount: '' as any,
     website: '',
+    businessEmail: '',
+    businessPhone: '',
     gstin: '',
     panNumber: '',
     coaNumber: '',
@@ -385,6 +402,7 @@ export const ArchitectProfileWizard: React.FC = () => {
     city: '',
     state: '',
     pincode: '',
+    country: 'India',
   });
 
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -438,6 +456,8 @@ export const ArchitectProfileWizard: React.FC = () => {
   const [kycDocuments, setKycDocuments] = useState<ArchitectKycDocument[]>([]);
 
   const [serviceCities, setServiceCities] = useState<string[]>([]);
+  const [remoteConsultation, setRemoteConsultation] = useState<boolean>(true);
+  const [servicePincodesText, setServicePincodesText] = useState<string>('');
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
   const cityDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -690,9 +710,19 @@ export const ArchitectProfileWizard: React.FC = () => {
         name: isNameFirmDuplicate ? '' : (draft?.personal?.name || prev.name || rawName),
         phone: draft?.personal?.phone || existing?.phone || lookupPhone || user?.phone || initialUser?.phone || prev.phone,
         email: draft?.personal?.email || existing?.email || user?.email || initialUser?.email || prev.email,
+        dob: draft?.personal?.dob || existing?.dob || prev.dob || '',
+        gender: draft?.personal?.gender || existing?.gender || prev.gender || 'Male',
+        alternatePhone: draft?.personal?.alternatePhone || existing?.alternatePhone || prev.alternatePhone || '',
         profilePhoto: realPhoto,
         designation: draft?.personal?.designation || existing?.designation || prev.designation,
         experienceYears: draft?.personal?.experienceYears || existing?.experienceYears || prev.experienceYears || ('' as any),
+        qualification: draft?.personal?.qualification || existing?.qualification || prev.qualification || 'B.Arch',
+        degree: draft?.personal?.degree || existing?.degree || prev.degree || 'Bachelor of Architecture',
+        university: draft?.personal?.university || existing?.university || prev.university || '',
+        graduationYear: draft?.personal?.graduationYear || existing?.graduationYear || prev.graduationYear || ('' as any),
+        specialization: draft?.personal?.specialization || existing?.specialization || prev.specialization || 'Residential Architecture',
+        languages: draft?.personal?.languages || existing?.languages || prev.languages || ['English', 'Hindi'],
+        skills: draft?.personal?.skills || existing?.skills || prev.skills || ['AutoCAD', 'Revit BIM', 'SketchUp', '3ds Max'],
         bio: draft?.personal?.bio || existing?.bio || prev.bio,
       };
     });
@@ -706,6 +736,8 @@ export const ArchitectProfileWizard: React.FC = () => {
       teamSize: draft?.business?.teamSize || existing?.teamSize || prev.teamSize,
       architectsCount: draft?.business?.architectsCount || existing?.architectsCount || prev.architectsCount,
       website: draft?.business?.website || existing?.website || prev.website,
+      businessEmail: draft?.business?.businessEmail || existing?.businessEmail || prev.businessEmail || '',
+      businessPhone: draft?.business?.businessPhone || existing?.businessPhone || prev.businessPhone || '',
       gstin: draft?.business?.gstin || existing?.gstin || prev.gstin,
       panNumber: draft?.business?.panNumber || existing?.panNumber || prev.panNumber,
       coaNumber: draft?.business?.coaNumber || existing?.coaNumber || prev.coaNumber,
@@ -714,6 +746,7 @@ export const ArchitectProfileWizard: React.FC = () => {
       city: draft?.business?.city || existing?.city || prev.city,
       state: draft?.business?.state || existing?.state || prev.state,
       pincode: draft?.business?.pincode || existing?.pincode || prev.pincode,
+      country: draft?.business?.country || existing?.country || prev.country || 'India',
     }));
 
     // Restore Directors KYC without ever wiping user-entered data
@@ -811,6 +844,18 @@ export const ArchitectProfileWizard: React.FC = () => {
       setServiceCities([]);
     }
 
+    if (draft?.remoteConsultation !== undefined) {
+      setRemoteConsultation(Boolean(draft.remoteConsultation));
+    } else if (existing?.remoteConsultation !== undefined) {
+      setRemoteConsultation(Boolean(existing.remoteConsultation));
+    }
+
+    if (draft?.servicePincodes && Array.isArray(draft.servicePincodes)) {
+      setServicePincodesText(draft.servicePincodes.join(', '));
+    } else if (existing?.servicePincodes && Array.isArray(existing.servicePincodes)) {
+      setServicePincodesText(existing.servicePincodes.join(', '));
+    }
+
     // Restore Bank Details without overwriting
     if (draft?.bank && (draft.bank.accountNumber || draft.bank.bankName || draft.bank.cancelledChequeUrl)) {
       setBank(draft.bank);
@@ -871,6 +916,8 @@ export const ArchitectProfileWizard: React.FC = () => {
         },
         selectedServices,
         serviceCities,
+        remoteConsultation,
+        servicePincodes: servicePincodesText.split(/[\s,]+/).filter(Boolean),
         portfolioProjects,
       };
       sessionStorage.setItem(draftKey, JSON.stringify(draftPayload));
@@ -883,7 +930,7 @@ export const ArchitectProfileWizard: React.FC = () => {
     } catch (e) {
       console.warn('Draft auto-save warning:', e);
     }
-  }, [personal, business, directors, businessVerification, bank, selectedServices, serviceCities, portfolioProjects]);
+  }, [personal, business, directors, businessVerification, bank, selectedServices, serviceCities, remoteConsultation, servicePincodesText, portfolioProjects]);
 
   const toggleService = (srvNameOrObj: any) => {
     const srvName = typeof srvNameOrObj === 'string' ? srvNameOrObj : srvNameOrObj?.name || String(srvNameOrObj);
@@ -1522,9 +1569,19 @@ export const ArchitectProfileWizard: React.FC = () => {
         phone: cleanUserPhone,
         name: personal.name,
         email: personal.email,
+        dob: personal.dob,
+        gender: personal.gender,
+        alternatePhone: personal.alternatePhone,
         profilePhoto: finalPhoto,
         designation: personal.designation,
         experienceYears: Number(personal.experienceYears) || 0,
+        qualification: personal.qualification,
+        degree: personal.degree,
+        university: personal.university,
+        graduationYear: Number(personal.graduationYear) || undefined,
+        specialization: personal.specialization,
+        languages: personal.languages,
+        skills: personal.skills,
         bio: personal.bio,
         firmName: business.firmName,
         businessType: business.businessType,
@@ -1533,6 +1590,8 @@ export const ArchitectProfileWizard: React.FC = () => {
         teamSize: Number(business.teamSize) || 1,
         architectsCount: Number(business.architectsCount) || 1,
         website: business.website,
+        businessEmail: business.businessEmail,
+        businessPhone: business.businessPhone,
         gstin: business.gstin || businessVerification.gstin,
         panNumber: business.panNumber || businessVerification.panNumber,
         coaNumber: business.coaNumber || businessVerification.coaNumber,
@@ -1540,7 +1599,10 @@ export const ArchitectProfileWizard: React.FC = () => {
         district: business.district || '',
         city: business.city,
         state: business.state,
+        country: business.country || 'India',
         pincode: business.pincode,
+        remoteConsultation,
+        servicePincodes: servicePincodesText.split(/[\s,]+/).map((s) => s.trim()).filter((s) => /^\d{6}$/.test(s)),
         services: selectedServices,
         portfolioProjects,
         directorsKyc: directors,
@@ -1783,6 +1845,47 @@ export const ArchitectProfileWizard: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Alternate Phone / WhatsApp (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={personal.alternatePhone}
+                    onChange={(e) => setPersonal({ ...personal, alternatePhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    placeholder="Enter 10-digit alternate mobile"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-sky-500 focus:bg-white text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={personal.dob}
+                    onChange={(e) => setPersonal({ ...personal, dob: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Gender
+                  </label>
+                  <select
+                    value={personal.gender || 'Male'}
+                    onChange={(e) => setPersonal({ ...personal, gender: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white text-slate-800"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Years of Architectural Experience <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1862,6 +1965,200 @@ export const ArchitectProfileWizard: React.FC = () => {
                         </button>
                       </>
                     )}
+                  </div>
+                </div>
+
+                {/* Academic & Professional Qualifications (Master Spec Section 3.2) */}
+                <div className="sm:col-span-2 pt-3 border-t border-slate-100 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-sky-600" />
+                    <span className="text-xs font-black uppercase font-mono tracking-wider text-slate-800">
+                      Academic & Professional Credentials
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Highest Qualification <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={personal.qualification || 'B.Arch'}
+                        onChange={(e) => setPersonal({ ...personal, qualification: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                      >
+                        <option value="B.Arch">B.Arch (Bachelor of Architecture)</option>
+                        <option value="M.Arch">M.Arch (Master of Architecture)</option>
+                        <option value="B.Plan">B.Plan (Bachelor of Planning)</option>
+                        <option value="M.Plan">M.Plan (Master of Planning)</option>
+                        <option value="Diploma in Architecture">Diploma in Architecture</option>
+                        <option value="B.Des">B.Des (Interior Architecture)</option>
+                        <option value="PhD in Architecture">PhD in Architecture</option>
+                        <option value="Other">Other Equivalent Degree</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Degree / Specialization Title
+                      </label>
+                      <input
+                        type="text"
+                        value={personal.degree}
+                        onChange={(e) => setPersonal({ ...personal, degree: e.target.value })}
+                        placeholder="e.g. Bachelor of Architecture"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                      >
+                      </input>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        College / University
+                      </label>
+                      <input
+                        type="text"
+                        value={personal.university}
+                        onChange={(e) => setPersonal({ ...personal, university: e.target.value })}
+                        placeholder="e.g. SPA Delhi / CEPT / IIT"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Graduation Year
+                      </label>
+                      <input
+                        type="number"
+                        min={1960}
+                        max={new Date().getFullYear()}
+                        value={personal.graduationYear || ''}
+                        onChange={(e) => setPersonal({ ...personal, graduationYear: e.target.value === '' ? ('' as any) : Number(e.target.value) })}
+                        placeholder="e.g. 2016"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Primary Architectural Specialization <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={personal.specialization || 'Residential Architecture'}
+                      onChange={(e) => setPersonal({ ...personal, specialization: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white"
+                    >
+                      <option value="Residential Architecture">Residential Architecture & Luxury Houses</option>
+                      <option value="Luxury Villas & Farmhouses">Luxury Villas, Estates & Farmhouses</option>
+                      <option value="High-Rise Apartments">High-Rise Apartments & Group Housing</option>
+                      <option value="Commercial & Retail">Commercial Complexes, Offices & Retail</option>
+                      <option value="Sustainable & Green Architecture">Sustainable & Net-Zero Green Architecture</option>
+                      <option value="Urban Planning & Master Planning">Urban Planning & Master Planning</option>
+                      <option value="Interior Architecture">Turnkey Interior Architecture</option>
+                      <option value="Landscape Architecture">Landscape & Environmental Architecture</option>
+                      <option value="Heritage Conservation">Heritage Restoration & Conservation</option>
+                    </select>
+                  </div>
+
+                  {/* Languages Spoken (Clickable Multiselect) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                      <Languages className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Languages for Customer Consultation</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'English',
+                        'Hindi',
+                        'Punjabi',
+                        'Bengali',
+                        'Marathi',
+                        'Gujarati',
+                        'Tamil',
+                        'Telugu',
+                        'Kannada',
+                        'Malayalam',
+                        'Urdu',
+                      ].map((lang) => {
+                        const isSelected = personal.languages?.includes(lang);
+                        return (
+                          <button
+                            key={lang}
+                            type="button"
+                            onClick={() => {
+                              const currentLangs = personal.languages || [];
+                              if (isSelected) {
+                                if (currentLangs.length > 1) {
+                                  setPersonal({ ...personal, languages: currentLangs.filter((l) => l !== lang) });
+                                }
+                              } else {
+                                setPersonal({ ...personal, languages: [...currentLangs, lang] });
+                              }
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-sky-600 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3" />}
+                            <span>{lang}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Technical Software Skills (Clickable Multiselect) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Technical Software & Drafting Tools Proficiencies</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'AutoCAD',
+                        'Revit BIM',
+                        'SketchUp',
+                        '3ds Max',
+                        'Lumion',
+                        'V-Ray',
+                        'STAAD.Pro',
+                        'Rhino / Grasshopper',
+                        'Enscape',
+                        'Photoshop',
+                        'ArchiCAD',
+                        'Chief Architect',
+                      ].map((skill) => {
+                        const isSelected = personal.skills?.includes(skill);
+                        return (
+                          <button
+                            key={skill}
+                            type="button"
+                            onClick={() => {
+                              const currentSkills = personal.skills || [];
+                              if (isSelected) {
+                                if (currentSkills.length > 1) {
+                                  setPersonal({ ...personal, skills: currentSkills.filter((s) => s !== skill) });
+                                }
+                              } else {
+                                setPersonal({ ...personal, skills: [...currentSkills, skill] });
+                              }
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3" />}
+                            <span>{skill}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -2012,6 +2309,32 @@ export const ArchitectProfileWizard: React.FC = () => {
                     onChange={(e) => setBusiness({ ...business, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) })}
                     placeholder="Enter 15-character GSTIN (optional)"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-sky-500 focus:bg-white uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Studio / Official Business Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={business.businessEmail}
+                    onChange={(e) => setBusiness({ ...business, businessEmail: e.target.value })}
+                    placeholder="e.g. contact@archstudio.in"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 focus:bg-white text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Studio / Desk Phone (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={business.businessPhone}
+                    onChange={(e) => setBusiness({ ...business, businessPhone: e.target.value })}
+                    placeholder="e.g. 011-23456789 / 080-..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:border-sky-500 focus:bg-white text-slate-800"
                   />
                 </div>
 
@@ -3533,6 +3856,51 @@ export const ArchitectProfileWizard: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Pan-India Remote Consultation & Pincodes (Master Spec Section 3.2 Step 7) */}
+                <div className="p-4 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 rounded-xl bg-sky-600 text-white shrink-0 mt-0.5">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-navy-950 flex items-center gap-1.5">
+                          <span>Pan-India Remote Consultation & Online Blueprints</span>
+                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900">Recommended</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Offer digital architectural floor plans, 3D elevations, structural blueprints, and online video consultations to clients outside your local physical city.
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={remoteConsultation}
+                        onChange={(e) => setRemoteConsultation(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                      <span className="ml-2 text-xs font-bold text-slate-700">
+                        {remoteConsultation ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="pt-2 border-t border-sky-100">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Serviced Postal Pincodes (Optional — comma separated for hyper-local site visits):
+                    </label>
+                    <input
+                      type="text"
+                      value={servicePincodesText}
+                      onChange={(e) => setServicePincodesText(e.target.value)}
+                      placeholder="e.g. 110001, 110016, 122002, 302020 (or leave blank for entire selected cities)"
+                      className="w-full px-3.5 py-2 bg-white border border-sky-200 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-sky-500 text-slate-800"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* ================= COMPREHENSIVE APPLICATION REVIEW ================= */}
@@ -3586,8 +3954,28 @@ export const ArchitectProfileWizard: React.FC = () => {
                       <strong className="font-mono text-navy-950 text-xs">{personal.phone || '—'}</strong>
                     </div>
                     <div>
+                      <span className="text-slate-500 block text-[11px]">Alternate / WhatsApp:</span>
+                      <strong className="font-mono text-navy-950 text-xs">{personal.alternatePhone || '—'}</strong>
+                    </div>
+                    <div>
                       <span className="text-slate-500 block text-[11px]">Email Address:</span>
                       <strong className="text-navy-950 text-xs">{personal.email || '—'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">Date of Birth & Gender:</span>
+                      <strong className="text-navy-950 text-xs">{personal.dob || '—'} ({personal.gender || '—'})</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">Academic Degree:</span>
+                      <strong className="text-navy-950 text-xs">{personal.qualification || 'B.Arch'} {personal.degree ? `(${personal.degree})` : ''}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">University / Year:</span>
+                      <strong className="text-navy-950 text-xs">{personal.university || '—'} {personal.graduationYear ? `(${personal.graduationYear})` : ''}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">Specialization:</span>
+                      <strong className="text-navy-950 text-xs">{personal.specialization || 'Residential Architecture'}</strong>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[11px] mb-1">Profile Photo:</span>
@@ -3626,6 +4014,26 @@ export const ArchitectProfileWizard: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  {(personal.languages?.length || 0) > 0 && (
+                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap text-xs">
+                      <span className="text-slate-500 text-[11px] font-bold">Languages:</span>
+                      {personal.languages?.map((l) => (
+                        <span key={l} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
+                          {l}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {(personal.skills?.length || 0) > 0 && (
+                    <div className="pt-1.5 flex items-center gap-2 flex-wrap text-xs">
+                      <span className="text-slate-500 text-[11px] font-bold">Software Skills:</span>
+                      {personal.skills?.map((s) => (
+                        <span key={s} className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {personal.bio && (
                     <div className="pt-2 border-t border-slate-100 text-xs">
                       <span className="text-slate-500 block text-[11px]">Professional Bio:</span>
@@ -3662,6 +4070,16 @@ export const ArchitectProfileWizard: React.FC = () => {
                       <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 text-xs font-bold inline-block">
                         {business.businessType === 'HUB' || business.businessType === 'Architecture Firm' ? 'Individual' : (business.businessType || 'Individual')}
                       </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Studio / Official Email:</span>
+                      <strong className="text-navy-950 text-xs block">{business.businessEmail || '—'}</strong>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Studio Phone:</span>
+                      <strong className="font-mono text-navy-950 text-xs block">{business.businessPhone || '—'}</strong>
                     </div>
 
                     <div>

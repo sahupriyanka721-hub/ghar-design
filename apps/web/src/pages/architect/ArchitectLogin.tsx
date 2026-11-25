@@ -98,8 +98,10 @@ export const ArchitectLogin: React.FC = () => {
 
       if (arch && arch.accountStatus === 'APPROVED') {
         navigate('/professional');
-      } else {
+      } else if (!arch || arch.accountStatus === 'PROFILE_INCOMPLETE' || arch.accountStatus === 'DRAFT') {
         navigate('/architect/profile-wizard');
+      } else {
+        navigate('/architect/application-status');
       }
     } catch (err: any) {
       error(err.message || 'Invalid verification code');

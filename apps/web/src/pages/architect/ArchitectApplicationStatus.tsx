@@ -157,8 +157,41 @@ export const ArchitectApplicationStatus: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="bg-white rounded-3xl p-6 sm:p-10 border-2 border-sky-100 shadow-lg relative overflow-hidden"
         >
-          {/* 1. PENDING APPROVAL */}
-          {status === 'PENDING_APPROVAL' && (
+          {/* 0. DRAFT / INCOMPLETE */}
+          {(status === 'DRAFT' || status === 'PROFILE_INCOMPLETE') && (
+            <div className="space-y-6 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="w-16 h-16 rounded-3xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 shadow-inner">
+                  <FileText className="w-8 h-8 text-sky-600" />
+                </div>
+                <div>
+                  <span className="px-3 py-0.5 rounded-full bg-sky-100 text-sky-900 text-xs font-black uppercase font-mono">
+                    Application Draft
+                  </span>
+                  <h2 className="text-2xl sm:text-3xl font-black font-display text-navy-950 mt-1">
+                    Complete Your Architect Onboarding
+                  </h2>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                Your mobile number is verified. Please complete your 9-step architecture profile wizard and upload your KYC documents to submit for Admin review.
+              </p>
+
+              <div className="pt-2">
+                <Link
+                  to="/architect/profile-wizard"
+                  className="px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition inline-flex items-center gap-2"
+                >
+                  <span>Continue Profile Wizard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* 1. PENDING APPROVAL / UNDER VERIFICATION / SUBMITTED */}
+          {(status === 'PENDING_APPROVAL' || status === 'SUBMITTED' || status === 'PENDING_REVIEW' || status === 'UNDER_VERIFICATION') && (
             <div className="space-y-6 text-center sm:text-left">
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-inner">
@@ -249,8 +282,8 @@ export const ArchitectApplicationStatus: React.FC = () => {
             </div>
           )}
 
-          {/* 2. CHANGES REQUESTED */}
-          {status === 'CHANGES_REQUESTED' && (
+          {/* 2. CHANGES REQUESTED / DOCUMENTS REQUIRED / RESUBMISSION REQUIRED */}
+          {(status === 'CHANGES_REQUESTED' || status === 'DOCUMENTS_REQUIRED' || status === 'RESUBMISSION_REQUIRED') && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 <div className="w-16 h-16 rounded-3xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 shadow-inner">
@@ -402,8 +435,8 @@ export const ArchitectApplicationStatus: React.FC = () => {
             </div>
           )}
 
-          {/* 5. SUSPENDED */}
-          {status === 'SUSPENDED' && (
+          {/* 5. SUSPENDED OR DEACTIVATED */}
+          {(status === 'SUSPENDED' || status === 'DEACTIVATED') && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 shadow-inner">

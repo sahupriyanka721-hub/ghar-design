@@ -1790,8 +1790,28 @@ export const AdminArchitects: React.FC = () => {
                             <span className="font-bold text-slate-800 font-mono">+91 {selectedArchitect.phone}</span>
                           </div>
                           <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Alternate / WhatsApp</span>
+                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.alternatePhone ? `+91 ${selectedArchitect.alternatePhone}` : '—'}</span>
+                          </div>
+                          <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Email Address</span>
                             <span className="font-bold text-slate-800">{selectedArchitect.email || 'Not Provided'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">DOB & Gender</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.dob || '—'} {selectedArchitect.gender ? `(${selectedArchitect.gender})` : ''}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Academic Degree</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.qualification || 'B.Arch'} {selectedArchitect.degree ? `(${selectedArchitect.degree})` : ''}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">University / Year</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.university || '—'} {selectedArchitect.graduationYear ? `(${selectedArchitect.graduationYear})` : ''}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Primary Specialization</span>
+                            <span className="font-bold text-sky-800">{selectedArchitect.specialization || 'Residential Architecture'}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Experience</span>
@@ -1808,6 +1828,26 @@ export const AdminArchitects: React.FC = () => {
                             </span>
                           </div>
                         </div>
+                        {(selectedArchitect.languages?.length || 0) > 0 && (
+                          <div className="pt-2 border-t border-slate-200 flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase mr-1">Languages:</span>
+                            {selectedArchitect.languages?.map((l) => (
+                              <span key={l} className="px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-800 text-[10px] font-bold">
+                                {l}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {(selectedArchitect.skills?.length || 0) > 0 && (
+                          <div className="pt-1.5 flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase mr-1">Software:</span>
+                            {selectedArchitect.skills?.map((s) => (
+                              <span key={s} className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-bold">
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {selectedArchitect.bio && (
                           <div className="pt-2 border-t border-slate-200">
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Professional Statement</span>
@@ -1846,12 +1886,32 @@ export const AdminArchitects: React.FC = () => {
                             <span className="font-bold text-slate-800 font-mono">{selectedArchitect.panNumber || 'Not Specified'}</span>
                           </div>
                           <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Studio Official Email</span>
+                            <span className="font-bold text-slate-800">{selectedArchitect.businessEmail || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Studio Desk Phone</span>
+                            <span className="font-bold text-slate-800 font-mono">{selectedArchitect.businessPhone || '—'}</span>
+                          </div>
+                          <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">GSTIN Registration</span>
                             <span className="font-bold text-slate-800 font-mono">{selectedArchitect.gstin || 'Composition / Exempt'}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Practice Team</span>
                             <span className="font-bold text-slate-800">{selectedArchitect.teamSize} Staff ({selectedArchitect.architectsCount} Architects)</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Remote Consultation</span>
+                            <span className={`font-bold ${selectedArchitect.remoteConsultation ? 'text-emerald-700' : 'text-slate-600'}`}>
+                              {selectedArchitect.remoteConsultation ? '✓ Enabled (Pan-India Online)' : 'Regional Only'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Serviced Pincodes</span>
+                            <span className="font-mono text-slate-700 font-bold">
+                              {selectedArchitect.servicePincodes && selectedArchitect.servicePincodes.length > 0 ? selectedArchitect.servicePincodes.join(', ') : 'All Pincodes in Cities'}
+                            </span>
                           </div>
                         </div>
                         <div className="pt-2 border-t border-slate-200">
