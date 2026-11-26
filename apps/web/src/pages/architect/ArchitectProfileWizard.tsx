@@ -3220,7 +3220,7 @@ export const ArchitectProfileWizard: React.FC = () => {
                         <button
                           type="button"
                           onClick={triggerBizGstUpload}
-                          className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          className="w-full py-2 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
                         >
                           <Upload className="w-3 h-3" />
                           <span>Upload GST Certificate</span>
@@ -4652,7 +4652,7 @@ export const ArchitectProfileWizard: React.FC = () => {
                             <button
                               type="button"
                               onClick={triggerBizGstUpload}
-                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
                             >
                               <Upload className="w-2.5 h-2.5" />
                               <span>Upload GST</span>
