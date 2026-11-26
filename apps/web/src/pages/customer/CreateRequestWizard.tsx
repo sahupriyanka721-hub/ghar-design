@@ -82,12 +82,12 @@ export const CreateRequestWizard: React.FC = () => {
   const [createdRequestId, setCreatedRequestId] = useState<string | null>(null);
 
   const initialCatParam = searchParams.get('category');
-  const initialCategorySlugs = initialCatParam ? [initialCatParam] : ['new-house-construction'];
+  const initialCategorySlugs = initialCatParam ? [initialCatParam] : [];
 
   // Form State
   const [formData, setFormData] = useState({
     // Step 1: Category (Supports multi-select)
-    categorySlug: initialCategorySlugs[0],
+    categorySlug: initialCatParam || '',
     categorySlugs: initialCategorySlugs,
 
     // Homeowner Contact Details
@@ -242,11 +242,8 @@ export const CreateRequestWizard: React.FC = () => {
   const validateCurrentStep = () => {
     if (currentStep === 1) {
       if (!formData.categorySlugs || formData.categorySlugs.length === 0) {
-        setFormData((prev) => ({
-          ...prev,
-          categorySlugs: ['new-house-construction', 'architectural-design'],
-          categorySlug: 'new-house-construction',
-        }));
+        error('Please select at least one service category for your project.');
+        return false;
       }
     } else if (currentStep === 2) {
       if (!formData.customerName.trim()) {
