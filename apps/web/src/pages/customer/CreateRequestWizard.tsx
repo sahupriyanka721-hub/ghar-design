@@ -42,6 +42,12 @@ import {
   Info,
   User,
   Phone,
+  Lock,
+  QrCode,
+  Building,
+  Receipt,
+  MapPin,
+  Mail,
 } from 'lucide-react';
 
 export interface UploadedDocItem {
@@ -79,7 +85,18 @@ export const CreateRequestWizard: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPaymentView, setIsPaymentView] = useState(false);
   const [createdRequestId, setCreatedRequestId] = useState<string | null>(null);
+
+  // Dedicated Payment Checkout State
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'NET_BANKING' | 'ESCROW'>('UPI');
+  const [upiMode, setUpiMode] = useState<'QR' | 'ID'>('QR');
+  const [upiIdInput, setUpiIdInput] = useState('');
+  const [selectedBank, setSelectedBank] = useState('HDFC Bank');
+  const [cardNumber, setCardNumber] = useState('4532 8920 1123 8890');
+  const [cardExpiry, setCardExpiry] = useState('08/29');
+  const [cardCvv, setCardCvv] = useState('892');
+  const [cardHolder, setCardHolder] = useState(user?.name || 'Registered Homeowner');
 
   const initialCatParam = searchParams.get('category');
   const initialCategorySlugs = initialCatParam ? [initialCatParam] : [];
@@ -398,12 +415,16 @@ export const CreateRequestWizard: React.FC = () => {
         });
       } catch {}
 
-      // Promptly open the payment section as requested
-      setShowPaymentModal(true);
+      // Promptly transition to full-window payment checkout page
+      setIsPaymentView(true);
+      setShowPaymentModal(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       savePlatformRequest(newRequestRecord);
       setCreatedRequestId(newRequestRecord.id);
-      setShowPaymentModal(true);
+      setIsPaymentView(true);
+      setShowPaymentModal(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -435,16 +456,18 @@ export const CreateRequestWizard: React.FC = () => {
       if (createdRequestId) {
         updatePlatformRequestStatus(createdRequestId, 'UNDER_REVIEW', { isFeePaid: true });
       }
-      success('Payment of ₹499 verified! Your project request has been submitted for admin verification.');
+      success('Payment of ₹499 verified successfully! Your project request has been submitted for admin verification.');
       setShowPaymentModal(false);
+      setIsPaymentView(false);
       navigate(`/dashboard/requests`);
     } catch {
       // Client mode fallback: simulate instant verification
       if (createdRequestId) {
         updatePlatformRequestStatus(createdRequestId, 'UNDER_REVIEW', { isFeePaid: true });
       }
-      success('Payment of ₹499 verified! Your project request has been submitted for admin verification.');
+      success('Payment of ₹499 verified successfully! Your project request has been submitted for admin verification.');
       setShowPaymentModal(false);
+      setIsPaymentView(false);
       navigate(`/dashboard/requests`);
     } finally {
       setIsSubmitting(false);
@@ -510,6 +533,548 @@ export const CreateRequestWizard: React.FC = () => {
   }, [formData.categorySlugs, formData.categorySlug, platformCategories]);
 
   const selectedCategoryObj = selectedCategoriesList[0] || platformCategories.find((c) => c.slug === formData.categorySlug) || SERVICE_CATEGORIES.find((c) => c.slug === formData.categorySlug);
+
+  if (isPaymentView) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6 pb-16 font-sans">
+        {/* Top Header & Breadcrumb Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setIsPaymentView(false);
+              setCurrentStep(6);
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition cursor-pointer self-start"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500" />
+            <span>Back to Quotation Review</span>
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+              <Lock className="w-3.5 h-3.5 text-emerald-600" />
+              <span>256-Bit SSL Encrypted Gateway</span>
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-[11px] font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+              <span>RBI Compliant Escrow Protocol</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Hero Banner */}
+        <div className="bg-gradient-to-r from-navy-950 via-slate-900 to-navy-900 rounded-2xl p-6 sm:p-7 text-white shadow-lg border border-slate-800 relative overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="space-y-1.5 max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-gold-400/20 text-gold-300 text-[10px] font-bold tracking-wider uppercase border border-gold-400/30">
+                <Receipt className="w-3 h-3 text-gold-400" />
+                <span>Official Quotation Vetting Desk</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight">
+                Quotation Vetting & Payment Checkout
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Review your verified project specifications below and authorize the nominal vetting fee to dispatch your request to certified architectural firms.
+              </p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-left sm:text-right shrink-0">
+              <div className="text-[10px] text-slate-300 font-medium">Request Reference Code</div>
+              <div className="text-base sm:text-lg font-mono font-bold text-gold-400">{createdRequestId || 'GHR-REQ-2026-9991'}</div>
+              <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">● Ready for Gateway Authorization</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Two-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: Project Dossier & Interactive Payment Method (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Card 1: Complete Project Specifications Dossier */}
+            <div className="card p-5 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-navy-950 text-gold-400 flex items-center justify-center">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-navy-950 font-display">Project Specifications Dossier</h2>
+                    <p className="text-[11px] text-slate-500">Verified property specifications attached to this quotation request</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaymentView(false);
+                    setCurrentStep(2);
+                  }}
+                  className="text-xs font-bold text-gold-700 hover:text-gold-800 flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span>Modify Specs</span>
+                </button>
+              </div>
+
+              {/* Project Primary Info Box */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-medium uppercase">Project Title</span>
+                    <span className="text-sm font-bold text-navy-950">{formData.projectName || 'Residential Architectural Construction'}</span>
+                  </div>
+                  <div className="sm:text-right">
+                    <span className="text-[10px] text-slate-400 block font-medium uppercase">Estimated Target Budget</span>
+                    <span className="text-xs font-bold text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-200/80 inline-block">
+                      {formData.budgetRange || '₹15 Lakhs - ₹30 Lakhs'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div>
+                  <span className="text-[10px] text-slate-400 block mb-1 font-medium uppercase">Selected Service Scope ({selectedCategoriesList.length})</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCategoriesList.length > 0 ? (
+                      selectedCategoriesList.map((cat) => (
+                        <span key={cat.slug} className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-navy-950 border border-slate-200 shadow-2xs flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>{cat.name}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-navy-950 border border-slate-200 shadow-2xs">
+                        New House Construction
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Property Grid Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-medium uppercase">Plot Dimensions</span>
+                  <span className="font-bold text-slate-800">{formData.plotWidth || '30'} × {formData.plotLength || '60'} {formData.measurementUnit?.toLowerCase() || 'feet'}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-medium uppercase">Plot Area</span>
+                  <span className="font-bold text-slate-800">{calculatedPlotArea || 1800} {formData.measurementUnit === 'FEET' ? 'sq.ft' : 'sq.m'}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-medium uppercase">Built-Up Area</span>
+                  <span className="font-bold text-slate-800">{formData.builtUpArea || calculatedPlotArea || 1800} sq.ft</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-medium uppercase">Configuration</span>
+                  <span className="font-bold text-slate-800">{formData.floors || 2} Flr • {formData.bedrooms || 3} BHK</span>
+                </div>
+              </div>
+
+              {/* Homeowner & Site Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-100 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                    <User className="w-3.5 h-3.5 text-gold-600" />
+                    <span>Homeowner Client Information</span>
+                  </div>
+                  <div className="text-slate-800 font-bold">{formData.customerName || user?.name || 'Registered Homeowner'}</div>
+                  <div className="text-slate-600 flex items-center gap-1.5"><Phone className="w-3 h-3 text-slate-400" /> {formData.customerPhone || user?.phone || '+91 9876543210'}</div>
+                  <div className="text-slate-600 flex items-center gap-1.5"><Mail className="w-3 h-3 text-slate-400" /> {formData.customerEmail || user?.email || 'homeowner@buildghar.com'}</div>
+                </div>
+
+                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-100 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                    <MapPin className="w-3.5 h-3.5 text-gold-600" />
+                    <span>Plot & Site Location</span>
+                  </div>
+                  <div className="text-slate-800 font-semibold">
+                    {formData.address || 'Plot 42, Civil Lines'}
+                  </div>
+                  <div className="text-slate-600">
+                    {formData.locality ? `${formData.locality}, ` : ''}{formData.city || 'Bhopal'}, {formData.state || 'Madhya Pradesh'} {formData.pinCode ? `- ${formData.pinCode}` : ''}
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-0.5">
+                    Stage: <strong className="text-slate-700">{formData.currentProjectStage || 'Concept & Spatial Planning'}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Interactive Payment Method Selection */}
+            <div className="card p-5 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-navy-950 text-gold-400 flex items-center justify-center">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-navy-950 font-display">Select Payment Method</h2>
+                    <p className="text-[11px] text-slate-500">Choose your preferred gateway payment channel</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-navy-950 bg-gold-50 border border-gold-200 px-2.5 py-1 rounded-lg">
+                  Amount: ₹499.00
+                </span>
+              </div>
+
+              {/* 4 Method Selector Pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { id: 'UPI', label: 'UPI / QR Code', icon: QrCode, badge: 'Zero Fee' },
+                  { id: 'CARD', label: 'Credit / Debit Card', icon: CreditCard, badge: 'Instant' },
+                  { id: 'NET_BANKING', label: 'Net Banking', icon: Building, badge: '50+ Banks' },
+                  { id: 'ESCROW', label: 'Instant Sandbox', icon: ShieldCheck, badge: 'Test Mode' },
+                ].map((m) => {
+                  const Icon = m.icon;
+                  const isSelected = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.id as any)}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 cursor-pointer ${
+                        isSelected
+                          ? 'border-gold-500 bg-gold-50/70 ring-1 ring-gold-500 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Icon className={`w-4 h-4 ${isSelected ? 'text-gold-600' : 'text-slate-500'}`} />
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          isSelected ? 'bg-gold-200/80 text-gold-900' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {m.badge}
+                        </span>
+                      </div>
+                      <div>
+                        <div className={`text-xs font-bold ${isSelected ? 'text-navy-950' : 'text-slate-700'}`}>
+                          {m.label}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* METHOD 1: UPI */}
+              {paymentMethod === 'UPI' && (
+                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                  {/* UPI Mode Selector */}
+                  <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                    <button
+                      type="button"
+                      onClick={() => setUpiMode('QR')}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                        upiMode === 'QR' ? 'bg-navy-950 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      Scan QR Code
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUpiMode('ID')}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                        upiMode === 'ID' ? 'bg-navy-950 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      Enter UPI ID / VPA
+                    </button>
+                  </div>
+
+                  {upiMode === 'QR' ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-5">
+                      {/* Stylized QR Box */}
+                      <div className="w-36 h-36 bg-white rounded-xl border-2 border-dashed border-slate-300 p-2 flex flex-col items-center justify-center shadow-xs shrink-0">
+                        <div className="w-full h-full bg-slate-900 rounded-lg p-2 flex flex-col items-center justify-center text-center text-white">
+                          <div className="grid grid-cols-4 gap-1 w-20 h-20 p-1 bg-white rounded">
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-200 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-200 rounded-xs"></div>
+                            <div className="bg-gold-500 rounded-xs flex items-center justify-center text-[9px] font-bold text-navy-950">₹</div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-200 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-200 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-200 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                            <div className="bg-slate-900 rounded-xs"></div>
+                          </div>
+                          <div className="mt-1 text-[8px] font-mono text-gold-400 font-bold">UPI: ₹499.00</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="font-bold text-navy-950 text-sm">Scan with Any Mobile UPI Application</div>
+                        <p className="text-slate-500 leading-relaxed text-[11px]">
+                          Open Google Pay, PhonePe, Paytm, or BHIM on your smartphone and scan this code to complete the transaction directly from your bank.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {['Google Pay', 'PhonePe', 'Paytm', 'BHIM UPI', 'CRED', 'Amazon Pay'].map((app) => (
+                            <span key={app} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-700 shadow-2xs">
+                              {app}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Enter UPI ID / Virtual Payment Address</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={upiIdInput}
+                            onChange={(e) => setUpiIdInput(e.target.value)}
+                            placeholder="e.g. 9893123456@paytm, client@okhdfcbank"
+                            className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-gold-500 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => { if (!upiIdInput) setUpiIdInput('client@okhdfcbank'); }}
+                            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                          >
+                            Verify
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['@okhdfcbank', '@oksbi', '@paytm', '@ybl', '@icici'].map((suffix) => (
+                          <button
+                            key={suffix}
+                            type="button"
+                            onClick={() => setUpiIdInput((prev) => (prev.includes('@') ? prev.split('@')[0] : (prev || 'client')) + suffix)}
+                            className="px-2 py-1 bg-white border border-slate-200 hover:border-slate-300 rounded-md text-[10px] font-medium text-slate-600 cursor-pointer"
+                          >
+                            {suffix}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* METHOD 2: CARDS */}
+              {paymentMethod === 'CARD' && (
+                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-navy-950">Debit / Credit Card Details</span>
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold">
+                      <Lock className="w-3 h-3 text-emerald-600" />
+                      <span>128-bit Encrypted</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Card Number</label>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-mono text-xs focus:ring-1 focus:ring-gold-500"
+                        placeholder="4532 •••• •••• 8890"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Valid Thru (MM/YY)</label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-mono text-xs focus:ring-1 focus:ring-gold-500"
+                          placeholder="08/29"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">CVV / CVC</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-mono text-xs focus:ring-1 focus:ring-gold-500"
+                          placeholder="•••"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cardholder Name</label>
+                      <input
+                        type="text"
+                        value={cardHolder}
+                        onChange={(e) => setCardHolder(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs focus:ring-1 focus:ring-gold-500"
+                        placeholder="Name as printed on card"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* METHOD 3: NET BANKING */}
+              {paymentMethod === 'NET_BANKING' && (
+                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3.5">
+                  <div className="text-xs font-bold text-navy-950">Select Retail / Corporate Net Banking Bank</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {['HDFC Bank', 'State Bank of India', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra', 'Punjab National Bank'].map((bank) => {
+                      const isBankSelected = selectedBank === bank;
+                      return (
+                        <button
+                          key={bank}
+                          type="button"
+                          onClick={() => setSelectedBank(bank)}
+                          className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition cursor-pointer ${
+                            isBankSelected
+                              ? 'border-gold-500 bg-gold-50 text-navy-950 ring-1 ring-gold-500'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <div className="truncate">{bank}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="pt-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Or Choose From All Indian Banks</label>
+                    <select
+                      value={selectedBank}
+                      onChange={(e) => setSelectedBank(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-1 focus:ring-gold-500"
+                    >
+                      <option>HDFC Bank</option>
+                      <option>State Bank of India</option>
+                      <option>ICICI Bank</option>
+                      <option>Axis Bank</option>
+                      <option>Kotak Mahindra Bank</option>
+                      <option>Punjab National Bank</option>
+                      <option>Bank of Baroda</option>
+                      <option>Canara Bank</option>
+                      <option>Union Bank of India</option>
+                      <option>IndusInd Bank</option>
+                      <option>IDFC FIRST Bank</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* METHOD 4: INSTANT SANDBOX ESCROW */}
+              {paymentMethod === 'ESCROW' && (
+                <div className="p-5 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-2 text-xs text-emerald-950">
+                  <div className="font-bold flex items-center gap-1.5 text-sm text-emerald-900">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <span>Instant Sandbox Test Mode Enabled</span>
+                  </div>
+                  <p className="leading-relaxed text-[11px] text-emerald-800">
+                    This test environment authenticates without requiring real bank debit. Clicking <strong>Authorize Payment</strong> simulates a 200 OK webhook and transitions this project to <strong>UNDER_REVIEW</strong> so administrators and architects can review and submit BOQ quotations.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Fee Invoice Breakdown, Escrow Protection & Checkout CTA (5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Tax Invoice Summary Card */}
+            <div className="card p-5 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-gold-600" />
+                  <h3 className="font-bold text-navy-950 font-display text-sm">Fee & Tax Invoice Breakdown</h3>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Official GST Invoice
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Base Technical Vetting Fee:</span>
+                  <span className="font-semibold text-slate-800">₹422.88</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Central GST (CGST 9.0%):</span>
+                  <span className="font-semibold text-slate-800">₹38.06</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>State GST (SGST 9.0%):</span>
+                  <span className="font-semibold text-slate-800">₹38.06</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-500 text-[11px] pt-1 border-t border-dashed border-slate-200">
+                  <span>Total Statutory GST (18%):</span>
+                  <span className="font-semibold text-slate-700">₹76.12</span>
+                </div>
+
+                <div className="pt-3 border-t-2 border-slate-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-navy-950 block">Total Amount Payable</span>
+                    <span className="text-[10px] text-slate-400">All Taxes & Gateway Charges Included</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold font-display text-navy-950">{formatINR(requestFeePaise)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Escrow Guarantee Box */}
+              <div className="p-4 bg-emerald-50/80 rounded-xl border border-emerald-200/90 text-emerald-900 text-xs space-y-2">
+                <div className="font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>100% Escrow & Refund Protection</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-emerald-800">
+                  Guaranteed minimum 2 certified quotations compiled within 5 business days. If fewer than 2 quotes are received, this ₹499 fee is automatically refunded back to your account.
+                </p>
+                <div className="text-[10px] font-semibold text-emerald-950 bg-white/70 px-2 py-1 rounded border border-emerald-200">
+                  ★ 100% credited toward your final project bill upon hiring!
+                </div>
+              </div>
+
+              {/* Security Badges */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-around text-center text-[10px] text-slate-500 font-semibold">
+                <div>🔒 256-Bit SSL</div>
+                <div>🛡️ PCI-DSS Level 1</div>
+                <div>🏛️ RBI Escrow Safe</div>
+              </div>
+
+              {/* Primary Checkout Button */}
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCompletePayment}
+                  disabled={isSubmitting}
+                  className="w-full btn-gold py-4 px-6 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md hover:scale-101 active:scale-99 transition cursor-pointer"
+                >
+                  <Lock className="w-4 h-4 text-emerald-950" />
+                  <span>{isSubmitting ? 'Verifying Gateway Transaction...' : `Authorize Payment of ${formatINR(requestFeePaise)}`}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPaymentView(false);
+                    setCurrentStep(6);
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Back to Quotation Review</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-16 font-sans">
@@ -1436,80 +2001,12 @@ export const CreateRequestWizard: React.FC = () => {
               disabled={isSubmitting}
               className="btn-gold text-xs py-3 px-8 flex items-center gap-2 font-black shadow-md rounded-xl hover:scale-102 active:scale-98 transition cursor-pointer"
             >
-              <span>{isSubmitting ? 'Dispatching to Admin Desk...' : 'Submit Quotation Request & Dispatch to Admin'}</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-900" />
+              <span>{isSubmitting ? 'Processing Request...' : 'Proceed to Secure Payment Checkout (₹499)'}</span>
+              <ArrowRight className="w-4 h-4 text-emerald-900" />
             </button>
           )}
         </div>
       </div>
-
-      {/* Payment Checkout Modal (Razorpay Simulation) */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="min-h-screen px-4 flex items-center justify-center">
-            <div className="fixed inset-0 bg-navy-950/70 backdrop-blur-sm" />
-            <div className="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 space-y-5 z-10">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-navy-950 text-gold-400 flex items-center justify-center font-bold text-xs">
-                    ₹
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-navy-950 font-display text-sm">Razorpay Secure Gateway</h3>
-                    <div className="text-[10px] text-slate-400">256-Bit SSL Encrypted Escrow Account</div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Verified
-                </span>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1.5">
-                  <div className="flex justify-between text-slate-500">
-                    <span>Purpose:</span>
-                    <span className="font-semibold text-slate-800">Quotation Request Vetting Fee</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Project:</span>
-                    <span className="font-semibold text-slate-800 truncate max-w-[180px]">{formData.projectName}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Total Amount:</span>
-                    <span className="font-bold text-navy-950 text-sm">{formatINR(requestFeePaise)}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-emerald-900 text-[11px] space-y-1">
-                  <div className="font-bold">Sandbox Test Mode Active</div>
-                  <p>
-                    Clicking "Authorize Payment" simulates an authenticated gateway verification and transitions your request to UNDER_REVIEW for administrative quotation compilation.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(false)}
-                  className="btn-outline text-xs py-2 px-4"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCompletePayment}
-                  disabled={isSubmitting}
-                  className="btn-gold text-xs py-2.5 px-6 flex items-center gap-2 font-bold"
-                >
-                  <span>{isSubmitting ? 'Verifying...' : 'Authorize Payment of ₹499'}</span>
-                  <Check className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
