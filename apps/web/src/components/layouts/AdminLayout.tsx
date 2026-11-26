@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext.js';
 import { BrandLogo } from '../common/BrandLogo.js';
 import { SectionErrorBoundary } from '../common/SectionErrorBoundary.js';
 import { getAdminByPhone } from '../../data/customerStore.js';
-import { pullFromCloud } from '../../data/cloudSync.js';
+import { pullFromCloud, pushToCloud } from '../../data/cloudSync.js';
 import {
   LayoutDashboard,
   Users,
@@ -311,6 +311,7 @@ export const AdminLayout: React.FC = () => {
   const handleGlobalRefresh = async () => {
     setRefreshing(true);
     try {
+      await pushToCloud();
       await pullFromCloud();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('storage'));

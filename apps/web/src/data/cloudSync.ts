@@ -477,21 +477,20 @@ export function initAutoCloudSync(intervalMs = 15000): void {
   if (syncInitialized || typeof window === 'undefined') return;
   syncInitialized = true;
 
-  // Immediate pull on boot
-  pullFromCloud();
+  // Immediate bidirectional sync on boot (pushes local records like Sonu, then pulls)
+  pushToCloud().then(() => pullFromCloud());
 
-  // Periodic pull for real-time cross-device updates (15s interval)
+  // Periodic bidirectional sync for real-time cross-device updates (15s interval)
   setInterval(() => {
-    pullFromCloud();
+    pushToCloud().then(() => pullFromCloud());
   }, intervalMs);
 
   // Sync on tab focus or returning to app
   window.addEventListener('focus', () => {
-    pullFromCloud();
+    pushToCloud().then(() => pullFromCloud());
   });
   window.addEventListener('online', () => {
-    pullFromCloud();
-    pushToCloud();
+    pushToCloud().then(() => pullFromCloud());
   });
 }
 
