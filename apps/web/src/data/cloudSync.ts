@@ -153,7 +153,7 @@ async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
   // 2. Custom API URL (explicitly set in VITE_API_URL or Render Live Backend)
   const candidateApi = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
     ? (import.meta.env.VITE_API_URL as string) 
-    : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'https://ghar-design-api.onrender.com' : '');
+    : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'https://ghar-design-api-8wbl.onrender.com' : '');
 
   if (candidateApi) {
     try {

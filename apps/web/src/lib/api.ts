@@ -1,4 +1,4 @@
-const DEFAULT_RENDER_API = 'https://ghar-design-api.onrender.com';
+const DEFAULT_RENDER_API = 'https://ghar-design-api-8wbl.onrender.com';
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}/api/v1`
   : (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
