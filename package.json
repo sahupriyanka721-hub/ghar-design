@@ -12,6 +12,8 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev --workspace=@ghar-design/web",
     "dev:api": "npm run dev --workspace=@ghar-design/api",
+    "build:backend": "npm run build:shared && npm run db:generate --workspace=@ghar-design/api && npm run build:api",
+    "start:api": "npm run start --workspace=@ghar-design/api",
     "build": "npm run build --workspaces --if-present && node -e \"const fs=require('fs'); fs.cpSync('apps/web/dist', 'dist', {recursive: true});\"",
     "build:shared": "npm run build --workspace=@ghar-design/shared",
     "build:web": "npm run build --workspace=@ghar-design/web",

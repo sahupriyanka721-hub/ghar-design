@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ghar-design-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build:backend
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: mongodb+srv://priyanka:priyanka123@cluster0.pekpkfm.mongodb.net/ghardesign?retryWrites=true&w=majority
+      - key: WEB_ORIGIN
+        value: https://ghar-design-app.pages.dev
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true

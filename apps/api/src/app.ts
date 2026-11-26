@@ -18,12 +18,38 @@ export function createApp() {
   // CORS configuration
   app.use(
     cors({
-      origin: [config.webOrigin, 'http://localhost:5173', 'http://localhost:3000'],
+      origin: (origin, callback) => {
+        // Allow mobile apps, curl, postman or same-origin
+        if (!origin) return callback(null, true);
+        if (
+          origin === config.webOrigin ||
+          origin.includes('pages.dev') ||
+          origin.includes('vercel.app') ||
+          origin.includes('localhost')
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     })
   );
+
+  // Root health check for Cloud hosting (Render / Railway / AWS)
+  app.get('/', (req, res) => {
+    res.json({
+      status: 'online',
+      service: 'GharDesign Marketplace API',
+      database: 'MongoDB Atlas',
+      version: '1.0.0',
+    });
+  });
+
+  app.get('/health', (req, res) => {
+    res.json({ status: 'healthy', database: 'MongoDB Atlas' });
+  });
 
   // Logging
   if (config.env !== 'test') {

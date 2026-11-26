@@ -150,10 +150,14 @@ async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
     }
   }
 
-  // 2. Custom API URL (only if explicitly set in VITE_API_URL, NOT static pages.dev origin fallback)
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+  // 2. Custom API URL (explicitly set in VITE_API_URL or Render Live Backend)
+  const candidateApi = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
+    ? (import.meta.env.VITE_API_URL as string) 
+    : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'https://ghar-design-api.onrender.com' : '');
+
+  if (candidateApi) {
     try {
-      const url = `${(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}/api/sync`;
+      const url = `${candidateApi.replace(/\/$/, '')}/api/sync`;
       const res = await fetch(method === 'GET' ? `${url}?t=${Date.now()}` : url, {
         method,
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
