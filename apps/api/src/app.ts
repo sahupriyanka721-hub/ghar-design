@@ -18,7 +18,7 @@ export function createApp() {
   // CORS configuration
   app.use(
     cors({
-      origin: (origin, callback) => {
+      origin: (origin: any, callback: any) => {
         // Allow mobile apps, curl, postman or same-origin
         if (!origin) return callback(null, true);
         if (
@@ -38,7 +38,7 @@ export function createApp() {
   );
 
   // Root health check for Cloud hosting (Render / Railway / AWS)
-  app.get('/', (req, res) => {
+  app.get('/', (req: any, res: any) => {
     res.json({
       status: 'online',
       service: 'GharDesign Marketplace API',
@@ -47,7 +47,7 @@ export function createApp() {
     });
   });
 
-  app.get('/health', (req, res) => {
+  app.get('/health', (req: any, res: any) => {
     res.json({ status: 'healthy', database: 'MongoDB Atlas' });
   });
 

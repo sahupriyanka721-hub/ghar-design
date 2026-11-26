@@ -22,7 +22,7 @@ apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/calculator', calculatorRoutes);
 
 // Health check endpoint
-apiRouter.get('/health', (req, res) => {
+apiRouter.get('/health', (req: any, res: any) => {
   res.json({
     status: 'healthy',
     platform: 'GharDesign API',
