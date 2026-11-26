@@ -94,10 +94,10 @@ export const ProfessionalBookings: React.FC = () => {
     return (
       customers.find((c) => {
         if (selectedBooking.customerId && c.id === selectedBooking.customerId) return true;
-        if (rawPhone && c.phone.replace(/\D/g, '').slice(-10) === rawPhone) return true;
+        if (rawPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === rawPhone) return true;
         if (
           selectedBooking.customerName &&
-          c.name.toLowerCase().trim() === selectedBooking.customerName.toLowerCase().trim()
+          (c.name || '').toLowerCase().trim() === selectedBooking.customerName.toLowerCase().trim()
         )
           return true;
         return false;

@@ -132,16 +132,17 @@ export const getProfessionalAccounts = (): ProfessionalAccount[] => {
 };
 
 export const getProfessionalByPhone = (phone: string): ProfessionalAccount | null => {
-  const clean = phone.replace(/\D/g, '').slice(-10);
+  const clean = (phone || '').replace(/\D/g, '').slice(-10);
+  if (!clean) return null;
   const list = getProfessionalAccounts();
-  return list.find((p) => p.phone.replace(/\D/g, '').slice(-10) === clean) || null;
+  return list.find((p) => (p?.phone || '').replace(/\D/g, '').slice(-10) === clean) || null;
 };
 
 export const saveProfessionalAccount = (acc: Partial<ProfessionalAccount>): ProfessionalAccount => {
   const current = getProfessionalAccounts();
   const cleanPhone = (acc.phone || '').replace(/\D/g, '').slice(-10);
   const existingIdx = current.findIndex(
-    (p) => p.id === acc.id || p.phone.replace(/\D/g, '').slice(-10) === cleanPhone
+    (p) => p.id === acc.id || (Boolean(cleanPhone) && (p.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone)
   );
 
   let updated: ProfessionalAccount;
@@ -183,8 +184,8 @@ export const getProfessionalPayoutRequests = (phone?: string): ProfessionalPayou
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
         if (!phone) return parsed;
-        const clean = phone.replace(/\D/g, '').slice(-10);
-        return parsed.filter((p) => p.professionalPhone.replace(/\D/g, '').slice(-10) === clean);
+        const clean = (phone || '').replace(/\D/g, '').slice(-10);
+        return parsed.filter((p) => (p.professionalPhone || '').replace(/\D/g, '').slice(-10) === clean);
       }
     }
   } catch (e) {}

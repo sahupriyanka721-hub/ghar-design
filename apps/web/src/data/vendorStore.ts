@@ -53,7 +53,7 @@ export const getRegisteredVendors = (): RegisteredVendor[] => {
 
 export const getVendorByPhone = (phone: string): RegisteredVendor | undefined => {
   const current = getRegisteredVendors();
-  const rawTarget = phone.replace(/\D/g, '').slice(-10);
+  const rawTarget = (phone || '').replace(/\D/g, '').slice(-10);
   if (!rawTarget) return undefined;
   return current.find((v) => {
     const vPhone = (v.phone || '').replace(/\D/g, '').slice(-10);

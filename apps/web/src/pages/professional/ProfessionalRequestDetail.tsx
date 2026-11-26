@@ -89,8 +89,8 @@ export const ProfessionalRequestDetail: React.FC = () => {
     return (
       customers.find((c) => {
         if (request.customerId && c.id === request.customerId) return true;
-        if (rawPhone && c.phone.replace(/\D/g, '').slice(-10) === rawPhone) return true;
-        if (request.customerName && c.name.toLowerCase().trim() === request.customerName.toLowerCase().trim()) return true;
+        if (rawPhone && (c.phone || '').replace(/\D/g, '').slice(-10) === rawPhone) return true;
+        if (request.customerName && (c.name || '').toLowerCase().trim() === request.customerName.toLowerCase().trim()) return true;
         return false;
       }) || null
     );

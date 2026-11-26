@@ -775,8 +775,8 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
       compiled.push({
         id: `doc-dir-${cleanDirId}-pan`,
         documentType: 'PAN_CARD',
-        title: `${d.name || arch.name} - PAN Card (${d.panNumber || arch.panNumber || 'Attached'})`,
-        fileName: d.panFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_PAN.jpg`,
+        title: `${d.name || arch.name || 'Director'} - PAN Card (${d.panNumber || arch.panNumber || 'Attached'})`,
+        fileName: d.panFileName || `${((d.name || arch.name || 'director')).replace(/\s+/g, '_')}_PAN.jpg`,
         fileSize: d.panFileSize || 'PAN Document (JPEG/PDF)',
         fileUrl: panUrl,
         storageKey: d.panStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_${cleanDirId}`,
@@ -789,8 +789,8 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
       compiled.push({
         id: `doc-dir-${cleanDirId}-aadhaar`,
         documentType: 'AADHAAR_CARD',
-        title: `${d.name || arch.name} - Aadhaar Card (${d.aadharNumber || 'Attached'})`,
-        fileName: d.aadharFileName || `${(d.name || arch.name).replace(/\s+/g, '_')}_Aadhaar.jpg`,
+        title: `${d.name || arch.name || 'Director'} - Aadhaar Card (${d.aadharNumber || 'Attached'})`,
+        fileName: d.aadharFileName || `${((d.name || arch.name || 'director')).replace(/\s+/g, '_')}_Aadhaar.jpg`,
         fileSize: d.aadharFileSize || 'Aadhaar Document (JPEG/PDF)',
         fileUrl: aadharUrl,
         storageKey: d.aadharStorageKey || `arch_doc_${cleanUserPhone}_DIRECTOR_AADHAAR_${cleanDirId}`,
@@ -803,8 +803,8 @@ export const ensureArchitectStatutoryDocuments = (arch: ArchitectAccount, fallba
     compiled.push({
       id: `doc-dir-1-pan`,
       documentType: 'PAN_CARD',
-      title: `${arch.name} - PAN Card (${arch.panNumber || 'Attached'})`,
-      fileName: `${arch.name.replace(/\s+/g, '_')}_PAN.jpg`,
+      title: `${arch.name || 'Principal Architect'} - PAN Card (${arch.panNumber || 'Attached'})`,
+      fileName: `${(arch.name || 'architect').replace(/\s+/g, '_')}_PAN.jpg`,
       fileSize: 'PAN Document (JPEG/PDF)',
       fileUrl: '',
       storageKey: `arch_doc_${cleanUserPhone}_DIRECTOR_PAN_1`,
@@ -1323,7 +1323,7 @@ export const getArchitectById = (id: string): ArchitectAccount | null => {
   const list = getArchitectAccounts();
   const found = list.find((a) => a.id === id) || null;
   if (found && !found.profilePhoto && found.phone) {
-    const clean = found.phone.replace(/\D/g, '').slice(-10);
+    const clean = (found.phone || '').replace(/\D/g, '').slice(-10);
     if (clean) {
       try {
         const stored =

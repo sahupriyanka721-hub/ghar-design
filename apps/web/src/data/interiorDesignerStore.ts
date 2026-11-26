@@ -300,16 +300,17 @@ export const getInteriorDesignerById = (id: string): InteriorDesignerAccount | n
 };
 
 export const getInteriorDesignerByPhone = (phone: string): InteriorDesignerAccount | null => {
-  const clean = phone.replace(/\D/g, '').slice(-10);
+  const clean = (phone || '').replace(/\D/g, '').slice(-10);
+  if (!clean) return null;
   const list = getInteriorDesignerAccounts();
-  return list.find((a) => a.phone.replace(/\D/g, '').slice(-10) === clean) || null;
+  return list.find((a) => (a.phone || '').replace(/\D/g, '').slice(-10) === clean) || null;
 };
 
 export const saveInteriorDesignerAccount = (acc: Partial<InteriorDesignerAccount>): InteriorDesignerAccount => {
   const current = getInteriorDesignerAccounts();
   const cleanPhone = (acc.phone || '').replace(/\D/g, '').slice(-10);
   const existingIdx = current.findIndex(
-    (a) => a.id === acc.id || (cleanPhone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+    (a) => a.id === acc.id || (Boolean(cleanPhone) && (a.phone || '').replace(/\D/g, '').slice(-10) === cleanPhone)
   );
 
   let updated: InteriorDesignerAccount;

@@ -241,7 +241,7 @@ export function buildQuotationPdfBlob(
   drawText(ops, 'PLATFORM DIGITAL AUTHORIZATION:', 360, 140, 'F2', 8.5, [0.2, 0.25, 0.3]);
   drawText(ops, 'BuildGhar Escrow & Quality Governance Desk', 360, 124, 'F1', 8.5, [0.1, 0.15, 0.2]);
   drawText(ops, '[✓] Digitally Verified & Authorized', 360, 110, 'F2', 8, [0.1, 0.5, 0.25]);
-  drawText(ops, `Certificate Ref: BG-ESC-${code.replace(/[^a-zA-Z0-9]/g, '')}`, 360, 96, 'F1', 7.5, [0.4, 0.45, 0.5]);
+  drawText(ops, `Certificate Ref: BG-ESC-${(code || '').replace(/[^a-zA-Z0-9]/g, '')}`, 360, 96, 'F1', 7.5, [0.4, 0.45, 0.5]);
 
   // 9. Bottom footer bar (y: 0, h: 32)
   ops.push('0.06 0.12 0.22 rg');
@@ -284,7 +284,7 @@ export function downloadQuotationPdf(
  */
 export function buildInquiryReceiptPdfBlob(request: any): Blob {
   const reqCode = request.requestCode || request.id || 'BG/REQ/0001';
-  const receiptNo = 'RCP-' + reqCode.replace(/[^0-9]/g, '').slice(-6).padStart(6, '0');
+  const receiptNo = 'RCP-' + (reqCode || '').replace(/[^0-9]/g, '').slice(-6).padStart(6, '0');
   const dateStr = request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
   const customerName = request.customerName || request.clientName || 'Registered Homeowner';
   const customerPhone = request.customerPhone || request.phone || '+91 9876543210';
@@ -390,7 +390,7 @@ export function buildInquiryReceiptPdfBlob(request: any): Blob {
   ops.push('S');
 
   drawText(ops, 'TOTAL INQUIRY FEE PAID: INR 499.00', 50, 422, 'F2', 11, [0.06, 0.35, 0.15]);
-  drawText(ops, `Payment Mode: Online / UPI Escrow Verified | Transaction ID: TXN-${reqCode.replace(/[^0-9]/g, '')}`, 50, 406, 'F1', 8, [0.10, 0.45, 0.20]);
+  drawText(ops, `Payment Mode: Online / UPI Escrow Verified | Transaction ID: TXN-${(reqCode || '').replace(/[^0-9]/g, '')}`, 50, 406, 'F1', 8, [0.10, 0.45, 0.20]);
 
   // Terms & Escrow Protection Notice (y: 250, h: 130)
   ops.push('0.97 0.97 0.98 rg');
