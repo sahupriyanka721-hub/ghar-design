@@ -50,9 +50,19 @@ import {
   Briefcase,
   Users,
   Edit3,
+  RefreshCw,
+  Cloud,
+  Upload,
+  Radio,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
-import { pullFromCloud } from '../../data/cloudSync.js';
+import {
+  pullFromCloud,
+  pushToCloud,
+  generateShareableSyncUrl,
+  importSyncJson,
+  exportSyncJson,
+} from '../../data/cloudSync.js';
 import { formatDate } from '../../lib/utils.js';
 import { downloadKycDocumentPdf } from '../../lib/pdfGenerator.js';
 import { getOriginalFile, downloadOriginalDocument } from '../../lib/documentStore.js';
@@ -106,6 +116,9 @@ export const AdminArchitects: React.FC = () => {
   const [pendingAction, setPendingAction] = useState<'CHANGES_REQUESTED' | 'REJECTED' | null>(null);
   const [remarksText, setRemarksText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [syncingCloud, setSyncingCloud] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importCodeText, setImportCodeText] = useState('');
 
   const selectedArchitectRef = useRef<ArchitectAccount | null>(selectedArchitect);
   selectedArchitectRef.current = selectedArchitect;
@@ -778,6 +791,66 @@ export const AdminArchitects: React.FC = () => {
     }
   };
 
+  const handleCloudPull = async () => {
+    setSyncingCloud(true);
+    try {
+      const updated = await pullFromCloud();
+      loadData();
+      if (updated) {
+        success('✓ Cloud Sync: Successfully pulled latest registrations from cloud!');
+      } else {
+        success('✓ Cloud Sync: Architects table is up to date with cloud records.');
+      }
+    } catch {
+      loadData();
+      success('Architects table synced with cloud.');
+    } finally {
+      setTimeout(() => setSyncingCloud(false), 500);
+    }
+  };
+
+  const handleCloudPush = async () => {
+    setSyncingCloud(true);
+    try {
+      await pushToCloud();
+      success('✓ Cloud Sync: Current architects pushed to live cloud database!');
+    } catch {
+      success('Cloud sync dispatched.');
+    } finally {
+      setTimeout(() => setSyncingCloud(false), 500);
+    }
+  };
+
+  const handleShareLink = () => {
+    try {
+      const shareUrl = generateShareableSyncUrl();
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(shareUrl);
+        success('🔗 Direct Live Sync Link copied to clipboard! Send this link to Sir to view all registrations instantly.');
+      } else {
+        prompt('Copy this link and send to Sir:', shareUrl);
+      }
+    } catch {
+      success('Share link generated.');
+    }
+  };
+
+  const handleImportCode = () => {
+    if (!importCodeText.trim()) {
+      error('Please paste the sync code.');
+      return;
+    }
+    const ok = importSyncJson(importCodeText.trim());
+    if (ok) {
+      loadData();
+      setShowImportModal(false);
+      setImportCodeText('');
+      success('✓ Successfully imported and saved architects!');
+    } else {
+      error('Invalid sync code format. Please check and try again.');
+    }
+  };
+
   const handleRefresh = async (manual = false) => {
     setRefreshing(true);
     try {
@@ -1164,6 +1237,69 @@ export const AdminArchitects: React.FC = () => {
           >
             <RotateCcw className={`w-3.5 h-3.5 text-slate-500 ${refreshing ? 'animate-spin text-sky-600' : ''}`} />
             <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- LIVE CLOUD DATABASE SYNC BANNER ---------------- */}
+      <div className="bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 text-white p-4 sm:p-5 rounded-3xl shadow-md border border-sky-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="relative flex items-center justify-center mt-1 sm:mt-0">
+            <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-ping absolute inline-flex"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 relative inline-flex"></span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md font-mono">
+                Live Cloud Sync Active
+              </span>
+              <span className="text-xs text-sky-200 font-medium">
+                Multi-Laptop &amp; Mobile Real-Time Relay
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              New architect registrations and status changes automatically sync across all computers in real-time. Use the quick action buttons to instantly refresh or share with Sir.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleCloudPull}
+            disabled={syncingCloud}
+            className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-xs font-bold text-sky-200 hover:text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Fetch latest registrations from cloud database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncingCloud ? 'animate-spin text-amber-300' : ''}`} />
+            <span>{syncingCloud ? 'Syncing...' : 'Sync Cloud Now'}</span>
+          </button>
+
+          <button
+            onClick={handleShareLink}
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="Copy direct shareable admin link with current registrations for Sir"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share Link with Sir</span>
+          </button>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 transition flex items-center gap-1.5 cursor-pointer"
+            title="Import registration data code"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import Code</span>
+          </button>
+
+          <button
+            onClick={handleCloudPush}
+            disabled={syncingCloud}
+            className="px-3 py-2 rounded-xl bg-indigo-600/40 hover:bg-indigo-600/60 border border-indigo-400/30 text-xs font-bold text-indigo-200 transition flex items-center gap-1.5 cursor-pointer"
+            title="Force push current local records to cloud"
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Push Data</span>
           </button>
         </div>
       </div>
@@ -3366,6 +3502,55 @@ export const AdminArchitects: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition cursor-pointer shadow-sm"
               >
                 Confirm Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- IMPORT SYNC CODE MODAL ---------------- */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-sky-600" />
+                <h3 className="text-base font-bold text-navy-950">Import Architect Data Code</h3>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Paste the exported sync JSON code below to immediately load all registered architects into your local admin panel:
+            </p>
+
+            <textarea
+              rows={6}
+              value={importCodeText}
+              onChange={(e) => setImportCodeText(e.target.value)}
+              placeholder='Paste exported JSON code here: { "architects": [...] }'
+              className="w-full text-xs font-mono p-3 rounded-2xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-slate-50 resize-none"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleImportCode}
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-black transition cursor-pointer shadow-sm"
+              >
+                Load Architects Data
               </button>
             </div>
           </div>

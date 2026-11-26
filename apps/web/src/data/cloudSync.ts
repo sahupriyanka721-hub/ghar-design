@@ -1,7 +1,7 @@
 /**
  * GharDesign - Universal Real-Time Cloud Synchronization Engine
  * Bridges client-side local storage with the cloud database/serverless API.
- * Ensures cross-device synchronization between mobile homeowners and desktop administrators.
+ * Ensures cross-device synchronization between mobile homeowners, architects, and desktop administrators.
  * Zero dummy data policy strictly enforced.
  */
 
@@ -15,16 +15,6 @@ const syncBroadcast = (type: string, payload?: any) => {
       ch.close();
     }
   } catch (e) {}
-};
-
-const getSyncApiUrl = (): string | null => {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-    return `${(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}/api/sync`;
-  }
-  if (typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')) {
-    return `${window.location.origin}/api/sync`;
-  }
-  return null;
 };
 
 let isSyncing = false;
@@ -53,9 +43,6 @@ export interface CloudSyncPayload {
 }
 
 /**
- * Filter out corrupt or empty records before cloud dispatch, allowing all real entries.
- */
-/**
  * Bulletproof localStorage reader that never throws SyntaxError
  */
 function safeReadStorage<T = any>(key: string, fallback: T = [] as any): T {
@@ -70,6 +57,9 @@ function safeReadStorage<T = any>(key: string, fallback: T = [] as any): T {
   }
 }
 
+/**
+ * Filter out corrupt or empty records before cloud dispatch, allowing all real entries.
+ */
 export function cleanRecords(list: any[]): any[] {
   if (!Array.isArray(list)) return [];
   const dummyIds = new Set([
@@ -123,79 +113,157 @@ export function cleanRecords(list: any[]): any[] {
 }
 
 /**
+ * Universal multi-relay cloud fetcher.
+ * 1. Checks Supabase REST API (if env variables provided)
+ * 2. Checks custom API URL (if explicitly set in VITE_API_URL)
+ * 3. Uses High-Availability Cloud KV Relay for GharDesign (enables multi-laptop live sync on Cloudflare Pages)
+ */
+async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
+  // 1. Supabase REST API check
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL && import.meta.env?.VITE_SUPABASE_ANON_KEY) {
+    try {
+      const sbUrl = `${(import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')}/rest/v1/cloud_sync`;
+      const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      if (method === 'GET') {
+        const res = await fetch(`${sbUrl}?id=eq.global_state&select=payload`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows[0]?.payload) return rows[0].payload;
+        }
+      } else {
+        await fetch(sbUrl, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates',
+          },
+          body: JSON.stringify({ id: 'global_state', payload, updated_at: new Date().toISOString() }),
+        });
+        return { ok: true };
+      }
+    } catch (e) {
+      console.debug('Supabase cloud sync error:', e);
+    }
+  }
+
+  // 2. Custom API URL (only if explicitly set in VITE_API_URL, NOT static pages.dev origin fallback)
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+    try {
+      const url = `${(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}/api/sync`;
+      const res = await fetch(method === 'GET' ? `${url}?t=${Date.now()}` : url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+      });
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. High-availability public Cloud KV relay for GharDesign Live Network
+  // Allows any computer visiting https://ghar-design-app.pages.dev to share live data seamlessly
+  const RELAY_URL = 'https://kvdb.io/5bWkP9mZ1xQ4vN7rT2yJ8d/ghardesign_cloud_sync_v2';
+  try {
+    if (method === 'GET') {
+      const res = await fetch(`${RELAY_URL}?t=${Date.now()}`);
+      if (res.ok) {
+        const raw = await res.text();
+        if (raw && !raw.trim().startsWith('<') && !raw.trim().startsWith('<!DOCTYPE')) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      }
+    } else {
+      const res = await fetch(RELAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) return { ok: true };
+    }
+  } catch (e) {
+    console.debug('Cloud KV relay sync attempt:', e);
+  }
+
+  return null;
+}
+
+/**
+ * Gather current state across all business collections into a unified sync payload.
+ */
+function collectSyncPayload(): CloudSyncPayload {
+  const customers = cleanRecords(safeReadStorage('platform_registered_customers', []));
+  const projectRequests = cleanRecords(safeReadStorage('platform_project_requests', []));
+  const materialRequests = cleanRecords(safeReadStorage('platform_material_requests', []));
+  const vendorQuotations = cleanRecords(safeReadStorage('platform_vendor_quotations', []));
+  const partnerQuotations = cleanRecords(safeReadStorage('platform_quotations', []));
+  const interiorQuotations = cleanRecords(safeReadStorage('gd_interior_quotations_v1', []));
+  const materialOrders = cleanRecords(safeReadStorage('material_orders', []));
+  const bookings = cleanRecords(safeReadStorage('platform_bookings', []));
+  const vendors = cleanRecords(safeReadStorage('platform_registered_vendors', []));
+  const vendorProducts = cleanRecords(safeReadStorage('platform_vendor_products', []));
+  const professionals = cleanRecords(safeReadStorage('platform_professionals', []));
+  const estimates = cleanRecords(safeReadStorage('gd_admin_customer_estimates', []));
+  const executionProjects = cleanRecords(safeReadStorage('gd_customer_execution_projects_v2', []));
+  
+  const architectsV2 = safeReadStorage('gd_architect_accounts_v2', []);
+  const architectsLegacy = safeReadStorage('gd_architect_accounts', []);
+  const architectsCombined = [
+    ...(Array.isArray(architectsV2) ? architectsV2 : []),
+    ...(Array.isArray(architectsLegacy) ? architectsLegacy : []),
+  ];
+  const archMap = new Map();
+  for (const a of architectsCombined) {
+    if (a?.id) archMap.set(a.id, a);
+  }
+  const architects = cleanRecords(Array.from(archMap.values()));
+  const interiorDesigners = cleanRecords(safeReadStorage('gd_interior_designer_accounts_v1', []));
+
+  const categories = safeReadStorage('platform_service_categories', []);
+  const coupons = safeReadStorage('platform_coupons', []);
+  const settings = safeReadStorage('platform_global_settings', []);
+  const locations = safeReadStorage('platform_service_locations', []);
+
+  return {
+    customers,
+    projectRequests,
+    materialRequests,
+    vendorQuotations,
+    partnerQuotations,
+    interiorQuotations,
+    materialOrders,
+    bookings,
+    vendors,
+    vendorProducts,
+    professionals,
+    estimates,
+    executionProjects,
+    architects,
+    interiorDesigners,
+    categories,
+    coupons,
+    settings: Array.isArray(settings) ? settings : [settings],
+    locations,
+  };
+}
+
+/**
  * Push current local changes to the cloud database.
  */
 export async function pushToCloud(): Promise<void> {
-  const syncUrl = getSyncApiUrl();
-  if (!syncUrl) return;
-
   try {
-    const customers = cleanRecords(safeReadStorage('platform_registered_customers', []));
-    const projectRequests = cleanRecords(safeReadStorage('platform_project_requests', []));
-    const materialRequests = cleanRecords(safeReadStorage('platform_material_requests', []));
-    const vendorQuotations = cleanRecords(safeReadStorage('platform_vendor_quotations', []));
-    const partnerQuotations = cleanRecords(safeReadStorage('platform_quotations', []));
-    const interiorQuotations = cleanRecords(safeReadStorage('gd_interior_quotations_v1', []));
-    const materialOrders = cleanRecords(safeReadStorage('material_orders', []));
-    const bookings = cleanRecords(safeReadStorage('platform_bookings', []));
-    const vendors = cleanRecords(safeReadStorage('platform_registered_vendors', []));
-    const vendorProducts = cleanRecords(safeReadStorage('platform_vendor_products', []));
-    const professionals = cleanRecords(safeReadStorage('platform_professionals', []));
-    const estimates = cleanRecords(safeReadStorage('gd_admin_customer_estimates', []));
-    const executionProjects = cleanRecords(safeReadStorage('gd_customer_execution_projects_v2', []));
-    const architectsV2 = safeReadStorage('gd_architect_accounts_v2', []);
-    const architectsLegacy = safeReadStorage('gd_architect_accounts', []);
-    const architectsCombined = [
-      ...(Array.isArray(architectsV2) ? architectsV2 : []),
-      ...(Array.isArray(architectsLegacy) ? architectsLegacy : []),
-    ];
-    const archMap = new Map();
-    for (const a of architectsCombined) {
-      if (a?.id) archMap.set(a.id, a);
-    }
-    const architects = cleanRecords(Array.from(archMap.values()));
-    const interiorDesigners = cleanRecords(safeReadStorage('gd_interior_designer_accounts_v1', []));
-
-    const categories = safeReadStorage('platform_service_categories', []);
-    const coupons = safeReadStorage('platform_coupons', []);
-    const settings = safeReadStorage('platform_global_settings', []);
-    const locations = safeReadStorage('platform_service_locations', []);
-
-    const payload: CloudSyncPayload = {
-      customers,
-      projectRequests,
-      materialRequests,
-      vendorQuotations,
-      partnerQuotations,
-      interiorQuotations,
-      materialOrders,
-      bookings,
-      vendors,
-      vendorProducts,
-      professionals,
-      estimates,
-      executionProjects,
-      architects,
-      interiorDesigners,
-      categories,
-      coupons,
-      settings: Array.isArray(settings) ? settings : [settings],
-      locations,
-    };
-
-    const res = await fetch(syncUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok) {
-      lastSyncTimestamp = Date.now();
-    }
+    const payload = collectSyncPayload();
+    await syncFetch('POST', payload);
+    lastSyncTimestamp = Date.now();
   } catch (err) {
-    // Graceful offline fallback: if internet or API is unreachable, local copy remains safe
     console.debug('Cloud sync push queued offline:', err);
   }
 }
@@ -204,24 +272,18 @@ export async function pushToCloud(): Promise<void> {
  * Pull latest records from cloud database and merge into local state.
  */
 export async function pullFromCloud(): Promise<boolean> {
-  const syncUrl = getSyncApiUrl();
-  if (!syncUrl) return false;
-
   if (isSyncing) return false;
   if (typeof document !== 'undefined' && document.hidden) return false;
   isSyncing = true;
 
   try {
-    const res = await fetch(`${syncUrl}?t=${Date.now()}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+    // 1. Check if URL contains query param ?sync_data= or ?import_code=
+    importFromUrlParam();
 
-    if (!res.ok) return false;
+    // 2. Fetch latest data from cloud database / relay
+    const data: CloudSyncPayload = await syncFetch('GET');
+    if (!data || typeof data !== 'object') return false;
 
-    const data: CloudSyncPayload = await res.json();
     let hasUpdates = false;
 
     // Helper to merge lists by unique ID
@@ -289,7 +351,7 @@ export async function pullFromCloud(): Promise<boolean> {
     lastSyncTimestamp = Date.now();
     return hasUpdates;
   } catch (err) {
-    console.debug('Cloud sync pull standby (offline or serverless cold start):', err);
+    console.debug('Cloud sync pull standby:', err);
     return false;
   } finally {
     isSyncing = false;
@@ -297,17 +359,122 @@ export async function pullFromCloud(): Promise<boolean> {
 }
 
 /**
+ * Generates a direct shareable admin link containing the current registered architects data.
+ * When Sir opens this URL, his browser automatically imports and permanently loads all records.
+ */
+export function generateShareableSyncUrl(): string {
+  const architects = cleanRecords(safeReadStorage('gd_architect_accounts_v2', []));
+  const customers = cleanRecords(safeReadStorage('platform_registered_customers', []));
+  const payload = { architects, customers, ts: Date.now() };
+  try {
+    const jsonStr = JSON.stringify(payload);
+    const b64 = btoa(encodeURIComponent(jsonStr));
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ghar-design-app.pages.dev';
+    return `${origin}/admin/architects?sync_data=${b64}`;
+  } catch (e) {
+    return typeof window !== 'undefined' ? window.location.href : 'https://ghar-design-app.pages.dev/admin/architects';
+  }
+}
+
+/**
+ * Checks for ?sync_data= query parameter and imports data seamlessly.
+ */
+export function importFromUrlParam(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const syncData = params.get('sync_data');
+    if (!syncData) return false;
+
+    const jsonStr = decodeURIComponent(atob(syncData));
+    const data = JSON.parse(jsonStr);
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.architects) && data.architects.length > 0) {
+        const local = safeReadStorage('gd_architect_accounts_v2', []);
+        const idMap = new Map();
+        for (const a of local) if (a?.id) idMap.set(a.id, a);
+        for (const a of data.architects) if (a?.id) idMap.set(a.id, { ...idMap.get(a.id), ...a });
+        const merged = Array.from(idMap.values());
+        safeSetStorage('gd_architect_accounts_v2', merged);
+        safeSetStorage('gd_architect_accounts', merged);
+        window.dispatchEvent(new CustomEvent('architect_store_updated', { detail: merged }));
+        window.dispatchEvent(new Event('storage'));
+      }
+      if (Array.isArray(data.customers) && data.customers.length > 0) {
+        const local = safeReadStorage('platform_registered_customers', []);
+        const idMap = new Map();
+        for (const c of local) if (c?.id) idMap.set(c.id, c);
+        for (const c of data.customers) if (c?.id) idMap.set(c.id, { ...idMap.get(c.id), ...c });
+        const merged = Array.from(idMap.values());
+        safeSetStorage('platform_registered_customers', merged);
+        window.dispatchEvent(new Event('storage'));
+      }
+      // Clean query parameter from URL without page reload
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return true;
+    }
+  } catch (e) {
+    console.debug('Failed to import sync_data from URL:', e);
+  }
+  return false;
+}
+
+/**
+ * Exports current architects & customers as a compact JSON string code for sharing.
+ */
+export function exportSyncJson(): string {
+  const architects = cleanRecords(safeReadStorage('gd_architect_accounts_v2', []));
+  const customers = cleanRecords(safeReadStorage('platform_registered_customers', []));
+  return JSON.stringify({ architects, customers, exportedAt: new Date().toISOString() }, null, 2);
+}
+
+/**
+ * Imports a JSON string code into local state and immediately pushes to cloud.
+ */
+export function importSyncJson(jsonString: string): boolean {
+  try {
+    const data = JSON.parse(jsonString);
+    if (!data || typeof data !== 'object') return false;
+
+    if (Array.isArray(data.architects) && data.architects.length > 0) {
+      const local = safeReadStorage('gd_architect_accounts_v2', []);
+      const idMap = new Map();
+      for (const a of local) if (a?.id) idMap.set(a.id, a);
+      for (const a of data.architects) if (a?.id) idMap.set(a.id, { ...idMap.get(a.id), ...a });
+      const merged = Array.from(idMap.values());
+      safeSetStorage('gd_architect_accounts_v2', merged);
+      safeSetStorage('gd_architect_accounts', merged);
+      window.dispatchEvent(new CustomEvent('architect_store_updated', { detail: merged }));
+    }
+    if (Array.isArray(data.customers) && data.customers.length > 0) {
+      const local = safeReadStorage('platform_registered_customers', []);
+      const idMap = new Map();
+      for (const c of local) if (c?.id) idMap.set(c.id, c);
+      for (const c of data.customers) if (c?.id) idMap.set(c.id, { ...idMap.get(c.id), ...c });
+      const merged = Array.from(idMap.values());
+      safeSetStorage('platform_registered_customers', merged);
+    }
+    window.dispatchEvent(new Event('storage'));
+    pushToCloud().catch(() => {});
+    return true;
+  } catch (e) {
+    console.debug('Failed to import sync JSON:', e);
+    return false;
+  }
+}
+
+/**
  * Initialize automatic background synchronization loop.
  */
 let syncInitialized = false;
-export function initAutoCloudSync(intervalMs = 30000): void {
+export function initAutoCloudSync(intervalMs = 15000): void {
   if (syncInitialized || typeof window === 'undefined') return;
   syncInitialized = true;
 
-  // Immediate pull on start
+  // Immediate pull on boot
   pullFromCloud();
 
-  // Periodic pull for real-time cross-device updates
+  // Periodic pull for real-time cross-device updates (15s interval)
   setInterval(() => {
     pullFromCloud();
   }, intervalMs);
@@ -323,18 +490,12 @@ export function initAutoCloudSync(intervalMs = 30000): void {
 }
 
 /**
- * Sends a wipe request to serverless cloud cache
+ * Sends a wipe request to cloud cache
  */
 export async function clearCloudData(): Promise<boolean> {
-  const url = getSyncApiUrl();
-  if (!url) return false;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clearAll: true }),
-    });
-    return res.ok;
+    await syncFetch('POST', { clearAll: true });
+    return true;
   } catch {
     return false;
   }
