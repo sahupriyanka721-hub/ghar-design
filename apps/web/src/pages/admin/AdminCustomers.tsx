@@ -9,6 +9,7 @@ import {
   getPlatformRequests,
   syncChannel,
 } from '../../data/customerStore.js';
+import { pullFromCloud, pushToCloud } from '../../data/cloudSync.js';
 import {
   Search,
   Phone,
@@ -79,6 +80,7 @@ export const AdminCustomers: React.FC = () => {
       status: newCustForm.status,
     });
     refreshCustomers();
+    pushToCloud().catch(() => {});
     setShowAddModal(false);
     setNewCustForm({
       name: '',
@@ -105,14 +107,18 @@ export const AdminCustomers: React.FC = () => {
     }
   };
 
-  const handleManualRefresh = () => {
+  const handleManualRefresh = async () => {
     setRefreshing(true);
+    await pullFromCloud().catch(() => {});
     refreshCustomers(true);
-    setTimeout(() => setRefreshing(false), 500);
+    setRefreshing(false);
   };
 
   useEffect(() => {
     refreshCustomers();
+    pullFromCloud().then(() => {
+      refreshCustomers(false);
+    }).catch(() => {});
 
     // Auto-refresh silently every 1 minute (60,000 ms)
     const interval = setInterval(() => {

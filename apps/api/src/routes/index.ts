@@ -8,6 +8,7 @@ import adminRoutes from './admin.routes.js';
 import notificationRoutes from './notification.routes.js';
 import customerRoutes from './customer.routes.js';
 import calculatorRoutes from './calculator.routes.js';
+import { syncRouter } from './sync.routes.js';
 
 const apiRouter = Router();
 
@@ -20,6 +21,7 @@ apiRouter.use('/professional', professionalRoutes);
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/calculator', calculatorRoutes);
+apiRouter.use('/sync', syncRouter);
 
 // Health check endpoint
 apiRouter.get('/health', (req: any, res: any) => {

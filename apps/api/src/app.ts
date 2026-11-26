@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { config } from './config/index.js';
 import apiRouter from './routes/index.js';
 import docsRouter from './routes/docs.routes.js';
+import { syncRouter } from './routes/sync.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 
@@ -50,6 +51,10 @@ export function createApp() {
   app.get('/health', (req: any, res: any) => {
     res.json({ status: 'healthy', database: 'MongoDB Atlas' });
   });
+
+  // Universal Cloud Database Sync Endpoint for Cross-Laptop & Mobile Synchronization
+  app.use('/api/sync', syncRouter);
+  app.use('/sync', syncRouter);
 
   // Logging
   if (config.env !== 'test') {

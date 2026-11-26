@@ -150,10 +150,10 @@ async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
     }
   }
 
-  // 2. Custom API URL (explicitly set in VITE_API_URL or Render Live Backend)
+  // 2. Custom API URL (Live Render Backend connected to MongoDB Atlas)
   const candidateApi = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
     ? (import.meta.env.VITE_API_URL as string) 
-    : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'https://ghar-design-api-8wbl.onrender.com' : '');
+    : 'https://ghar-design-api-8wbl.onrender.com';
 
   if (candidateApi) {
     try {
@@ -169,7 +169,9 @@ async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
           return await res.json();
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.debug('Render API sync attempt error:', e);
+    }
   }
 
   // 3. High-availability public Cloud KV relay for GharDesign Live Network
