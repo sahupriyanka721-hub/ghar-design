@@ -95,9 +95,6 @@ export function cleanRecords(list: any[]): any[] {
     
     const name = (item.name || item.customerName || '').toLowerCase().trim();
     if (dummyExactNames.has(name)) return false;
-    
-    const phone = (item.phone || item.customerPhone || '').replace(/\D/g, '').slice(-10);
-    if (dummyPhones.includes(phone)) return false;
 
     const proName = (item.professionalName || item.professional?.name || '').toLowerCase().trim();
     if (dummyProKeywords.some((dp) => proName === dp)) return false;

@@ -56,9 +56,6 @@ function cleanList(list: any[]): any[] {
     const name = (item.name || item.customerName || '').toLowerCase().trim();
     if (['demo user', 'dummy architect', 'test contractor', 'sample client'].includes(name)) return false;
 
-    const phone = (item.phone || item.customerPhone || '').replace(/\D/g, '').slice(-10);
-    if (['0000000000', '1111111111', '1234567890'].includes(phone)) return false;
-
     return true;
   });
 }
@@ -154,6 +151,7 @@ syncRouter.get('/', async (req: Request, res: Response) => {
 syncRouter.post('/', async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
+    logger.info(`📡 Sync POST received: customers=${body.customers?.length || 0}, requests=${body.projectRequests?.length || 0}`);
 
     if (body.customers) inMemoryStore.customers = mergeRecords(inMemoryStore.customers, body.customers);
     if (body.projectRequests) inMemoryStore.projectRequests = mergeRecords(inMemoryStore.projectRequests, body.projectRequests);

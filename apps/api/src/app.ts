@@ -13,30 +13,28 @@ import { apiLimiter } from './middleware/rateLimiter.js';
 export function createApp() {
   const app = express();
 
-  // Security headers
-  app.use(helmet());
+  // Security headers (Allow cross-origin resource access for web & mobile)
+  app.use(helmet({ crossOriginResourcePolicy: false }));
 
-  // CORS configuration
+  // CORS configuration (Reflect origin so mobile & cloudflare pages always connect seamlessly)
   app.use(
     cors({
-      origin: (origin: any, callback: any) => {
-        // Allow mobile apps, curl, postman or same-origin
-        if (!origin) return callback(null, true);
-        if (
-          origin === config.webOrigin ||
-          origin.includes('pages.dev') ||
-          origin.includes('vercel.app') ||
-          origin.includes('localhost')
-        ) {
-          return callback(null, true);
-        }
-        return callback(null, true);
-      },
+      origin: true,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     })
   );
+
+  // Body parsers - MUST BE FIRST BEFORE ANY ROUTES!
+  app.use(express.json({ limit: '20mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+  app.use(cookieParser(config.sessionSecret));
+
+  // Logging
+  if (config.env !== 'test') {
+    app.use(morgan('dev'));
+  }
 
   // Root health check for Cloud hosting (Render / Railway / AWS)
   app.get('/', (req: any, res: any) => {
@@ -55,16 +53,6 @@ export function createApp() {
   // Universal Cloud Database Sync Endpoint for Cross-Laptop & Mobile Synchronization
   app.use('/api/sync', syncRouter);
   app.use('/sync', syncRouter);
-
-  // Logging
-  if (config.env !== 'test') {
-    app.use(morgan('dev'));
-  }
-
-  // Body parsers
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  app.use(cookieParser(config.sessionSecret));
 
   // Global rate limiter
   app.use('/api', apiLimiter);
