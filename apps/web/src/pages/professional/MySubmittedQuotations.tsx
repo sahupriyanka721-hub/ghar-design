@@ -50,6 +50,42 @@ export const MySubmittedQuotations: React.FC = () => {
   const { success, error } = useToast();
   const navigate = useNavigate();
 
+  // Helper to reliably resolve full quotation total amount in paise (never hardcode fallback)
+  const resolveQuotationTotal = (q: any): number => {
+    if (!q) return 0;
+    if (typeof q.finalAmountPaise === 'number' && q.finalAmountPaise > 0) return q.finalAmountPaise;
+    if (typeof q.totalAmountPaise === 'number' && q.totalAmountPaise > 0) return q.totalAmountPaise;
+    if (typeof q.grandTotalPaise === 'number' && q.grandTotalPaise > 0) return q.grandTotalPaise;
+    if (typeof q.netTotalPaise === 'number' && q.netTotalPaise > 0) {
+      const tax = q.taxPaise || Math.round(q.netTotalPaise * 0.18);
+      return q.netTotalPaise + tax;
+    }
+    if (typeof q.taxableAmountPaise === 'number' && q.taxableAmountPaise > 0) {
+      const tax = q.taxPaise || Math.round(q.taxableAmountPaise * 0.18);
+      return q.taxableAmountPaise + tax;
+    }
+    if (typeof q.subtotalPaise === 'number' && q.subtotalPaise > 0) {
+      const net = Math.max(0, q.subtotalPaise - (q.discountPaise || 0));
+      const tax = q.taxPaise || Math.round(net * 0.18);
+      return net + tax;
+    }
+    if (typeof q.finalQuotationTotal === 'number' && q.finalQuotationTotal > 0) return Math.round(q.finalQuotationTotal * 100);
+    if (typeof q.totalAmount === 'number' && q.totalAmount > 0) {
+      return q.totalAmount > 500000 ? q.totalAmount : Math.round(q.totalAmount * 100);
+    }
+    if (Array.isArray(q.lineItems) && q.lineItems.length > 0) {
+      const sum = q.lineItems.reduce((acc: number, it: any) => {
+        const line = it.totalPaise || (it.unitPricePaise && it.quantity ? it.unitPricePaise * it.quantity : 0) || (it.rate && it.quantity ? it.rate * it.quantity * 100 : 0) || (it.amount ? it.amount * 100 : 0) || 0;
+        return acc + (Number(line) || 0);
+      }, 0);
+      if (sum > 0) {
+        const tax = q.taxPaise || Math.round(sum * 0.18);
+        return sum + tax;
+      }
+    }
+    return 0;
+  };
+
   // Helper to reliably resolve full customer profile for quotation display & PDF
   const resolveCustomerInfo = (quote: any): PdfCustomerInfo => {
     let name = quote?.customerName || quote?.clientName || quote?.customer?.name || '';
@@ -205,7 +241,7 @@ export const MySubmittedQuotations: React.FC = () => {
   if (activeQuote) {
     const normalized = normalizeQuotation(activeQuote);
     const customerInfo = resolveCustomerInfo(activeQuote);
-    const totalAmount = normalized.finalAmountPaise || activeQuote.totalAmountPaise || 45000000;
+    const totalAmount = resolveQuotationTotal(activeQuote);
     const advancePercentage = normalized.advancePercentage || activeQuote.advancePercentage || 25;
     const advanceAmount = Math.round((totalAmount * advancePercentage) / 100);
 
@@ -673,7 +709,7 @@ export const MySubmittedQuotations: React.FC = () => {
                         {q.scopeOfWork || 'Architectural Floor Plans & 3D Renderings'}
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-blue-900">
-                        {formatINR(q.totalAmountPaise || 45000000)}
+                        {formatINR(resolveQuotationTotal(q))}
                       </td>
                       <td className="py-3.5 px-4 text-slate-500 font-mono">
                         {q.validUntil ? formatDate(q.validUntil) : '30 Days'}

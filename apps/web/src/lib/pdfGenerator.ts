@@ -75,7 +75,15 @@ export function buildQuotationPdfBlob(
   const architectName = architect?.firmName || architect?.name || quote.architectName || 'COA Verified Architect';
   const coaNum = architect?.coaNumber || quote.coaNumber || 'COA/VERIFIED/2026';
   
-  const totalPaise = quote.finalAmountPaise || quote.totalAmountPaise || (quote.totalAmount ? quote.totalAmount * 100 : 45000000);
+  const totalPaise =
+    (typeof quote.finalAmountPaise === 'number' && quote.finalAmountPaise > 0) ? quote.finalAmountPaise :
+    (typeof quote.totalAmountPaise === 'number' && quote.totalAmountPaise > 0) ? quote.totalAmountPaise :
+    (typeof quote.grandTotalPaise === 'number' && quote.grandTotalPaise > 0) ? quote.grandTotalPaise :
+    (typeof quote.netTotalPaise === 'number' && quote.netTotalPaise > 0) ? quote.netTotalPaise + (quote.taxPaise || Math.round(quote.netTotalPaise * 0.18)) :
+    (typeof quote.totalAmount === 'number' && quote.totalAmount > 0) ? (quote.totalAmount > 500000 ? quote.totalAmount : Math.round(quote.totalAmount * 100)) :
+    (Array.isArray(quote.lineItems) && quote.lineItems.length > 0)
+      ? quote.lineItems.reduce((acc: number, it: any) => acc + (it.totalPaise || (it.unitPricePaise && it.quantity ? it.unitPricePaise * it.quantity : 0) || 0), 0)
+      : 0;
   const totalRupees = Math.round(totalPaise / 100);
   const discountRupees = Math.round((quote.discountPaise || 0) / 100);
   const rawSubtotalRupees = Math.round((quote.subtotalPaise || 0) / 100);

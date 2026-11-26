@@ -57,21 +57,33 @@ export function normalizeQuotation(q: any): any {
     ? q.items
     : [];
 
+  const resolvedTotal =
+    (typeof q.finalAmountPaise === 'number' && q.finalAmountPaise > 0) ? q.finalAmountPaise :
+    (typeof q.totalAmountPaise === 'number' && q.totalAmountPaise > 0) ? q.totalAmountPaise :
+    (typeof q.grandTotalPaise === 'number' && q.grandTotalPaise > 0) ? q.grandTotalPaise :
+    (typeof q.netTotalPaise === 'number' && q.netTotalPaise > 0) ? q.netTotalPaise + (q.taxPaise || Math.round(q.netTotalPaise * 0.18)) :
+    (typeof q.taxableAmountPaise === 'number' && q.taxableAmountPaise > 0) ? q.taxableAmountPaise + (q.taxPaise || Math.round(q.taxableAmountPaise * 0.18)) :
+    (typeof q.subtotalPaise === 'number' && q.subtotalPaise > 0) ? (q.subtotalPaise - (q.discountPaise || 0)) + (q.taxPaise || Math.round((q.subtotalPaise - (q.discountPaise || 0)) * 0.18)) :
+    (typeof q.finalQuotationTotal === 'number' && q.finalQuotationTotal > 0) ? Math.round(q.finalQuotationTotal * 100) :
+    (typeof q.totalAmount === 'number' && q.totalAmount > 0) ? (q.totalAmount > 500000 ? q.totalAmount : Math.round(q.totalAmount * 100)) :
+    (rawItems.length > 0) ? rawItems.reduce((acc: number, it: any) => acc + (it.totalPaise || (it.unitPricePaise && it.quantity ? it.unitPricePaise * it.quantity : 0) || (it.rate && it.quantity ? it.rate * it.quantity * 100 : 0) || 0), 0) :
+    0;
+
   const lineItems = rawItems.length > 0
     ? rawItems.map((it: any) => ({
         description: it.title || it.description || 'Civil & Architectural Specification Item',
         quantity: it.quantity || 1,
         unit: it.unit || 'Lumpsum',
-        unitPricePaise: it.ratePaise || it.unitPricePaise || Math.round((q.finalAmountPaise || 1000000) * 0.7),
-        totalPaise: it.ratePaise || it.totalPaise || Math.round((q.finalAmountPaise || 1000000) * 0.7),
+        unitPricePaise: it.ratePaise || it.unitPricePaise || Math.round((resolvedTotal || 1000000) * 0.7),
+        totalPaise: it.ratePaise || it.totalPaise || Math.round((resolvedTotal || 1000000) * 0.7),
       }))
     : [
         {
           description: q.scopeOfWork || 'Complete Architectural Planning & Structural Package',
           quantity: 1,
           unit: 'Lumpsum',
-          unitPricePaise: q.finalAmountPaise || 1200000,
-          totalPaise: q.finalAmountPaise || 1200000,
+          unitPricePaise: resolvedTotal || 1200000,
+          totalPaise: resolvedTotal || 1200000,
         },
       ];
 
@@ -136,6 +148,9 @@ export function normalizeQuotation(q: any): any {
 
   return {
     ...q,
+    finalAmountPaise: resolvedTotal || q.finalAmountPaise || 0,
+    totalAmountPaise: resolvedTotal || q.totalAmountPaise || 0,
+    totalAmount: (resolvedTotal || q.finalAmountPaise || 0) / 100,
     lineItems,
     includedDeliverables,
     excludedWork,
@@ -153,8 +168,8 @@ export function normalizeQuotation(q: any): any {
     estimatedDurationDays: q.estimatedDurationDays || q.timelineDays || 30,
     revisionsCount: q.revisionsCount || 3,
     validUntil: q.validUntil || new Date(Date.now() + 30 * 86400000).toISOString(),
-    subtotalPaise: q.subtotalPaise || Math.round((q.finalAmountPaise || 1000000) / 1.18),
-    taxPaise: q.taxPaise || Math.round((q.finalAmountPaise || 1000000) - (q.finalAmountPaise || 1000000) / 1.18),
+    subtotalPaise: q.subtotalPaise || (resolvedTotal > 0 ? Math.round(resolvedTotal / 1.18) : 0),
+    taxPaise: q.taxPaise || (resolvedTotal > 0 ? Math.round(resolvedTotal - resolvedTotal / 1.18) : 0),
     discountPaise: q.discountPaise || 0,
     advancePercentage: q.advancePercentage || 15,
   };

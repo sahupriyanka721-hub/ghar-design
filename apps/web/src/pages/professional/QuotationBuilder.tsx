@@ -337,6 +337,8 @@ export const QuotationBuilder: React.FC = () => {
         taxableAmountPaise,
         taxPaise,
         finalAmountPaise,
+        totalAmountPaise: finalAmountPaise,
+        totalAmount: finalAmountPaise / 100,
         includedDeliverables: deliverables,
         excludedWork: exclusions,
         revisionsCount,
