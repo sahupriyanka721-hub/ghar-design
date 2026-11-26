@@ -982,12 +982,10 @@ export const AdminRequestDetail: React.FC = () => {
               <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-3 px-3">Slot</th>
+                  <th className="py-3 px-3">Customer Name</th>
+                  <th className="py-3 px-3">Customer Mobile</th>
                   <th className="py-3 px-3">Architect Firm Name</th>
                   <th className="py-3 px-3">Architect ID</th>
-                  <th className="py-3 px-3 text-right">Subtotal</th>
-                  <th className="py-3 px-3 text-right">Discount to Client</th>
-                  <th className="py-3 px-3 text-right">Net Total</th>
-                  <th className="py-3 px-3 text-right">GST (18%)</th>
                   <th className="py-3 px-3 text-right font-black">Final Quotation Total</th>
                   <th className="py-3 px-3 text-center">Status</th>
                   <th className="py-3 px-3 text-right">Actions</th>
@@ -1002,6 +1000,8 @@ export const AdminRequestDetail: React.FC = () => {
                   const net = Math.max(0, subtotal - discount);
                   const tax = q.taxPaise ? q.taxPaise / 100 : Math.round(net * 0.18);
                   const finalTotal = q.finalAmountPaise ? q.finalAmountPaise / 100 : (net + tax);
+                  const rowCustName = q.customerName || request?.customerName || 'Homeowner';
+                  const rowCustPhone = q.customerPhone || request?.customerPhone || '';
 
                   return (
                     <tr key={q.id || q.quotationCode || idx} className="hover:bg-sky-50/40 transition">
@@ -1011,6 +1011,18 @@ export const AdminRequestDetail: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-3">
+                        <span className="font-bold text-slate-900 block">{rowCustName}</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-xs text-slate-700 whitespace-nowrap">
+                        {rowCustPhone ? (
+                          <a href={`tel:${rowCustPhone.replace(/\D/g, '')}`} className="text-slate-800 hover:text-blue-600 hover:underline">
+                            {rowCustPhone}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3">
                         <span className="font-bold text-slate-900 block">{firmName}</span>
                         <span className="text-[11px] text-slate-500">{architectName} • {archPhone}</span>
                       </td>
@@ -1018,18 +1030,6 @@ export const AdminRequestDetail: React.FC = () => {
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">
                           {archId}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-mono text-slate-700">
-                        ₹{subtotal.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-mono text-emerald-700 font-semibold">
-                        {discount > 0 ? `-₹${discount.toLocaleString('en-IN')}` : '₹0'}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-mono text-slate-900 font-semibold">
-                        ₹{net.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-mono text-slate-600">
-                        ₹{tax.toLocaleString('en-IN')}
                       </td>
                       <td className="py-3.5 px-3 text-right font-mono font-black text-navy-950 text-sm whitespace-nowrap">
                         ₹{finalTotal.toLocaleString('en-IN')}
