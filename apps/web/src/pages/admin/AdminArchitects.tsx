@@ -826,9 +826,9 @@ export const AdminArchitects: React.FC = () => {
       const shareUrl = generateShareableSyncUrl();
       if (navigator?.clipboard?.writeText) {
         navigator.clipboard.writeText(shareUrl);
-        success('🔗 Direct Live Sync Link copied to clipboard! Send this link to Sir to view all registrations instantly.');
+        success('🔗 Direct Live Sync Link copied to clipboard! Share this link to view all registrations instantly.');
       } else {
-        prompt('Copy this link and send to Sir:', shareUrl);
+        prompt('Copy this shareable link:', shareUrl);
       }
     } catch {
       success('Share link generated.');
@@ -1258,7 +1258,7 @@ export const AdminArchitects: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              New architect registrations and status changes automatically sync across all computers in real-time. Use the quick action buttons to instantly refresh or share with Sir.
+              New architect registrations and status changes automatically sync across all computers in real-time. Use the quick action buttons to instantly refresh or share live data.
             </p>
           </div>
         </div>
@@ -1277,10 +1277,10 @@ export const AdminArchitects: React.FC = () => {
           <button
             onClick={handleShareLink}
             className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-            title="Copy direct shareable admin link with current registrations for Sir"
+            title="Copy direct shareable admin link with current registrations"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>Share Link with Sir</span>
+            <span>Share Link</span>
           </button>
 
           <button

@@ -366,7 +366,7 @@ export async function pullFromCloud(): Promise<boolean> {
 
 /**
  * Generates a direct shareable admin link containing the current registered architects data.
- * When Sir opens this URL, his browser automatically imports and permanently loads all records.
+ * When opened on any device, the browser automatically imports and permanently loads all records.
  */
 export function generateShareableSyncUrl(): string {
   const architects = cleanRecords(safeReadStorage('gd_architect_accounts_v2', []));
