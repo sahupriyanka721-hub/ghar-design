@@ -810,6 +810,13 @@ export const AdminArchitects: React.FC = () => {
     };
     window.addEventListener('focus', onFocus);
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     let bc: BroadcastChannel | null = null;
     try {
       if ('BroadcastChannel' in window) {
