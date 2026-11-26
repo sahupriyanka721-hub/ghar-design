@@ -75,7 +75,7 @@ export class RequestService {
             id: newRequest.id,
             requestCode: newRequest.requestCode,
             customerId: newRequest.customerId,
-            categorySlug: newRequest.categorySlug,
+            categoryId: newRequest.categorySlug || 'new-house-construction',
             propertyType: newRequest.propertyType as any,
             plotWidth: newRequest.plotWidth,
             plotLength: newRequest.plotLength,

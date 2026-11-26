@@ -609,7 +609,7 @@ export const AdminLayout: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-navy-950 font-bold">
                 <Database className="w-3.5 h-3.5 text-blue-600" />
-                <span>Prisma PostgreSQL</span>
+                <span>MongoDB Atlas</span>
               </div>
               <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold border border-emerald-200">Connected</span>
             </div>

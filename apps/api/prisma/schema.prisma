@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -100,7 +100,7 @@ enum BookingStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   phone     String   @unique
   email     String?  @unique
   name      String
@@ -124,12 +124,11 @@ model User {
   materialOrders      MaterialOrder[]
   supportTickets      SupportTicket[]
 
-  @@index([phone])
   @@index([role])
 }
 
 model CustomerProfile {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   userId    String   @unique
   city      String?
   state     String?
@@ -141,7 +140,7 @@ model CustomerProfile {
 }
 
 model ProfessionalProfile {
-  id                 String               @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   userId             String               @unique
   firmName           String
   category           ProfessionalCategory
@@ -160,7 +159,7 @@ model ProfessionalProfile {
 }
 
 model ProfessionalVerificationDocument {
-  id                    String    @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   professionalProfileId String
   documentType          String
   documentUrl           String
@@ -172,7 +171,7 @@ model ProfessionalVerificationDocument {
 }
 
 model ServiceCategory {
-  id               String           @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   slug             String           @unique
   name             String
   description      String
@@ -183,7 +182,7 @@ model ServiceCategory {
 }
 
 model ProjectRequest {
-  id                     String          @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   requestCode            String          @unique
   customerId             String
   categoryId             String
@@ -237,7 +236,7 @@ model ProjectRequest {
 }
 
 model ProjectRequestService {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   requestId   String
   serviceName String
 
@@ -247,7 +246,7 @@ model ProjectRequestService {
 }
 
 model ProjectAttachment {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   requestId   String
   fileName    String
   fileUrl     String
@@ -262,7 +261,7 @@ model ProjectAttachment {
 }
 
 model RequestStatusHistory {
-  id             String        @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   requestId      String
   previousStatus RequestStatus
   newStatus      RequestStatus
@@ -276,7 +275,7 @@ model RequestStatusHistory {
 }
 
 model RequestAssignment {
-  id               String           @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   requestId        String
   professionalId   String
   status           AssignmentStatus @default(PENDING)
@@ -295,7 +294,7 @@ model RequestAssignment {
 }
 
 model Quotation {
-  id                    String          @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   quotationCode         String          @unique
   requestId             String
   professionalId        String
@@ -333,7 +332,7 @@ model Quotation {
 }
 
 model QuotationRevision {
-  id             String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   quotationId    String
   revisionNumber Int
   snapshotJson   String
@@ -345,7 +344,7 @@ model QuotationRevision {
 }
 
 model QuotationLineItem {
-  id             String @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   quotationId    String
   description    String
   quantity       Float
@@ -359,7 +358,7 @@ model QuotationLineItem {
 }
 
 model QuotationDeliverable {
-  id          String  @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   quotationId String
   title       String
   isIncluded  Boolean @default(true)
@@ -370,7 +369,7 @@ model QuotationDeliverable {
 }
 
 model QuotationMilestone {
-  id          String  @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   quotationId String
   title       String
   percentage  Float
@@ -383,7 +382,7 @@ model QuotationMilestone {
 }
 
 model Payment {
-  id                String         @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   paymentCode       String         @unique
   userId            String
   requestId         String?
@@ -409,7 +408,7 @@ model Payment {
 }
 
 model Booking {
-  id                String        @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   bookingCode       String        @unique
   requestId         String        @unique
   quotationId       String        @unique
@@ -434,7 +433,7 @@ model Booking {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   userId    String
   title     String
   message   String
@@ -450,7 +449,7 @@ model Notification {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   actorId   String?
   action    String
   entity    String
@@ -467,7 +466,7 @@ model AuditLog {
 }
 
 model PlatformSetting {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   key         String   @unique
   value       String
   description String?
@@ -475,7 +474,7 @@ model PlatformSetting {
 }
 
 model OtpToken {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   phone     String
   otpHash   String
   attempts  Int      @default(0)
@@ -487,7 +486,7 @@ model OtpToken {
 }
 
 model Session {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   userId    String
   token     String   @unique
   expiresAt DateTime
@@ -496,11 +495,10 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
 }
 
 model CustomerAddress {
-  id                String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   customerId        String
   label             String
   houseNo           String
@@ -522,7 +520,7 @@ model CustomerAddress {
 }
 
 model ProjectStage {
-  id               String    @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   projectId        String
   stageNumber      Int
   stageName        String
@@ -545,7 +543,7 @@ model ProjectStage {
 }
 
 model ProjectDocument {
-  id             String            @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   projectId      String
   documentCode   String            @unique
   title          String
@@ -563,7 +561,7 @@ model ProjectDocument {
 }
 
 model DocumentVersion {
-  id         String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   documentId String
   version    String
   fileUrl    String
@@ -576,7 +574,7 @@ model DocumentVersion {
 }
 
 model DesignApproval {
-  id              String    @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   projectId       String
   documentId      String
   documentTitle   String
@@ -594,7 +592,7 @@ model DesignApproval {
 }
 
 model ProjectMessage {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   projectId   String
   senderId    String
   senderName  String
@@ -609,7 +607,7 @@ model ProjectMessage {
 }
 
 model MaterialProduct {
-  id                String              @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   sku               String              @unique
   name              String
   brand             String
@@ -631,7 +629,7 @@ model MaterialProduct {
 }
 
 model MaterialOrder {
-  id                   String              @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   orderCode            String              @unique
   customerId           String
   subtotalPaise        Int
@@ -651,11 +649,10 @@ model MaterialOrder {
   customer User @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@index([customerId])
-  @@index([orderCode])
 }
 
 model MaterialOrderItem {
-  id             String @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   orderId        String
   productId      String
   name           String
@@ -675,7 +672,7 @@ model MaterialOrderItem {
 }
 
 model Invoice {
-  id                     String            @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   invoiceNumber          String            @unique
   invoiceType            String            @default("TAX_INVOICE") // TAX_INVOICE, PRO_FORMA, RECEIPT
   issueDate              DateTime          @default(now())
@@ -697,12 +694,11 @@ model Invoice {
   updatedAt              DateTime          @updatedAt
   lineItems              InvoiceLineItem[]
 
-  @@index([invoiceNumber])
   @@index([status])
 }
 
 model InvoiceLineItem {
-  id             String  @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   invoiceId      String
   description    String
   quantity       Float
@@ -716,7 +712,7 @@ model InvoiceLineItem {
 }
 
 model FinalSettlement {
-  id                      String    @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   projectId               String    @unique
   projectName             String
   projectCode             String
@@ -734,12 +730,11 @@ model FinalSettlement {
   createdAt               DateTime  @default(now())
   closedAt                DateTime?
 
-  @@index([projectId])
   @@index([status])
 }
 
 model SupportTicket {
-  id               String                 @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   ticketCode       String                 @unique
   customerId       String
   category         String // QUOTATION, BILLING, PROJECT_EXECUTION, MATERIALS, GENERAL
@@ -759,7 +754,7 @@ model SupportTicket {
 }
 
 model SupportTicketMessage {
-  id         String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   ticketId   String
   senderName String
   senderRole String
@@ -772,7 +767,7 @@ model SupportTicketMessage {
 }
 
 model CustomerReview {
-  id                String   @id @default(uuid())
+  id String @id @default(uuid()) @map("_id")
   bookingId         String
   projectName       String
   professionalName  String

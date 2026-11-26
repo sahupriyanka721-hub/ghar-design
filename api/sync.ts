@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
  * In-memory fallback cache across warm serverless invocations.
- * When DATABASE_URL is configured (Neon / Supabase), data is permanently persisted in PostgreSQL.
+ * When DATABASE_URL is configured (MongoDB Atlas / PostgreSQL), data is permanently persisted in the cloud database.
  */
 let memoryStore: Record<string, any[]> = {
   customers: [],
@@ -147,7 +147,7 @@ export default async function handler(req: any, res: any) {
   // 1. GET - Fetch latest cloud records
   if (req.method === 'GET') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('X-Cloud-Database', dbUrl ? 'PostgreSQL-Configured' : 'Serverless-Memory-Active');
+    res.setHeader('X-Cloud-Database', dbUrl ? (dbUrl.startsWith('mongodb') ? 'MongoDB-Atlas-Configured' : 'Database-Configured') : 'Serverless-Memory-Active');
 
     return res.status(200).json({
       success: true,

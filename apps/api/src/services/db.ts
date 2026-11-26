@@ -14,15 +14,28 @@ export function getPrisma(): PrismaClient {
 }
 
 export async function testDbConnection(): Promise<boolean> {
+  const dbUrl = process.env.DATABASE_URL || '';
+  const isMongo = dbUrl.startsWith('mongodb://') || dbUrl.startsWith('mongodb+srv://');
+
   try {
     const prisma = getPrisma();
-    await prisma.$queryRaw`SELECT 1`;
-    isConnected = true;
-    logger.info('✅ Successfully connected to PostgreSQL database via Prisma');
-    return true;
+    if (isMongo) {
+      await (prisma as any).$runCommandRaw({ ping: 1 });
+      isConnected = true;
+      logger.info('✅ Successfully connected to MongoDB Atlas database via Prisma');
+      return true;
+    } else {
+      if (typeof (prisma as any).$queryRaw === 'function') {
+        await (prisma as any).$queryRaw`SELECT 1`;
+      }
+      isConnected = true;
+      logger.info('✅ Successfully connected to database via Prisma');
+      return true;
+    }
   } catch (err: any) {
     isConnected = false;
-    logger.warn('⚠️ PostgreSQL database not reachable yet. Using fallback mock store for seamless local demo.');
+    const dbType = isMongo ? 'MongoDB Atlas' : 'PostgreSQL';
+    logger.warn(`⚠️ ${dbType} database unreachable: ${err.message || err}. Using in-memory store for fallback.`);
     return false;
   }
 }
