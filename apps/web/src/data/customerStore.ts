@@ -397,6 +397,8 @@ export interface PlatformProjectRequest {
   assignedCount?: number;
   quotationsCount?: number;
   adminNotes?: string;
+  selectedProfessionalIds?: string[];
+  assignedProfessionals?: any[];
   assignedProfessionalIds?: string[];
   responseDeadline?: string;
   termsAccepted?: boolean;

@@ -63,36 +63,82 @@ export const AdminRequests: React.FC = () => {
   };
 
   const getAssignedArchitects = (req: PlatformProjectRequest) => {
-    const ids = req.assignedProfessionalIds || [];
-    if (ids.length === 0) return [];
+    // 1. If status is NOT an assigned or active state, do not show any assigned architects
+    const unassignedStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'UNDER_ADMIN_REVIEW', 'VERIFIED', 'CANCELLED', 'REJECTED'];
+    if (unassignedStatuses.includes(req.status)) {
+      return [];
+    }
 
-    return ids.map((id) => {
+    // 2. If structured assignedProfessionals array exists, deduplicate and return
+    if (req.assignedProfessionals && Array.isArray(req.assignedProfessionals) && req.assignedProfessionals.length > 0) {
+      const seen = new Set<string>();
+      return req.assignedProfessionals
+        .filter((p: any) => {
+          if (!p) return false;
+          const key = (p.id || p.phone || p.name || p.firmName || '').toLowerCase().trim();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((p: any) => ({
+          firmName: p.firmName || p.name || 'Architectural Partner',
+          architectName: p.name || 'Verified Architect',
+          phone: p.phone ? `+91 ${String(p.phone).replace(/\D/g, '').slice(-10)}` : '',
+        }));
+    }
+
+    // 3. Otherwise, resolve from selectedProfessionalIds or assignedProfessionalIds
+    const sourceIds = (req.selectedProfessionalIds && req.selectedProfessionalIds.length > 0)
+      ? req.selectedProfessionalIds
+      : req.assignedProfessionalIds || [];
+
+    if (sourceIds.length === 0) return [];
+
+    // Deduplicate by clean architect ID / phone number so each architect appears AT MOST ONCE
+    const uniqueMap = new Map<string, { firmName: string; architectName: string; phone: string }>();
+
+    sourceIds.forEach((id) => {
       const cleanTarget = String(id).trim().toLowerCase();
       const cleanPhone = cleanTarget.replace(/\D/g, '').slice(-10);
 
       const matched = architects.find((a: any) => {
+        if (!a) return false;
         if (a.id && a.id.toLowerCase() === cleanTarget) return true;
+        if (a.userId && a.userId.toLowerCase() === cleanTarget) return true;
         if (a.applicationNumber && a.applicationNumber.toLowerCase() === cleanTarget) return true;
         const aPhone = (a.phone || '').replace(/\D/g, '').slice(-10);
-        if (cleanPhone && aPhone && aPhone === cleanPhone) return true;
-        if (a.firmName && cleanTarget.includes(a.firmName.toLowerCase())) return true;
-        if (a.name && cleanTarget.includes(a.name.toLowerCase())) return true;
+        if (cleanPhone && cleanPhone.length === 10 && aPhone === cleanPhone) return true;
+        if (a.firmName && (a.firmName.toLowerCase() === cleanTarget || cleanTarget === a.firmName.toLowerCase().replace(/\s+/g, ''))) return true;
+        if (a.name && (a.name.toLowerCase() === cleanTarget || cleanTarget === a.name.toLowerCase().replace(/\s+/g, ''))) return true;
         return false;
       });
 
       if (matched) {
-        return {
-          firmName: matched.firmName || matched.name,
-          architectName: matched.name,
-          phone: matched.phone ? `+91 ${matched.phone.replace(/\D/g, '').slice(-10)}` : '',
-        };
+        const uniqueKey = (matched.phone ? String(matched.phone).replace(/\D/g, '').slice(-10) : '') || matched.id || matched.name;
+        if (!uniqueMap.has(uniqueKey)) {
+          uniqueMap.set(uniqueKey, {
+            firmName: matched.firmName || matched.name,
+            architectName: matched.name,
+            phone: matched.phone ? `+91 ${String(matched.phone).replace(/\D/g, '').slice(-10)}` : '',
+          });
+        }
       }
-      return {
-        firmName: id,
-        architectName: 'Assigned Partner',
-        phone: '',
-      };
     });
+
+    // If req.selectedProfessionalIds was explicitly set, but didn't match the registered architects list
+    if (uniqueMap.size === 0 && req.selectedProfessionalIds && req.selectedProfessionalIds.length > 0) {
+      req.selectedProfessionalIds.forEach((id) => {
+        if (!id.includes('+91') && !id.startsWith('usr-') && !uniqueMap.has(id)) {
+          uniqueMap.set(id, {
+            firmName: id,
+            architectName: 'Assigned Partner',
+            phone: '',
+          });
+        }
+      });
+    }
+
+    return Array.from(uniqueMap.values());
   };
 
   useEffect(() => {

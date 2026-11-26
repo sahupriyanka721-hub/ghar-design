@@ -157,7 +157,9 @@ export const AdminRequestDetail: React.FC = () => {
     if (local) {
       setRequest(local);
       loadQuotes(local);
-      if (local.assignedProfessionalIds && local.assignedProfessionalIds.length > 0) {
+      if (local.selectedProfessionalIds && Array.isArray(local.selectedProfessionalIds) && local.selectedProfessionalIds.length > 0) {
+        setSelectedProIds(local.selectedProfessionalIds);
+      } else if (local.assignedProfessionalIds && local.assignedProfessionalIds.length > 0) {
         // Resolve to distinct primary professional IDs to prevent multiple duplicate tokens from inflating count
         const tokenSet = new Set(local.assignedProfessionalIds.map((t: string) => String(t).toLowerCase().trim()));
         const matched = (professionals || []).filter((p) => {
@@ -165,15 +167,17 @@ export const AdminRequestDetail: React.FC = () => {
           const pUser = (p.userId || '').toLowerCase();
           const pPhone = (p.phone || '').replace(/\D/g, '').slice(-10);
           return tokenSet.has(pid) || tokenSet.has(pUser) || (pPhone && tokenSet.has(pPhone));
-        }).map((p) => p.id);
+        }).map((p) => p.userId || p.id);
 
         if (matched.length > 0) {
           setSelectedProIds(Array.from(new Set(matched)));
         } else {
           // If professionals haven't loaded yet, keep only distinct tokens
-          const distinct = Array.from(new Set(local.assignedProfessionalIds.filter((t: string) => !t.includes('+91') && !t.includes(' '))));
+          const distinct = Array.from(new Set(local.assignedProfessionalIds.filter((t: string) => !t.includes('+91') && !t.includes(' ') && !t.startsWith('usr-') && !t.startsWith('arch-'))));
           setSelectedProIds(distinct.slice(0, Math.max(local.assignedCount || 1, 1)));
         }
+      } else {
+        setSelectedProIds([]);
       }
       if (local.responseDeadline) {
         setResponseDeadline(local.responseDeadline);
@@ -304,9 +308,16 @@ export const AdminRequestDetail: React.FC = () => {
 
   const handleUpdateStatus = (newStatus: PlatformProjectRequest['status']) => {
     if (!request) return;
-    const updated = updatePlatformRequestStatus(request.id, newStatus, {
-      adminNotes: internalNotes,
-    });
+    const extra: any = { adminNotes: internalNotes };
+    const unassign = ['SUBMITTED', 'UNDER_REVIEW', 'UNDER_ADMIN_REVIEW', 'VERIFIED', 'CANCELLED', 'REJECTED'];
+    if (unassign.includes(newStatus)) {
+      extra.assignedProfessionalIds = [];
+      extra.selectedProfessionalIds = [];
+      extra.assignedProfessionals = [];
+      extra.assignedCount = 0;
+      setSelectedProIds([]);
+    }
+    const updated = updatePlatformRequestStatus(request.id, newStatus, extra);
     if (updated) {
       setRequest(updated);
       success(`Project request status successfully changed to "${newStatus.replace(/_/g, ' ')}"`);
@@ -407,8 +418,23 @@ export const AdminRequestDetail: React.FC = () => {
         }),
       }).catch(() => {});
 
+      // Prepare clean structured objects for selected professionals
+      const assignedArchitectObjects = selectedProIds.map((proId) => {
+        const matched = (professionals || []).find((p) => p.id === proId || p.userId === proId) ||
+                        allArchs.find((a) => a.id === proId || a.userId === proId);
+        return {
+          id: proId,
+          name: matched?.name || 'Architect',
+          firmName: matched?.firmName || matched?.name || proId,
+          phone: matched?.phone || '',
+          category: matched?.category || 'ARCHITECT',
+        };
+      });
+
       const updated = updatePlatformRequestStatus(request.id, 'ASSIGNED', {
         assignedCount: selectedProIds.length,
+        selectedProfessionalIds: selectedProIds,
+        assignedProfessionals: assignedArchitectObjects,
         assignedProfessionalIds: expandedAssignedIds,
         responseDeadline,
         adminNotes: internalNotes,
