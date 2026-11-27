@@ -39,9 +39,18 @@ export type StageStatus =
 
 export type MilestonePaymentStatus =
   | 'PLANNED'
+  | 'LOCKED'
+  | 'PENDING_APPROVAL'
   | 'SUBMITTED_FOR_REVIEW'
+  | 'PENDING_ADMIN_INSPECTION'
+  | 'INSPECTION_SCHEDULED'
+  | 'FORWARDED_TO_CUSTOMER'
+  | 'AWAITING_CUSTOMER_APPROVAL'
+  | 'CUSTOMER_APPROVED'
   | 'REVISION_REQUESTED'
+  | 'CORRECTION_REQUESTED'
   | 'APPROVED'
+  | 'PAYMENT_ELIGIBLE'
   | 'PAYMENT_DUE'
   | 'PAID'
   | 'DISPUTED'
@@ -121,18 +130,27 @@ export interface PaymentMilestoneItem {
   title: string;
   description: string;
   percentage: number;
+  weightPercent?: number;
   amountPaise: number;
   linkedStageNumber: number;
   evidencePhotos: string[];
+  supportingFiles?: Array<{ name: string; url: string; size?: string }>;
   inspectionNotes?: string;
   inspectedBy?: string;
   status: MilestonePaymentStatus;
   submittedAt?: string;
+  adminInspectedAt?: string;
+  forwardedToCustomerAt?: string;
+  customerDecisionAt?: string;
+  customerComments?: string;
   approvedAt?: string;
+  paymentEligibleAt?: string;
   paidAt?: string;
   transactionId?: string;
   disputeReason?: string;
   correctionNotes?: string;
+  verifiedCompletionFraction?: number; // 0.0 to 1.0
+  reportedCompletionFraction?: number; // 0.0 to 1.0
 }
 
 export interface ProjectIssue {
@@ -307,6 +325,7 @@ export interface ExecutionProject {
   interiorDesignerName?: string;
   budgetPaise?: number;
   progressPercentage?: number;
+  customerApprovedProgress?: number;
   siteLocation?: {
     addressLine1?: string;
     city?: string;
@@ -705,6 +724,233 @@ export const completeProjectClosure = (projectId: string, notes?: string): Execu
       handoverDate: now,
       completionSummary: notes || 'Project successfully completed and handed over to homeowner.',
     },
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Lifecycle: Admin forwards submitted milestone to customer for sign-off.
+ */
+export const adminForwardMilestoneToCustomer = (
+  projectId: string,
+  milestoneId: string,
+  notes?: string
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedMilestones = (project.paymentMilestones || []).map((m) => {
+    if (m.id === milestoneId) {
+      return {
+        ...m,
+        status: 'AWAITING_CUSTOMER_APPROVAL' as const,
+        inspectionNotes: notes || m.inspectionNotes || 'Admin technical inspection cleared. Forwarded for customer approval.',
+        forwardedToCustomerAt: now,
+      };
+    }
+    return m;
+  });
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: updatedMilestones,
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Lifecycle: Admin requests additional proof or correction from professional.
+ */
+export const adminRequestMilestoneCorrection = (
+  projectId: string,
+  milestoneId: string,
+  correctionNotes: string
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedMilestones = (project.paymentMilestones || []).map((m) => {
+    if (m.id === milestoneId) {
+      return {
+        ...m,
+        status: 'CORRECTION_REQUESTED' as const,
+        correctionNotes,
+        inspectionNotes: `Correction requested by Admin: ${correctionNotes}`,
+      };
+    }
+    return m;
+  });
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: updatedMilestones,
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Lifecycle: Admin schedules an on-site technical inspection.
+ */
+export const adminScheduleMilestoneTechnicalInspection = (
+  projectId: string,
+  milestoneId: string,
+  params: { inspectorName: string; inspectionDate: string; instructions?: string }
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedMilestones = (project.paymentMilestones || []).map((m) => {
+    if (m.id === milestoneId) {
+      return {
+        ...m,
+        status: 'INSPECTION_SCHEDULED' as const,
+        inspectedBy: params.inspectorName,
+        inspectionNotes: `Physical Site Inspection scheduled for ${params.inspectionDate} by ${params.inspectorName}. Instructions: ${params.instructions || 'Inspect physical reinforcement and material specs.'}`,
+        adminInspectedAt: params.inspectionDate,
+      };
+    }
+    return m;
+  });
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: updatedMilestones,
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Lifecycle: Admin verifies milestone work and marks payment eligible.
+ * Recalculates weighted project progress according to IS 456.
+ */
+export const adminVerifyAndMarkPaymentEligible = (
+  projectId: string,
+  milestoneId: string,
+  verifiedFraction: number,
+  notes?: string
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedMilestones = (project.paymentMilestones || []).map((m) => {
+    if (m.id === milestoneId) {
+      return {
+        ...m,
+        status: 'PAYMENT_ELIGIBLE' as const,
+        verifiedCompletionFraction: verifiedFraction,
+        approvedAt: now,
+        paymentEligibleAt: now,
+        inspectionNotes: notes || m.inspectionNotes || 'Milestone verified and certified by Admin Desk.',
+      };
+    }
+    return m;
+  });
+
+  // Also update corresponding physical stage progress if linked
+  const targetMilestone = project.paymentMilestones.find((m) => m.id === milestoneId);
+  let updatedStages = project.stages;
+  if (targetMilestone) {
+    const stageNum = targetMilestone.linkedStageNumber || targetMilestone.milestoneNumber;
+    updatedStages = (project.stages || []).map((s) => {
+      if (s.stageNumber === stageNum) {
+        return {
+          ...s,
+          verifiedProgress: Math.round(verifiedFraction * 100),
+          status: verifiedFraction >= 1 ? 'COMPLETED' : 'IN_PROGRESS',
+        };
+      }
+      return s;
+    });
+  }
+
+  const recalculated = calculateProjectWeightedProgress(updatedStages);
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: updatedMilestones,
+    stages: updatedStages,
+    overallVerifiedProgress: recalculated.verifiedProgress,
+    overallReportedProgress: Math.max(recalculated.reportedProgress, project.overallReportedProgress || 0),
+    progressPercentage: recalculated.verifiedProgress,
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Lifecycle: Admin authorizes and releases escrow payout.
+ * Strictly adheres to rule: Progress percentage alone never releases payment without this admin release.
+ */
+export const adminReleaseMilestonePayout = (
+  projectId: string,
+  milestoneId: string,
+  txDetails?: string
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const targetMilestone = (project.paymentMilestones || []).find((m) => m.id === milestoneId);
+  if (!targetMilestone) return undefined;
+
+  const now = new Date().toISOString();
+  const payoutAmount = targetMilestone.amountPaise;
+
+  const updatedMilestones = (project.paymentMilestones || []).map((m) => {
+    if (m.id === milestoneId) {
+      return {
+        ...m,
+        status: 'PAID' as const,
+        paidAt: now,
+        transactionId: txDetails || `TX-ESCROW-${Date.now()}`,
+      };
+    }
+    return m;
+  });
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: updatedMilestones,
+    totalPaidPaise: (project.totalPaidPaise || 0) + payoutAmount,
+    amountDuePaise: Math.max(0, (project.amountDuePaise || project.contractValuePaise || 0) - payoutAmount),
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Section 11 Milestone Configuration: Admin configures custom milestone breakdown for project.
+ */
+export const adminConfigureProjectMilestones = (
+  projectId: string,
+  newMilestones: PaymentMilestoneItem[]
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedProject: ExecutionProject = {
+    ...project,
+    paymentMilestones: newMilestones,
     updatedAt: now,
   };
 
