@@ -41,6 +41,14 @@ export interface CustomerPaymentItem {
   refundReason?: string;
   refundedAt?: string;
   associatedInvoiceId?: string;
+  failureReason?: string;
+  retryUrl?: string;
+  gatewayFeePaise?: number; // e.g. 2% gateway fee
+  gatewayTaxPaise?: number; // 18% GST on gateway fee
+  netSettledPaise?: number; // Net amount credited to platform bank account
+  settlementBatchId?: string;
+  reconciliationStatus?: 'MATCHED' | 'UNMATCHED' | 'PENDING_RECONCILIATION';
+  bankUtrNumber?: string;
 }
 
 export interface ArchitectPayoutItem {
@@ -189,6 +197,12 @@ export const getDefaultSeedPayments = (): CustomerPaymentItem[] => [
     verifiedBy: 'Super Admin',
     verificationNotes: 'Escrow deposit verified via Razorpay webhook. Webhook signature validated.',
     associatedInvoiceId: 'INV-2026-CUST-1001',
+    gatewayFeePaise: 354000,
+    gatewayTaxPaise: 63720,
+    netSettledPaise: 17282280,
+    settlementBatchId: 'SETTLE-RZP-2026-041',
+    reconciliationStatus: 'MATCHED',
+    bankUtrNumber: 'HDFCR520261117009842',
   },
   {
     id: 'PAY-2026-0002',
@@ -216,6 +230,12 @@ export const getDefaultSeedPayments = (): CustomerPaymentItem[] => [
     verifiedBy: 'Finance Manager',
     verificationNotes: 'HDFC Corporate NetBanking credit reflected in BuildGhar platform escrow account.',
     associatedInvoiceId: 'INV-2026-CUST-1002',
+    gatewayFeePaise: 200000,
+    gatewayTaxPaise: 36000,
+    netSettledPaise: 29264000,
+    settlementBatchId: 'SETTLE-RZP-2026-048',
+    reconciliationStatus: 'MATCHED',
+    bankUtrNumber: 'HDFCR520261124001923',
   },
   {
     id: 'PAY-2026-0003',
@@ -240,6 +260,189 @@ export const getDefaultSeedPayments = (): CustomerPaymentItem[] => [
     status: 'PENDING_VERIFICATION',
     createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
     verificationNotes: 'Awaiting automatic gateway reconciliation batch clearance.',
+    gatewayFeePaise: 708000,
+    gatewayTaxPaise: 127440,
+    netSettledPaise: 34564560,
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+  },
+  {
+    id: 'PAY-2026-0004',
+    paymentCode: 'GHR-PAY-2026-1004',
+    projectId: 'BG-2026-0003',
+    projectTitle: 'Contemporary 3BHK Duplex - Bodakdev, Ahmedabad',
+    customerId: 'usr-cust-103',
+    customerName: 'Amit Patel',
+    customerPhone: '+91 98980 11223',
+    customerEmail: 'amit.patel@pateltextiles.in',
+    architectId: 'ARC-2026-002',
+    architectName: 'Ar. Meera Sengupta',
+    milestoneId: 'ms-ahmed-1',
+    milestoneTitle: 'Plinth Level & Column Reinforcement',
+    purpose: 'MILESTONE_PAYMENT',
+    subtotalPaise: 35000000, // ₹3,50,000
+    taxPaise: 6300000, // 18% GST ₹63,000
+    grossAmountPaise: 41300000, // ₹4,13,000
+    paymentMethod: 'NEFT_RTGS',
+    gatewayOrderId: 'order_direct_neft_004',
+    gatewayPaymentId: 'HDFCR52026112500892',
+    status: 'PENDING_VERIFICATION',
+    createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString(),
+    verificationNotes: 'Customer submitted NEFT counterfoil. Pending bank statement ledger match.',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+    bankUtrNumber: 'HDFCR52026112500892',
+  },
+  {
+    id: 'PAY-2026-0005',
+    paymentCode: 'GHR-PAY-2026-1005',
+    projectId: 'BG-2026-0004',
+    projectTitle: 'Traditional Haveli Restoration - Mansarovar, Jaipur',
+    customerId: 'usr-cust-104',
+    customerName: 'Priya Sharma',
+    customerPhone: '+91 94140 55667',
+    customerEmail: 'priya.sharma@rajasthancrafts.com',
+    purpose: 'REQUEST_FEE',
+    subtotalPaise: 10000000, // ₹1,00,000
+    taxPaise: 1800000, // ₹18,000
+    grossAmountPaise: 11800000, // ₹1,18,000
+    paymentMethod: 'RAZORPAY_CARD',
+    gatewayOrderId: 'order_rzp_bg_jpr_005',
+    gatewayPaymentId: 'pay_rzp_failed_554433',
+    status: 'FAILED',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    failureReason: 'PAYMENT_DECLINED_BY_BANK: Customer issuing bank declined transaction during 3D Secure OTP verification.',
+    retryUrl: 'https://buildghar.in/pay/retry/GHR-PAY-2026-1005',
+    reconciliationStatus: 'UNMATCHED',
+  },
+  {
+    id: 'PAY-2026-0006',
+    paymentCode: 'GHR-PAY-2026-1006',
+    projectId: 'BG-2026-0005',
+    projectTitle: 'Eco-Smart Residential Rowhouse - Sector 8, Chandigarh',
+    customerId: 'usr-cust-105',
+    customerName: 'Manish Aggarwal',
+    customerPhone: '+91 97800 23456',
+    customerEmail: 'm.aggarwal@punjabtrading.com',
+    purpose: 'BOOKING_ADVANCE',
+    subtotalPaise: 7500000, // ₹75,000
+    taxPaise: 1350000, // ₹13,500
+    grossAmountPaise: 8850000, // ₹88,500
+    paymentMethod: 'RAZORPAY_UPI',
+    gatewayOrderId: 'order_rzp_bg_chd_006',
+    gatewayPaymentId: 'pay_rzp_failed_667788',
+    status: 'FAILED',
+    createdAt: new Date(Date.now() - 86400000 * 1.5).toISOString(),
+    failureReason: 'UPI_TRANSACTION_LIMIT_EXCEEDED: Bank daily UPI transaction limit of ₹1,00,000 exceeded. Advised to retry via Net Banking.',
+    retryUrl: 'https://buildghar.in/pay/retry/GHR-PAY-2026-1006',
+    reconciliationStatus: 'UNMATCHED',
+  },
+  {
+    id: 'PAY-2026-0007',
+    paymentCode: 'GHR-PAY-2026-1007',
+    projectId: 'BG-2026-0006',
+    projectTitle: 'Lakeview G+3 Penthouse - Gomti Nagar, Lucknow',
+    customerId: 'usr-cust-106',
+    customerName: 'Rajeev Singhania',
+    customerPhone: '+91 99350 44332',
+    customerEmail: 'rajeev.singhania@lucknowgroup.in',
+    purpose: 'BOOKING_ADVANCE',
+    subtotalPaise: 12711864,
+    taxPaise: 2288136,
+    grossAmountPaise: 15000000, // ₹1,50,000
+    paymentMethod: 'NET_BANKING',
+    gatewayOrderId: 'order_rzp_bg_lko_007',
+    gatewayPaymentId: 'pay_rzp_898912345',
+    status: 'REFUND_REQUESTED',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    refundReason: 'Customer requested architectural scope reduction & advance refund for uninitiated site excavation.',
+    reconciliationStatus: 'MATCHED',
+  },
+  {
+    id: 'PAY-2026-0008',
+    paymentCode: 'GHR-PAY-2026-1008',
+    projectId: 'BG-2026-0007',
+    projectTitle: 'Heritage Bungalow Refurbishment - Salt Lake, Kolkata',
+    customerId: 'usr-cust-107',
+    customerName: 'Ananya Sen',
+    customerPhone: '+91 98300 77889',
+    customerEmail: 'ananya.sen@bengalarts.org',
+    purpose: 'REQUEST_FEE',
+    subtotalPaise: 2118644,
+    taxPaise: 381356,
+    grossAmountPaise: 2500000, // ₹25,000
+    paymentMethod: 'RAZORPAY_UPI',
+    gatewayOrderId: 'order_rzp_bg_kol_008',
+    gatewayPaymentId: 'pay_rzp_ref_778899',
+    status: 'REFUNDED',
+    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+    refundedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    refundReason: 'Duplicate consultation deposit reversed back to customer UPI ID via Razorpay instant refund.',
+    reconciliationStatus: 'MATCHED',
+  },
+  {
+    id: 'PAY-2026-0009',
+    paymentCode: 'GHR-PAY-2026-1009',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    customerId: 'usr-cust-102',
+    customerName: 'Vikramaditya Roy',
+    customerPhone: '+91 98112 00099',
+    customerEmail: 'v.roy@delhi-enterprises.com',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    milestoneId: 'ms-gur-2',
+    milestoneTitle: '2D Architectural Drawings & Structural Calculation',
+    purpose: 'MILESTONE_PAYMENT',
+    subtotalPaise: 15000000,
+    taxPaise: 2700000,
+    grossAmountPaise: 17700000, // ₹1,77,000
+    paymentMethod: 'NET_BANKING',
+    gatewayOrderId: 'order_rzp_bg_gur_009',
+    gatewayPaymentId: 'pay_rzp_991122334',
+    status: 'VERIFIED_SUCCESSFUL',
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    verifiedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    verifiedBy: 'Finance Manager',
+    verificationNotes: 'Verified via bank direct ledger integration.',
+    associatedInvoiceId: 'INV-2026-CUST-1009',
+    gatewayFeePaise: 200000,
+    gatewayTaxPaise: 36000,
+    netSettledPaise: 17464000,
+    settlementBatchId: 'SETTLE-RZP-2026-045',
+    reconciliationStatus: 'MATCHED',
+    bankUtrNumber: 'HDFCR520261122007812',
+  },
+  {
+    id: 'PAY-2026-0010',
+    paymentCode: 'GHR-PAY-2026-1010',
+    projectId: 'BG-2026-0003',
+    projectTitle: 'Contemporary 3BHK Duplex - Bodakdev, Ahmedabad',
+    customerId: 'usr-cust-103',
+    customerName: 'Amit Patel',
+    customerPhone: '+91 98980 11223',
+    customerEmail: 'amit.patel@pateltextiles.in',
+    architectId: 'ARC-2026-002',
+    architectName: 'Ar. Meera Sengupta',
+    milestoneId: 'ms-ahmed-2',
+    milestoneTitle: '3D Elevation & Interior Layout Rendering',
+    purpose: 'MILESTONE_PAYMENT',
+    subtotalPaise: 20000000,
+    taxPaise: 3600000,
+    grossAmountPaise: 23600000, // ₹2,36,000
+    paymentMethod: 'RAZORPAY_UPI',
+    gatewayOrderId: 'order_rzp_bg_ahmed_010',
+    gatewayPaymentId: 'pay_rzp_992233445',
+    status: 'VERIFIED_SUCCESSFUL',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    verifiedAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    verifiedBy: 'Super Admin',
+    verificationNotes: 'Razorpay UPI payment captured and verified.',
+    associatedInvoiceId: 'INV-2026-CUST-1010',
+    gatewayFeePaise: 472000,
+    gatewayTaxPaise: 84960,
+    netSettledPaise: 23043040,
+    settlementBatchId: 'SETTLE-RZP-2026-046',
+    reconciliationStatus: 'MATCHED',
+    bankUtrNumber: 'HDFCR520261123005544',
   },
 ];
 
@@ -471,6 +674,46 @@ export const refundCustomerPayment = (
     authorizedBy: params.refundedBy,
   });
 
+  return updated;
+};
+
+export const reconcileCustomerPayment = (
+  paymentId: string,
+  bankUtr?: string
+): CustomerPaymentItem | null => {
+  const all = getCustomerPayments();
+  const idx = all.findIndex((p) => p.id === paymentId);
+  if (idx < 0) return null;
+
+  const current = all[idx];
+  const updated: CustomerPaymentItem = {
+    ...current,
+    reconciliationStatus: 'MATCHED',
+    bankUtrNumber: bankUtr || current.bankUtrNumber || `HDFC-REC-${Date.now().toString().slice(-6)}`,
+  };
+
+  all[idx] = updated;
+  safeJsonSave(STORAGE_KEYS.PAYMENTS, all, 'FINANCIAL_PAYMENTS_UPDATED');
+  return updated;
+};
+
+export const requestCustomerPaymentRefund = (
+  paymentId: string,
+  reason: string
+): CustomerPaymentItem | null => {
+  const all = getCustomerPayments();
+  const idx = all.findIndex((p) => p.id === paymentId);
+  if (idx < 0) return null;
+
+  const current = all[idx];
+  const updated: CustomerPaymentItem = {
+    ...current,
+    status: 'REFUND_REQUESTED',
+    refundReason: reason,
+  };
+
+  all[idx] = updated;
+  safeJsonSave(STORAGE_KEYS.PAYMENTS, all, 'FINANCIAL_PAYMENTS_UPDATED');
   return updated;
 };
 

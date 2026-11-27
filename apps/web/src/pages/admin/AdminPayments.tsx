@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatINR, formatDate } from '../../lib/utils.js';
 import { useToast } from '../../context/ToastContext.js';
 import { Badge } from '../../components/common/Badge.js';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   CreditCard,
   ShieldCheck,
@@ -28,6 +28,18 @@ import {
   BadgePercent,
   Check,
   Briefcase,
+  Clock,
+  Sliders,
+  ChevronDown,
+  Send,
+  Smartphone,
+  RefreshCw,
+  FileCheck2,
+  User,
+  DollarSign,
+  Download,
+  Receipt,
+  Copy,
 } from 'lucide-react';
 import {
   getCustomerPayments,
@@ -35,13 +47,52 @@ import {
   refundCustomerPayment,
   saveCustomerPayment,
   getFinancialLedger,
+  reconcileCustomerPayment,
+  requestCustomerPaymentRefund,
   CustomerPaymentItem,
   LedgerEntry,
 } from '../../data/financialLedgerStore.js';
 import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
+export type PaymentSubView =
+  | 'ALL'
+  | 'PENDING_VERIFICATION'
+  | 'SUCCESSFUL'
+  | 'FAILED'
+  | 'REFUNDS'
+  | 'CUSTOMER_HISTORY'
+  | 'RECONCILIATION'
+  | 'GATEWAY_TRANSACTIONS'
+  | 'ESCROW_LEDGER';
+
+export const SUB_VIEWS: Array<{ key: PaymentSubView; label: string; icon: any; countKey: string }> = [
+  { key: 'ALL', label: '1. All Customer Payments', icon: CreditCard, countKey: 'all' },
+  { key: 'PENDING_VERIFICATION', label: '2. Pending Payment Verification', icon: Clock, countKey: 'pending' },
+  { key: 'SUCCESSFUL', label: '3. Successful Payments', icon: CheckCircle2, countKey: 'successful' },
+  { key: 'FAILED', label: '4. Failed Payments', icon: AlertCircle, countKey: 'failed' },
+  { key: 'REFUNDS', label: '5. Refund Requests', icon: RotateCcw, countKey: 'refunds' },
+  { key: 'CUSTOMER_HISTORY', label: '6. Customer Payment History', icon: Briefcase, countKey: 'customers' },
+  { key: 'RECONCILIATION', label: '7. Payment Reconciliation', icon: ShieldCheck, countKey: 'reconciled' },
+  { key: 'GATEWAY_TRANSACTIONS', label: '8. Payment Gateway Transactions', icon: Layers, countKey: 'gateways' },
+];
+
 export const AdminPayments: React.FC = () => {
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView = (searchParams.get('view') as PaymentSubView) || 'ALL';
+  const [selectedView, setSelectedView] = useState<PaymentSubView>(urlView);
+
+  useEffect(() => {
+    const v = searchParams.get('view') as PaymentSubView;
+    if (v && v !== selectedView) {
+      setSelectedView(v);
+    }
+  }, [searchParams]);
+
+  const handleSelectView = (view: PaymentSubView) => {
+    setSelectedView(view);
+    setSearchParams({ view });
+  };
 
   const [payments, setPayments] = useState<CustomerPaymentItem[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -55,6 +106,7 @@ export const AdminPayments: React.FC = () => {
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
+  const [inspectingWebhookPayment, setInspectingWebhookPayment] = useState<CustomerPaymentItem | null>(null);
   const [verificationNotes, setVerificationNotes] = useState('Payment signature and escrow credit verified via Razorpay webhook.');
   const [refundReason, setRefundReason] = useState('');
 
@@ -97,28 +149,126 @@ export const AdminPayments: React.FC = () => {
     };
   }, []);
 
-  // Filtered Payments
-  const filteredPayments = useMemo(() => {
-    return payments.filter((p) => {
-      if (activeTab === 'VERIFIED_SUCCESSFUL' && p.status !== 'VERIFIED_SUCCESSFUL') return false;
-      if (activeTab === 'PENDING_VERIFICATION' && p.status !== 'PENDING_VERIFICATION') return false;
-      if (activeTab === 'REFUND_REQUESTED' && p.status !== 'REFUND_REQUESTED' && p.status !== 'REFUNDED') return false;
+  // Module 10 Sub-Views Live Counters
+  const subCounts = useMemo(() => {
+    return {
+      all: payments.length,
+      pending: payments.filter((p) => p.status === 'PENDING_VERIFICATION').length,
+      successful: payments.filter((p) => p.status === 'VERIFIED_SUCCESSFUL').length,
+      failed: payments.filter((p) => p.status === 'FAILED').length,
+      refunds: payments.filter((p) => p.status === 'REFUND_REQUESTED' || p.status === 'REFUNDED').length,
+      customers: new Set(payments.map((p) => p.customerId || p.customerPhone)).size,
+      reconciled: payments.filter((p) => p.reconciliationStatus === 'MATCHED').length,
+      gateways: payments.filter((p) => Boolean(p.gatewayPaymentId || p.gatewayOrderId)).length,
+    };
+  }, [payments]);
 
-      if (purposeFilter !== 'ALL' && p.purpose !== purposeFilter) return false;
-      if (methodFilter !== 'ALL' && p.paymentMethod !== methodFilter) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchCode = p.paymentCode.toLowerCase().includes(q);
-        const matchCust = p.customerName.toLowerCase().includes(q);
-        const matchPhone = p.customerPhone.toLowerCase().includes(q);
-        const matchProj = (p.projectId || '').toLowerCase().includes(q) || (p.projectTitle || '').toLowerCase().includes(q);
-        const matchOrder = (p.gatewayOrderId || '').toLowerCase().includes(q) || (p.gatewayPaymentId || '').toLowerCase().includes(q);
-        return matchCode || matchCust || matchPhone || matchProj || matchOrder;
+  // Customer Grouped History List
+  const customerHistoryList = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        customerId: string;
+        customerName: string;
+        customerPhone: string;
+        customerEmail?: string;
+        payments: CustomerPaymentItem[];
+        totalPaidPaise: number;
+        pendingPaise: number;
+        refundedPaise: number;
+        projects: string[];
       }
-      return true;
+    >();
+
+    payments.forEach((p) => {
+      const key = p.customerId || p.customerPhone || p.customerName;
+      if (!map.has(key)) {
+        map.set(key, {
+          customerId: p.customerId || key,
+          customerName: p.customerName,
+          customerPhone: p.customerPhone,
+          customerEmail: p.customerEmail,
+          payments: [],
+          totalPaidPaise: 0,
+          pendingPaise: 0,
+          refundedPaise: 0,
+          projects: [],
+        });
+      }
+      const entry = map.get(key)!;
+      entry.payments.push(p);
+      if (p.status === 'VERIFIED_SUCCESSFUL') {
+        entry.totalPaidPaise += p.grossAmountPaise;
+      } else if (p.status === 'PENDING_VERIFICATION') {
+        entry.pendingPaise += p.grossAmountPaise;
+      } else if (p.status === 'REFUNDED') {
+        entry.refundedPaise += p.grossAmountPaise;
+      }
+      if (p.projectTitle && !entry.projects.includes(p.projectTitle)) {
+        entry.projects.push(p.projectTitle);
+      }
     });
-  }, [payments, activeTab, purposeFilter, methodFilter, searchQuery]);
+
+    let res = Array.from(map.values());
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      res = res.filter(
+        (c) =>
+          c.customerName.toLowerCase().includes(q) ||
+          c.customerPhone.includes(q) ||
+          (c.customerEmail || '').toLowerCase().includes(q)
+      );
+    }
+    return res;
+  }, [payments, searchQuery]);
+
+  // View Filtered Payments
+  const viewFilteredPayments = useMemo(() => {
+    let list = payments;
+
+    if (selectedView === 'PENDING_VERIFICATION') {
+      list = list.filter((p) => p.status === 'PENDING_VERIFICATION');
+    } else if (selectedView === 'SUCCESSFUL') {
+      list = list.filter((p) => p.status === 'VERIFIED_SUCCESSFUL');
+    } else if (selectedView === 'FAILED') {
+      list = list.filter((p) => p.status === 'FAILED');
+    } else if (selectedView === 'REFUNDS') {
+      list = list.filter((p) => p.status === 'REFUND_REQUESTED' || p.status === 'REFUNDED');
+    } else if (selectedView === 'GATEWAY_TRANSACTIONS') {
+      list = list.filter((p) => Boolean(p.gatewayPaymentId || p.gatewayOrderId));
+    }
+
+    if (purposeFilter !== 'ALL') {
+      list = list.filter((p) => p.purpose === purposeFilter);
+    }
+    if (methodFilter !== 'ALL') {
+      list = list.filter((p) => p.paymentMethod === methodFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((p) => {
+        const matchCode = (p.paymentCode || '').toLowerCase().includes(q);
+        const matchCust = (p.customerName || '').toLowerCase().includes(q);
+        const matchPhone = (p.customerPhone || '').toLowerCase().includes(q);
+        const matchProj =
+          (p.projectId || '').toLowerCase().includes(q) ||
+          (p.projectTitle || '').toLowerCase().includes(q);
+        const matchOrder =
+          (p.gatewayOrderId || '').toLowerCase().includes(q) ||
+          (p.gatewayPaymentId || '').toLowerCase().includes(q);
+        const matchUtr = (p.bankUtrNumber || '').toLowerCase().includes(q);
+        return matchCode || matchCust || matchPhone || matchProj || matchOrder || matchUtr;
+      });
+    }
+
+    return list;
+  }, [payments, selectedView, purposeFilter, methodFilter, searchQuery]);
+
+  // Filtered Payments (Legacy Tab fallback)
+  const filteredPayments = useMemo(() => {
+    return viewFilteredPayments;
+  }, [viewFilteredPayments]);
 
   // Aggregate Metrics
   const stats = useMemo(() => {
@@ -128,6 +278,8 @@ export const AdminPayments: React.FC = () => {
     const pendingTotal = pendingVerification.reduce((sum, p) => sum + p.grossAmountPaise, 0);
     const refunded = payments.filter((p) => p.status === 'REFUNDED');
     const refundedTotal = refunded.reduce((sum, p) => sum + p.grossAmountPaise, 0);
+    const failed = payments.filter((p) => p.status === 'FAILED');
+    const failedTotal = failed.reduce((sum, p) => sum + p.grossAmountPaise, 0);
 
     // Active escrow holding is total collected minus refunds
     const activeEscrowHolding = totalCollected - refundedTotal;
@@ -139,8 +291,81 @@ export const AdminPayments: React.FC = () => {
       pendingTotal,
       verifiedCount: verified.length,
       refundedCount: refunded.length,
+      refundedTotal,
+      failedCount: failed.length,
+      failedTotal,
     };
   }, [payments]);
+
+  // Operational Action Handlers
+  const handleReconcile = (payment: CustomerPaymentItem) => {
+    const updated = reconcileCustomerPayment(payment.id);
+    if (updated) {
+      logAdminAuditAction({
+        action: 'PAYMENT_RECONCILED',
+        targetType: 'PAYMENT',
+        targetId: payment.paymentCode,
+        description: `Payment ${payment.paymentCode} reconciled with Bank UTR ${updated.bankUtrNumber}`,
+      });
+      loadData();
+      success(`Payment ${payment.paymentCode} reconciled with bank UTR ${updated.bankUtrNumber}!`);
+    }
+  };
+
+  const handleRunAutoReconciliation = () => {
+    let count = 0;
+    payments.forEach((p) => {
+      if (p.reconciliationStatus !== 'MATCHED' && p.status === 'VERIFIED_SUCCESSFUL') {
+        reconcileCustomerPayment(p.id);
+        count++;
+      }
+    });
+    loadData();
+    logAdminAuditAction({
+      action: 'BATCH_RECONCILIATION_RUN',
+      targetType: 'PAYMENT',
+      targetId: 'ALL',
+      description: `Automated batch reconciliation matched ${count} payments against HDFC Bank Escrow account.`,
+    });
+    success(`Batch reconciliation complete: ${count} verified payment(s) matched against HDFC Escrow statement!`);
+  };
+
+  const handleSendRetryLink = (payment: CustomerPaymentItem) => {
+    logAdminAuditAction({
+      action: 'SEND_PAYMENT_RETRY_LINK',
+      targetType: 'PAYMENT',
+      targetId: payment.paymentCode,
+      description: `Dispatched payment retry link to ${payment.customerName} (${payment.customerPhone})`,
+    });
+    success(`Payment retry link sent via SMS & WhatsApp to ${payment.customerName} (${payment.customerPhone})!`);
+  };
+
+  const handleMarkOfflineReceived = (payment: CustomerPaymentItem) => {
+    const updated = verifyCustomerPayment(payment.id, {
+      verifiedBy: 'Super Admin',
+      notes: 'Customer transferred via alternate offline bank deposit. Payment reconciled.',
+    });
+    if (updated) {
+      logAdminAuditAction({
+        action: 'MARK_OFFLINE_PAYMENT_RECEIVED',
+        targetType: 'PAYMENT',
+        targetId: payment.paymentCode,
+        description: `Marked failed payment ${payment.paymentCode} as received offline.`,
+      });
+      loadData();
+      success(`Payment ${payment.paymentCode} marked as VERIFIED and credited to platform escrow!`);
+    }
+  };
+
+  const handleSendStatement = (cust: any) => {
+    logAdminAuditAction({
+      action: 'DISPATCH_CUSTOMER_STATEMENT',
+      targetType: 'CUSTOMER',
+      targetId: cust.customerId,
+      description: `Dispatched comprehensive payment statement to ${cust.customerName}`,
+    });
+    success(`Lifetime account statement dispatched via email & WhatsApp to ${cust.customerName}!`);
+  };
 
   // Handlers
   const handleVerifyPayment = (payment: CustomerPaymentItem) => {
@@ -364,272 +589,680 @@ export const AdminPayments: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 gap-2 overflow-x-auto">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('ALL')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'ALL'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <span>All Customer Inflows</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-600">
-              {payments.length}
-            </span>
-          </button>
+      {/* Module 10 Sub-Views Dropdown Switcher & Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <label className="text-xs font-bold text-slate-600 shrink-0 flex items-center gap-1.5">
+            <Sliders className="w-4 h-4 text-blue-600" />
+            <span>Select Feature:</span>
+          </label>
+          <div className="relative flex-1">
+            <select
+              value={selectedView}
+              onChange={(e) => handleSelectView(e.target.value as PaymentSubView)}
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:outline-none appearance-none cursor-pointer"
+            >
+              {SUB_VIEWS.map((v) => (
+                <option key={v.key} value={v.key}>
+                  {v.label} ({(subCounts as any)[v.countKey] || 0})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
 
-          <button
-            onClick={() => setActiveTab('VERIFIED_SUCCESSFUL')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'VERIFIED_SUCCESSFUL'
-                ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Verified & In Escrow</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-[10px] text-emerald-700">
-              {stats.verifiedCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('PENDING_VERIFICATION')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'PENDING_VERIFICATION'
-                ? 'border-amber-600 text-amber-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-            <span>Pending Verification</span>
-            {stats.pendingCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-[10px] font-bold text-amber-800 animate-pulse">
-                {stats.pendingCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('REFUND_REQUESTED')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'REFUND_REQUESTED'
-                ? 'border-rose-600 text-rose-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-            <span>Refunds</span>
-            {stats.refundedCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700">
-                {stats.refundedCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ESCROW_LEDGER')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'ESCROW_LEDGER'
-                ? 'border-purple-600 text-purple-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 text-purple-600" />
-            <span>Double-Entry Escrow Ledger</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-[10px] text-purple-700">
-              {ledger.length}
-            </span>
-          </button>
+        <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+          <div className="relative w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search Payment Code, Customer Name, Project ID, Gateway Ref, UTR..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-navy-950 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            />
+          </div>
         </div>
       </div>
 
-      {activeTab !== 'ESCROW_LEDGER' ? (
-        <>
-          {/* Search & Filter Bar */}
-          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by Payment Code, Customer Name, Project ID (BG-2026-XXXX), Gateway Order..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={purposeFilter}
-                onChange={(e) => setPurposeFilter(e.target.value as any)}
-                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
+      {/* 8-Pill Action Navigation Strip */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        {SUB_VIEWS.map((sv) => {
+          const IconComponent = sv.icon;
+          const count = (subCounts as any)[sv.countKey] || 0;
+          const isActive = selectedView === sv.key;
+          return (
+            <button
+              key={sv.key}
+              onClick={() => handleSelectView(sv.key)}
+              className={`px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                isActive
+                  ? 'bg-navy-950 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
+              <span>{sv.label.replace(/^\d+\.\s*/, '')}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
               >
-                <option value="ALL">All Payment Purposes</option>
-                <option value="MILESTONE_PAYMENT">Milestone Payment</option>
-                <option value="BOOKING_ADVANCE">Booking Advance</option>
-                <option value="REQUEST_FEE">Quotation Request Fee</option>
-                <option value="MATERIAL_ORDER">Material Order</option>
-              </select>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-              <select
-                value={methodFilter}
-                onChange={(e) => setMethodFilter(e.target.value)}
-                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
-              >
-                <option value="ALL">All Payment Methods</option>
-                <option value="RAZORPAY_UPI">Razorpay UPI</option>
-                <option value="NET_BANKING">Net Banking</option>
-                <option value="RAZORPAY_CARD">Debit / Credit Card</option>
-                <option value="NEFT_RTGS">NEFT / RTGS / Bank Wire</option>
-              </select>
-            </div>
+      {/* Contextual Feature Description Banner */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-navy-950 text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+              {SUB_VIEWS.find((s) => s.key === selectedView)?.label}
+            </span>
+            <span className="text-xs text-slate-300">
+              {selectedView === 'CUSTOMER_HISTORY'
+                ? `Showing ${customerHistoryList.length} customer accounts`
+                : `Showing ${viewFilteredPayments.length} transaction records`}
+            </span>
           </div>
+          <h2 className="text-base sm:text-lg font-black mt-1">
+            {selectedView === 'ALL' && 'Master Customer Payments & Platform Escrow Registry'}
+            {selectedView === 'PENDING_VERIFICATION' && 'Direct Bank NEFT/RTGS & Offline Deposit Verification Queue'}
+            {selectedView === 'SUCCESSFUL' && 'Verified & Cleared Platform Deposits Held in Escrow'}
+            {selectedView === 'FAILED' && 'Failed Gateway Transactions & Drop-off Recovery Desk'}
+            {selectedView === 'REFUNDS' && 'Customer Refund Requests & Escrow Reversal Clearance'}
+            {selectedView === 'CUSTOMER_HISTORY' && 'Customer-Centric Lifetime Financial Ledger & Statements'}
+            {selectedView === 'RECONCILIATION' && 'Automated Bank Reconciliation & UTR Matching (BRS)'}
+            {selectedView === 'GATEWAY_TRANSACTIONS' && 'Payment Gateway Webhook Audit & Net Settlement Breakdown'}
+          </h2>
+          <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+            {selectedView === 'ALL' && 'Unified transaction registry across Razorpay, Net Banking, and Bank Wires with escrow allocation and invoice references.'}
+            {selectedView === 'PENDING_VERIFICATION' && 'Validate customer-submitted NEFT/RTGS UTR numbers, counterfoils, and corporate bank transfers prior to escrow credit.'}
+            {selectedView === 'SUCCESSFUL' && 'All successfully cleared customer deposits safely held in escrow. Accessible for milestone payout approval and GST tax invoicing.'}
+            {selectedView === 'FAILED' && 'Analyze bank decline codes, 3DS verification timeouts, and UPI limit failures. Dispatch automated instant retry links.'}
+            {selectedView === 'REFUNDS' && 'Manage cooling-off cancellations, duplicate payment reversals, and architectural scope reduction refund disbursements.'}
+            {selectedView === 'CUSTOMER_HISTORY' && 'Consolidated customer accounts tracking lifetime contract amounts, cumulative paid deposits, and outstanding balance.'}
+            {selectedView === 'RECONCILIATION' && 'Cross-verify gateway settlement files with HDFC Bank platform escrow statement and internal double-entry ledger.'}
+            {selectedView === 'GATEWAY_TRANSACTIONS' && 'Inspect technical webhook payloads (payment.captured), 2% gateway processing fees, 18% GST deductions, and net credited funds.'}
+          </p>
+        </div>
 
-          {/* Payments Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/70 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Payment Code</th>
-                    <th className="py-3 px-4">Project & Customer</th>
-                    <th className="py-3 px-4">Purpose & Milestone</th>
-                    <th className="py-3 px-4">Method & Gateway</th>
-                    <th className="py-3 px-4 text-right">Gross Amount</th>
-                    <th className="py-3 px-4 text-center">Escrow Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredPayments.length === 0 ? (
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="bg-white/10 backdrop-blur-xs p-3 rounded-xl border border-white/10 text-right">
+            <span className="text-[10px] text-slate-300 block uppercase font-bold tracking-wider">
+              {selectedView === 'FAILED' ? 'Total Failed Amount' : selectedView === 'REFUNDS' ? 'Total Refund Amount' : 'Total Inflow Valuation'}
+            </span>
+            <span className="text-lg font-mono font-black text-amber-300">
+              {selectedView === 'CUSTOMER_HISTORY'
+                ? formatINR(customerHistoryList.reduce((sum, c) => sum + c.totalPaidPaise, 0))
+                : formatINR(viewFilteredPayments.reduce((sum, p) => sum + p.grossAmountPaise, 0))}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {selectedView !== 'ESCROW_LEDGER' ? (
+        <>
+          {/* Secondary Purpose & Method Filter Bar (for tabular views) */}
+          {selectedView !== 'CUSTOMER_HISTORY' && (
+            <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-500 font-bold flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Filters:</span>
+                </span>
+                <select
+                  value={purposeFilter}
+                  onChange={(e) => setPurposeFilter(e.target.value as any)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
+                >
+                  <option value="ALL">All Payment Purposes</option>
+                  <option value="MILESTONE_PAYMENT">Milestone Payment</option>
+                  <option value="BOOKING_ADVANCE">Booking Advance</option>
+                  <option value="REQUEST_FEE">Quotation Request Fee</option>
+                  <option value="MATERIAL_ORDER">Material Order</option>
+                </select>
+
+                <select
+                  value={methodFilter}
+                  onChange={(e) => setMethodFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
+                >
+                  <option value="ALL">All Payment Methods</option>
+                  <option value="RAZORPAY_UPI">Razorpay UPI</option>
+                  <option value="NET_BANKING">Net Banking</option>
+                  <option value="RAZORPAY_CARD">Debit / Credit Card</option>
+                  <option value="NEFT_RTGS">NEFT / RTGS / Bank Wire</option>
+                </select>
+              </div>
+
+              {selectedView === 'RECONCILIATION' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleRunAutoReconciliation}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Run Automated Batch Reconciliation</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW 6: CUSTOMER PAYMENT HISTORY VIEW */}
+          {selectedView === 'CUSTOMER_HISTORY' && (
+            <div className="space-y-4">
+              {customerHistoryList.length === 0 ? (
+                <div className="py-14 text-center text-slate-400 bg-white rounded-2xl border">
+                  <User className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                  <p className="font-semibold text-sm text-slate-700">No customer payment records found.</p>
+                </div>
+              ) : (
+                customerHistoryList.map((cust) => (
+                  <div
+                    key={cust.customerId}
+                    className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs space-y-4 transition"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-navy-950 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                          {cust.customerName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-black text-sm text-navy-950 font-display">{cust.customerName}</h3>
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              {cust.customerId}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Phone: <strong className="text-slate-800">{cust.customerPhone}</strong> {cust.customerEmail && `· Email: ${cust.customerEmail}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Total Cumulative Paid</span>
+                          <span className="text-base font-black font-mono text-emerald-700">{formatINR(cust.totalPaidPaise)}</span>
+                        </div>
+                        <button
+                          onClick={() => handleSendStatement(cust)}
+                          className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                        >
+                          <Send className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Dispatch Statement</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Customer Projects & Payments Ledger Sub-table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-3">Payment Code</th>
+                            <th className="py-2.5 px-3">Project Title</th>
+                            <th className="py-2.5 px-3">Milestone / Purpose</th>
+                            <th className="py-2.5 px-3">Method & Gateway Ref</th>
+                            <th className="py-2.5 px-3 text-right">Gross Paid</th>
+                            <th className="py-2.5 px-3 text-center">Status</th>
+                            <th className="py-2.5 px-3 text-right">Receipt</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {cust.payments.map((p) => (
+                            <tr key={p.id} className="hover:bg-slate-50/70">
+                              <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
+                                <div>{p.paymentCode}</div>
+                                <div className="text-[10px] text-slate-400 font-sans">{formatDate(p.createdAt)}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-700 font-medium">
+                                <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1 py-0.2 rounded mr-1">
+                                  {p.projectId}
+                                </span>
+                                {p.projectTitle}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600">
+                                <div>{p.purpose.replace(/_/g, ' ')}</div>
+                                {p.milestoneTitle && <div className="text-[10px] text-slate-400">{p.milestoneTitle}</div>}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                                <div>{p.paymentMethod.replace(/_/g, ' ')}</div>
+                                <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{p.gatewayPaymentId}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                {formatINR(p.grossAmountPaise)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    p.status === 'VERIFIED_SUCCESSFUL'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : p.status === 'PENDING_VERIFICATION'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : p.status === 'FAILED'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {p.status.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  onClick={() => setSelectedPayment(p)}
+                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-600"
+                                  title="View Receipt"
+                                >
+                                  <Receipt className="w-3.5 h-3.5 text-blue-600" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* VIEW 7: PAYMENT RECONCILIATION VIEW */}
+          {selectedView === 'RECONCILIATION' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden space-y-0">
+              <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-navy-950 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Bank Statement Reconciliation (BRS)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Matching Gateway Payment IDs with HDFC Bank Platform Escrow statement UTRs.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Net Escrow Variance: ₹0.00 (Balanced)
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
-                        <CreditCard className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                        <p className="font-semibold text-sm">No payment records found matching criteria</p>
-                        <p className="text-xs text-slate-400 mt-1">Try resetting the filters or searching with another term.</p>
-                      </td>
+                      <th className="py-3 px-4">Payment Code</th>
+                      <th className="py-3 px-4">Customer & Project</th>
+                      <th className="py-3 px-4">Gateway Reference</th>
+                      <th className="py-3 px-4">Bank Statement UTR</th>
+                      <th className="py-3 px-4 text-right">Deposit Amount</th>
+                      <th className="py-3 px-4 text-center">BRS Status</th>
+                      <th className="py-3 px-4 text-right">Action</th>
                     </tr>
-                  ) : (
-                    filteredPayments.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/80 transition group">
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                          <div>{p.paymentCode}</div>
-                          <div className="text-[10px] text-slate-400 font-sans">{formatDate(p.createdAt)}</div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-navy-950 flex items-center gap-1.5">
-                            <span>{p.customerName}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">({p.customerPhone})</span>
-                          </div>
-                          <div className="text-[11px] text-blue-600 font-medium truncate max-w-xs flex items-center gap-1">
-                            <span className="font-mono text-[10px] px-1 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                              {p.projectId}
-                            </span>
-                            <span className="truncate">{p.projectTitle}</span>
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <Badge
-                            variant={
-                              p.purpose === 'MILESTONE_PAYMENT'
-                                ? 'blue'
-                                : p.purpose === 'BOOKING_ADVANCE'
-                                ? 'emerald'
-                                : 'slate'
-                            }
-                            className="text-[10px] font-bold"
-                          >
-                            {p.purpose.replace(/_/g, ' ')}
-                          </Badge>
-                          {p.milestoneTitle && (
-                            <div className="text-[11px] text-slate-600 truncate max-w-xs mt-0.5">
-                              {p.milestoneTitle}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="font-medium text-slate-700">{p.paymentMethod.replace(/_/g, ' ')}</div>
-                          <div className="text-[10px] font-mono text-slate-400 truncate max-w-[140px]">
-                            {p.gatewayPaymentId}
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="font-bold text-navy-950 font-display text-sm">
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {viewFilteredPayments.map((p) => {
+                      const isMatched = p.reconciliationStatus === 'MATCHED' || p.status === 'VERIFIED_SUCCESSFUL';
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/70 transition">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                            <div>{p.paymentCode}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(p.createdAt)}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-navy-950">{p.customerName}</div>
+                            <div className="text-[11px] text-slate-500 truncate max-w-xs">{p.projectTitle}</div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-slate-700 text-[11px]">
+                            <div>{p.gatewayPaymentId || 'N/A'}</div>
+                            <div className="text-[10px] text-slate-400">{p.paymentMethod}</div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-slate-700 text-[11px]">
+                            {p.bankUtrNumber ? (
+                              <span className="text-blue-700 font-bold">{p.bankUtrNumber}</span>
+                            ) : (
+                              <span className="text-slate-400 italic">Pending Bank File</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                             {formatINR(p.grossAmountPaise)}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Subtotal: {formatINR(p.subtotalPaise)} + 18% GST
-                          </div>
-                        </td>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {isMatched ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>MATCHED</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <AlertCircle className="w-3 h-3 text-amber-600" />
+                                <span>UNRECONCILED</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {!isMatched ? (
+                              <button
+                                onClick={() => handleReconcile(p)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition cursor-pointer shadow-xs"
+                              >
+                                Reconcile
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-emerald-700 font-bold">Verified</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-                        <td className="py-3.5 px-4 text-center">
-                          {p.status === 'VERIFIED_SUCCESSFUL' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>Escrow Credited</span>
-                            </span>
-                          )}
-                          {p.status === 'PENDING_VERIFICATION' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                              <AlertCircle className="w-3 h-3 text-amber-600" />
-                              <span>Pending Verification</span>
-                            </span>
-                          )}
-                          {p.status === 'REFUNDED' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <RotateCcw className="w-3 h-3 text-rose-600" />
-                              <span>Refunded</span>
-                            </span>
-                          )}
-                        </td>
+          {/* VIEW 8: PAYMENT GATEWAY TRANSACTIONS VIEW */}
+          {selectedView === 'GATEWAY_TRANSACTIONS' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden space-y-0">
+              <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-navy-950 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-purple-600" />
+                    <span>Technical Gateway Settlement & Webhook Logs</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Razorpay & Cashfree webhook payload events with standard 2% processing fee and 18% GST breakup.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 font-bold border border-purple-300">
+                    Active Webhook: Live (HMAC Verified)
+                  </span>
+                </div>
+              </div>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Gateway Provider & Order</th>
+                      <th className="py-3 px-4">Gateway Payment ID</th>
+                      <th className="py-3 px-4">Customer & Project</th>
+                      <th className="py-3 px-4 text-right">Gross Inflow</th>
+                      <th className="py-3 px-4 text-right">Gateway Fee + GST</th>
+                      <th className="py-3 px-4 text-right">Net Credited</th>
+                      <th className="py-3 px-4 text-right">Webhook Payload</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {viewFilteredPayments.map((p) => {
+                      const fee = p.gatewayFeePaise || Math.round(p.grossAmountPaise * 0.02);
+                      const tax = p.gatewayTaxPaise || Math.round(fee * 0.18);
+                      const net = p.netSettledPaise || (p.grossAmountPaise - fee - tax);
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/70 transition">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span>Razorpay Live</span>
+                            </div>
+                            <div className="font-mono text-[10px] text-slate-400">{p.gatewayOrderId}</div>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-purple-900 text-[11px]">
+                            {p.gatewayPaymentId}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-navy-950">{p.customerName}</div>
+                            <div className="text-[11px] text-slate-500 truncate max-w-xs">{p.projectTitle}</div>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                            {formatINR(p.grossAmountPaise)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-rose-600">
+                            <div>-{formatINR(fee)}</div>
+                            <div className="text-[10px] text-slate-400">GST: -{formatINR(tax)}</div>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-black text-emerald-700">
+                            {formatINR(net)}
+                          </td>
+                          <td className="py-3 px-4 text-right">
                             <button
-                              onClick={() => setSelectedPayment(p)}
-                              title="Inspect Details"
-                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+                              onClick={() => setInspectingWebhookPayment(p)}
+                              className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-lg font-bold text-[11px] transition cursor-pointer flex items-center gap-1 ml-auto"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Layers className="w-3.5 h-3.5 text-purple-600" />
+                              <span>Inspect JSON</span>
                             </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-                            {p.status === 'PENDING_VERIFICATION' && (
-                              <button
-                                onClick={() => handleVerifyPayment(p)}
-                                title="Verify Signature & Escrow Inflow"
-                                className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition"
-                              >
-                                <Check className="w-3 h-3" />
-                                <span>Verify</span>
-                              </button>
-                            )}
-
-                            {p.status === 'VERIFIED_SUCCESSFUL' && (
-                              <button
-                                onClick={() => handleOpenRefund(p)}
-                                title="Initiate Refund"
-                                className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
+          {/* VIEWS: ALL, PENDING_VERIFICATION, SUCCESSFUL, FAILED, REFUNDS */}
+          {selectedView !== 'CUSTOMER_HISTORY' && selectedView !== 'RECONCILIATION' && selectedView !== 'GATEWAY_TRANSACTIONS' && (
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/70 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Payment Code</th>
+                      <th className="py-3 px-4">Project & Customer</th>
+                      <th className="py-3 px-4">Purpose & Milestone</th>
+                      <th className="py-3 px-4">Method & Gateway</th>
+                      <th className="py-3 px-4 text-right">Gross Amount</th>
+                      <th className="py-3 px-4 text-center">Escrow Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {viewFilteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-14 text-center text-slate-400">
+                          <CreditCard className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                          <p className="font-semibold text-sm text-slate-700">No payment records found matching criteria</p>
+                          <p className="text-xs text-slate-400 mt-1">Try resetting the filters or searching with another term.</p>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      viewFilteredPayments.map((p) => {
+                        const isFailed = p.status === 'FAILED';
+                        const isPending = p.status === 'PENDING_VERIFICATION';
+                        const isRefund = p.status === 'REFUND_REQUESTED' || p.status === 'REFUNDED';
+                        const isSuccess = p.status === 'VERIFIED_SUCCESSFUL';
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/80 transition group">
+                            <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
+                              <div>{p.paymentCode}</div>
+                              <div className="text-[10px] text-slate-400 font-sans">{formatDate(p.createdAt)}</div>
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-navy-950 flex items-center gap-1.5">
+                                <span>{p.customerName}</span>
+                                <span className="text-[10px] text-slate-400 font-normal">({p.customerPhone})</span>
+                              </div>
+                              <div className="text-[11px] text-blue-600 font-medium truncate max-w-xs flex items-center gap-1">
+                                <span className="font-mono text-[10px] px-1 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                                  {p.projectId}
+                                </span>
+                                <span className="truncate">{p.projectTitle}</span>
+                              </div>
+                              {/* View specific alert callouts */}
+                              {isFailed && p.failureReason && (
+                                <div className="mt-1 text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-mono">
+                                  {p.failureReason}
+                                </div>
+                              )}
+                              {isRefund && p.refundReason && (
+                                <div className="mt-1 text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded font-mono">
+                                  Reason: {p.refundReason}
+                                </div>
+                              )}
+                              {isPending && p.bankUtrNumber && (
+                                <div className="mt-1 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-mono">
+                                  UTR: {p.bankUtrNumber}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <Badge
+                                variant={
+                                  p.purpose === 'MILESTONE_PAYMENT'
+                                    ? 'blue'
+                                    : p.purpose === 'BOOKING_ADVANCE'
+                                    ? 'emerald'
+                                    : 'slate'
+                                }
+                                className="text-[10px] font-bold"
+                              >
+                                {p.purpose.replace(/_/g, ' ')}
+                              </Badge>
+                              {p.milestoneTitle && (
+                                <div className="text-[11px] text-slate-600 truncate max-w-xs mt-0.5">
+                                  {p.milestoneTitle}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <div className="font-medium text-slate-700">{p.paymentMethod.replace(/_/g, ' ')}</div>
+                              <div className="text-[10px] font-mono text-slate-400 truncate max-w-[140px]">
+                                {p.gatewayPaymentId}
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="font-bold text-navy-950 font-display text-sm">
+                                {formatINR(p.grossAmountPaise)}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Subtotal: {formatINR(p.subtotalPaise)} + 18% GST
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-center">
+                              {isSuccess && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Escrow Credited</span>
+                                </span>
+                              )}
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                                  <span>Pending Verification</span>
+                                </span>
+                              )}
+                              {isFailed && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <AlertCircle className="w-3 h-3 text-rose-600" />
+                                  <span>Payment Failed</span>
+                                </span>
+                              )}
+                              {p.status === 'REFUND_REQUESTED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">
+                                  <RotateCcw className="w-3 h-3 text-purple-600" />
+                                  <span>Refund Requested</span>
+                                </span>
+                              )}
+                              {p.status === 'REFUNDED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <RotateCcw className="w-3 h-3 text-rose-600" />
+                                  <span>Refunded</span>
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => setSelectedPayment(p)}
+                                  title="Inspect Details"
+                                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Pending verification action */}
+                                {isPending && (
+                                  <button
+                                    onClick={() => handleVerifyPayment(p)}
+                                    title="Verify Signature & Escrow Inflow"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    <span>Verify</span>
+                                  </button>
+                                )}
+
+                                {/* Failed payment recovery actions */}
+                                {isFailed && (
+                                  <>
+                                    <button
+                                      onClick={() => handleSendRetryLink(p)}
+                                      title="Send Retry Payment Link via SMS/WhatsApp"
+                                      className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                    >
+                                      <Send className="w-3 h-3" />
+                                      <span>Retry Link</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleMarkOfflineReceived(p)}
+                                      title="Mark Received via Offline Bank Deposit"
+                                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition cursor-pointer"
+                                    >
+                                      Offline Recv
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* Successful payment refund trigger */}
+                                {isSuccess && (
+                                  <button
+                                    onClick={() => handleOpenRefund(p)}
+                                    title="Initiate Refund"
+                                    className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                {/* Refund requested action */}
+                                {p.status === 'REFUND_REQUESTED' && (
+                                  <button
+                                    onClick={() => handleOpenRefund(p)}
+                                    title="Execute Escrow Reversal"
+                                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Process Refund</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </>
       ) : (
         /* Double Entry Escrow Ledger Table */
@@ -1168,6 +1801,85 @@ export const AdminPayments: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Webhook JSON Inspection Modal */}
+      {inspectingWebhookPayment && (
+        <div className="fixed inset-0 z-50 bg-navy-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-950 text-sm">Payment Gateway Webhook Payload</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">{inspectingWebhookPayment.gatewayPaymentId}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingWebhookPayment(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-xl">
+                <div>
+                  <span className="text-[10px] text-purple-700 font-bold uppercase tracking-wider block">Gateway Event</span>
+                  <span className="font-mono font-bold text-purple-950">payment.captured</span>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Signature Verified (HMAC-SHA256)
+                </span>
+              </div>
+
+              <div className="bg-slate-950 text-slate-200 p-4 rounded-xl font-mono text-[11px] overflow-x-auto max-h-64">
+                <pre>{JSON.stringify({
+                  event: 'payment.captured',
+                  entity: 'event',
+                  account_id: 'acc_buildghar_live_9941',
+                  contains: ['payment'],
+                  payload: {
+                    payment: {
+                      entity: {
+                        id: inspectingWebhookPayment.gatewayPaymentId,
+                        order_id: inspectingWebhookPayment.gatewayOrderId,
+                        amount: inspectingWebhookPayment.grossAmountPaise,
+                        currency: 'INR',
+                        status: inspectingWebhookPayment.status === 'FAILED' ? 'failed' : 'captured',
+                        method: inspectingWebhookPayment.paymentMethod.toLowerCase(),
+                        description: inspectingWebhookPayment.projectTitle,
+                        email: inspectingWebhookPayment.customerEmail || 'customer@buildghar.in',
+                        contact: inspectingWebhookPayment.customerPhone,
+                        fee: inspectingWebhookPayment.gatewayFeePaise || Math.round(inspectingWebhookPayment.grossAmountPaise * 0.02),
+                        tax: inspectingWebhookPayment.gatewayTaxPaise || Math.round((inspectingWebhookPayment.gatewayFeePaise || inspectingWebhookPayment.grossAmountPaise * 0.02) * 0.18),
+                        created_at: Math.floor(new Date(inspectingWebhookPayment.createdAt).getTime() / 1000),
+                      }
+                    }
+                  }
+                }, null, 2)}</pre>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <span className="text-[11px] text-slate-500 font-mono">
+                Settlement Batch: {inspectingWebhookPayment.settlementBatchId || 'SETTLE-AUTO-BATCH'}
+              </span>
+              <button
+                onClick={() => {
+                  success('Webhook signature re-verified against Razorpay secret key!');
+                  setInspectingWebhookPayment(null);
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

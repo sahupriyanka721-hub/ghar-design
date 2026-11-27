@@ -355,6 +355,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/projects': true,
     '/admin/documents': true,
     '/admin/timeline': true,
+    '/admin/payments': true,
   });
   const { success } = useToast();
 
@@ -379,6 +380,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/timeline')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/timeline': true }));
+    }
+    if (location.pathname.startsWith('/admin/payments')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/payments': true }));
     }
   }, [location.pathname]);
 
@@ -647,7 +651,21 @@ export const AdminLayout: React.FC = () => {
     {
       title: '5. Finance, Payouts & Resolutions',
       items: [
-        { label: 'Payment Management & Escrow', path: '/admin/payments', icon: CreditCard },
+        {
+          label: 'Payment Management',
+          path: '/admin/payments',
+          icon: CreditCard,
+          subItems: [
+            { label: 'All Customer Payments', path: '/admin/payments?view=ALL', view: 'ALL' },
+            { label: 'Pending Payment Verification', path: '/admin/payments?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
+            { label: 'Successful Payments', path: '/admin/payments?view=SUCCESSFUL', view: 'SUCCESSFUL' },
+            { label: 'Failed Payments', path: '/admin/payments?view=FAILED', view: 'FAILED' },
+            { label: 'Refund Requests', path: '/admin/payments?view=REFUNDS', view: 'REFUNDS' },
+            { label: 'Customer Payment History', path: '/admin/payments?view=CUSTOMER_HISTORY', view: 'CUSTOMER_HISTORY' },
+            { label: 'Payment Reconciliation', path: '/admin/payments?view=RECONCILIATION', view: 'RECONCILIATION' },
+            { label: 'Payment Gateway Transactions', path: '/admin/payments?view=GATEWAY_TRANSACTIONS', view: 'GATEWAY_TRANSACTIONS' },
+          ],
+        },
         { label: 'Architect Payout Management', path: '/admin/payouts', icon: CreditCard },
         { label: 'Invoice & Billing Management', path: '/admin/invoices', icon: FileText },
         { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
