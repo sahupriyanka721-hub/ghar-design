@@ -349,12 +349,16 @@ export const AdminLayout: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     '/admin/architects': true,
+    '/admin/requests': true,
   });
   const { success } = useToast();
 
   useEffect(() => {
     if (location.pathname.startsWith('/admin/architects')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/architects': true }));
+    }
+    if (location.pathname.startsWith('/admin/requests')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/requests': true }));
     }
   }, [location.pathname]);
 
@@ -511,7 +515,19 @@ export const AdminLayout: React.FC = () => {
     {
       title: '3. Quotation & Assignment Desk',
       items: [
-        { label: 'Quotation Request Inbox', path: '/admin/requests', icon: FileText },
+        {
+          label: 'Quotation Request Management',
+          path: '/admin/requests',
+          icon: FileText,
+          subItems: [
+            { label: 'New Quotation Requests', path: '/admin/requests?view=NEW_REQUESTS', view: 'NEW_REQUESTS' },
+            { label: 'Pending Assignment', path: '/admin/requests?view=PENDING_ASSIGNMENT', view: 'PENDING_ASSIGNMENT' },
+            { label: 'Assigned Requests', path: '/admin/requests?view=ASSIGNED', view: 'ASSIGNED' },
+            { label: 'Request Clarification', path: '/admin/requests?view=CLARIFICATION', view: 'CLARIFICATION' },
+            { label: 'Request History', path: '/admin/requests?view=HISTORY', view: 'HISTORY' },
+            { label: 'Cancelled Requests', path: '/admin/requests?view=CANCELLED', view: 'CANCELLED' },
+          ],
+        },
         { label: 'Architect Assignment Desk', path: '/admin/assignments', icon: Briefcase },
         { label: 'Quotation Review & Publish', path: '/admin/quotations', icon: FileCheck2 },
         { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
