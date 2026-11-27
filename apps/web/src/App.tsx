@@ -110,6 +110,7 @@ import { AdminAssignments } from './pages/admin/AdminAssignments.js';
 import { AdminDocuments } from './pages/admin/AdminDocuments.js';
 import { AdminPayouts } from './pages/admin/AdminPayouts.js';
 import { AdminInvoices } from './pages/admin/AdminInvoices.js';
+import { AdminNotifications } from './pages/admin/AdminNotifications.js';
 
 // Architect Partner Portal Pages (Master Development Prompt)
 import { ArchitectLandingPage } from './pages/public/ArchitectLandingPage.js';
@@ -453,7 +454,7 @@ export const App: React.FC = () => {
           <Route path="documents" element={<AdminDocuments />} />
           <Route path="payouts" element={<AdminPayouts />} />
           <Route path="invoices" element={<AdminInvoices />} />
-          <Route path="notifications" element={<AdminCommunications />} />
+          <Route path="notifications" element={<AdminNotifications />} />
         </Route>
 
         {/* Direct Shortcuts for Homeowner Quotation Request */}

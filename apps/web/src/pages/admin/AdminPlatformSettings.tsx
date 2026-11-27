@@ -24,6 +24,7 @@ import {
   savePlatformGlobalSettings,
   recordPlatformAuditLog,
 } from '../../data/adminStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminPlatformSettings: React.FC = () => {
   const { success, error } = useToast();
@@ -51,6 +52,13 @@ export const AdminPlatformSettings: React.FC = () => {
         targetId: 'GLOBAL_SETTINGS',
         performedBy: 'Super Administrator',
         notes: `Platform rates and commission configuration updated`,
+      });
+
+      logAdminAuditAction({
+        action: 'UPDATE_GLOBAL_SETTINGS',
+        targetType: 'PLATFORM_SETTINGS',
+        targetId: 'GLOBAL_CONFIG',
+        description: `Updated platform commercial rates: Arch Commission: ${settings.architectCommissionPercent}%, Quotation Token: ₹${quotationFeeRupees}, GST: ${settings.gstRatePercent}%`,
       });
 
       success('Global platform configurations successfully saved!');
