@@ -17,7 +17,15 @@ export interface RegisteredCustomer {
   country?: string;
   alternateContact?: string;
   registeredAt: string;
-  status: 'ACTIVE' | 'VERIFIED' | 'SUSPENDED';
+  status: 'ACTIVE' | 'VERIFIED' | 'SUSPENDED' | 'BLOCKED';
+  otpStatus?: 'VERIFIED' | 'PENDING';
+  suspensionReason?: string;
+  internalNotes?: Array<{
+    id: string;
+    adminName: string;
+    note: string;
+    createdAt: string;
+  }>;
   requestsCount: number;
   bookingsCount: number;
   materialOrdersCount: number;
@@ -236,6 +244,75 @@ export const updateCustomerStatus = (
   const updated = current.map((c) => (c.id === id ? { ...c, status: newStatus } : c));
   saveRegisteredCustomers(updated);
   return updated;
+};
+
+export const updateCustomerDetails = (
+  id: string,
+  updates: Partial<RegisteredCustomer>
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === id);
+  if (idx === -1) return null;
+  const updatedCust: RegisteredCustomer = {
+    ...current[idx],
+    ...updates,
+  };
+  current[idx] = updatedCust;
+  saveRegisteredCustomers(current);
+  return updatedCust;
+};
+
+export const addCustomerInternalNote = (
+  customerId: string,
+  noteText: string,
+  adminName: string
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === customerId);
+  if (idx === -1) return null;
+  const note = {
+    id: `note-${Date.now()}`,
+    adminName,
+    note: noteText,
+    createdAt: new Date().toISOString(),
+  };
+  const notes = current[idx].internalNotes ? [note, ...current[idx].internalNotes!] : [note];
+  current[idx] = { ...current[idx], internalNotes: notes };
+  saveRegisteredCustomers(current);
+  return current[idx];
+};
+
+export const suspendCustomerAccount = (
+  customerId: string,
+  reason: string,
+  adminName: string
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === customerId);
+  if (idx === -1) return null;
+  current[idx] = {
+    ...current[idx],
+    status: 'SUSPENDED',
+    suspensionReason: reason,
+  };
+  saveRegisteredCustomers(current);
+  return current[idx];
+};
+
+export const restoreCustomerAccount = (
+  customerId: string,
+  adminName: string
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === customerId);
+  if (idx === -1) return null;
+  current[idx] = {
+    ...current[idx],
+    status: 'ACTIVE',
+    suspensionReason: undefined,
+  };
+  saveRegisteredCustomers(current);
+  return current[idx];
 };
 
 export const incrementCustomerActivity = (

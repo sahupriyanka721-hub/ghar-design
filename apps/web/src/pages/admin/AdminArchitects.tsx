@@ -93,6 +93,7 @@ import {
   getRegisteredCustomers,
   RegisteredCustomer,
 } from '../../data/customerStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminArchitects: React.FC = () => {
   const { success, error } = useToast();
@@ -1060,6 +1061,17 @@ export const AdminArchitects: React.FC = () => {
       }
 
       loadData();
+      logAdminAuditAction({
+        action: 'APPROVE_ARCHITECT_APPLICATION',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: updated.id,
+        targetName: updated.name,
+        details: {
+          coaNumber: updated.coaNumber,
+          firmName: updated.firmName,
+          verifiedAt: new Date().toISOString(),
+        },
+      });
       success(`Architect "${updated.name}" approved successfully! Official ID: ${updated.id} issued.`);
     }
   };
@@ -1093,6 +1105,16 @@ export const AdminArchitects: React.FC = () => {
       loadData();
       setSelectedArchitect(ensureArchitectStatutoryDocuments(updated));
       setShowRemarksModal(false);
+      logAdminAuditAction({
+        action: pendingAction === 'CHANGES_REQUESTED' ? 'REQUEST_ARCHITECT_CHANGES' : 'REJECT_ARCHITECT_APPLICATION',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: selectedArchitect.id,
+        targetName: selectedArchitect.name,
+        details: {
+          status: pendingAction,
+          remarks: remarksText.trim(),
+        },
+      });
       setPendingAction(null);
       setRemarksText('');
       success(`Status updated to ${pendingAction.replace('_', ' ')} with admin feedback.`);
@@ -1112,6 +1134,16 @@ export const AdminArchitects: React.FC = () => {
       if (selectedArchitect?.id === id) {
         setSelectedArchitect(ensureArchitectStatutoryDocuments(updated));
       }
+      logAdminAuditAction({
+        action: nextStatus === 'SUSPENDED' ? 'SUSPEND_ARCHITECT_ACCOUNT' : 'RESTORE_ARCHITECT_ACCOUNT',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: id,
+        targetName: selectedArchitect?.name || id,
+        details: {
+          status: nextStatus,
+          remarks,
+        },
+      });
       success(`Architect account ${nextStatus === 'SUSPENDED' ? 'suspended' : 'reinstated'}.`);
     }
   };
@@ -1132,6 +1164,13 @@ export const AdminArchitects: React.FC = () => {
 
     if (updated) {
       loadData();
+      logAdminAuditAction({
+        action: 'SAVE_ARCHITECT_GOVERNANCE_REVIEW',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: archId,
+        targetName: selectedArchitect?.name || archId,
+        details: reviewForm,
+      });
       success('Governance Review & Rating saved successfully!');
     }
   };
@@ -1144,6 +1183,13 @@ export const AdminArchitects: React.FC = () => {
     }
     const updated = addArchitectNote(archId, noteText, 'Super Admin Desk', notePriority);
     if (updated) {
+      logAdminAuditAction({
+        action: 'ADD_ARCHITECT_INTERNAL_NOTE',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: archId,
+        targetName: selectedArchitect?.name || archId,
+        details: { noteText, priority: notePriority },
+      });
       setNoteText('');
       loadData();
       success('Internal administrative note recorded!');

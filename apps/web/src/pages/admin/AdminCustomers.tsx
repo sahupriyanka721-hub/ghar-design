@@ -5,10 +5,17 @@ import {
   getRegisteredCustomers,
   RegisteredCustomer,
   updateCustomerStatus,
+  updateCustomerDetails,
+  addCustomerInternalNote,
+  suspendCustomerAccount,
+  restoreCustomerAccount,
   registerNewCustomer,
   getPlatformRequests,
   syncChannel,
 } from '../../data/customerStore.js';
+import { getExecutionProjects, ExecutionProject } from '../../data/projectExecutionStore.js';
+import { getPlatformSupportTickets, PlatformSupportTicket } from '../../data/adminStore.js';
+import { logAdminAuditAction, getActiveAdminRole } from '../../data/adminRbacStore.js';
 import { pullFromCloud, pushToCloud } from '../../data/cloudSync.js';
 import {
   Search,
@@ -35,16 +42,50 @@ import {
   ArrowRight,
   Check,
   RotateCcw,
+  Edit,
+  AlertTriangle,
+  AlertOctagon,
+  ShieldAlert,
+  HelpCircle,
+  Clock,
+  StickyNote,
+  History,
+  DollarSign,
+  Plus,
 } from 'lucide-react';
 
 export const AdminCustomers: React.FC = () => {
   const { success, error } = useToast();
   const [customers, setCustomers] = useState<RegisteredCustomer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'VERIFIED' | 'SUSPENDED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'VERIFIED' | 'SUSPENDED' | 'BLOCKED'>('ALL');
   const [selectedCustomer, setSelectedCustomer] = useState<RegisteredCustomer | null>(null);
+  const [activeProfileTab, setActiveProfileTab] = useState<
+    'OVERVIEW' | 'REQUESTS' | 'PROJECTS' | 'ORDERS' | 'PAYMENTS' | 'COMPLAINTS' | 'NOTES'
+  >('OVERVIEW');
+
+  // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [addCustomerStep, setAddCustomerStep] = useState<number>(1);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('Compliance verification pending / suspicious inquiry pattern');
+  const [newNoteText, setNewNoteText] = useState('');
+
+  // Edit Customer Form State
+  const [editForm, setEditForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    housePlotNumber: '',
+    streetLocality: '',
+    landmark: '',
+    city: '',
+    state: '',
+    pinCode: '',
+  });
+
+  // New Customer Form State
   const [newCustForm, setNewCustForm] = useState({
     name: '',
     phone: '',
@@ -57,51 +98,17 @@ export const AdminCustomers: React.FC = () => {
     status: 'VERIFIED' as 'ACTIVE' | 'VERIFIED',
   });
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustForm.name.trim()) {
-      error('Customer full name is required');
-      return;
-    }
-    const cleanPhone = newCustForm.phone.replace(/\D/g, '').slice(-10);
-    if (cleanPhone.length !== 10) {
-      error('Please enter a valid 10-digit mobile number');
-      return;
-    }
-    const created = registerNewCustomer({
-      name: newCustForm.name.trim(),
-      phone: `+91 ${cleanPhone}`,
-      email: newCustForm.email.trim() || 'Not Provided',
-      housePlotNumber: newCustForm.housePlotNumber.trim() || 'Site Plot',
-      streetLocality: newCustForm.streetLocality.trim() || 'Locality',
-      city: newCustForm.city.trim() || 'Gurugram',
-      state: newCustForm.state.trim() || 'Haryana',
-      pinCode: newCustForm.pinCode.trim() || '122002',
-      status: newCustForm.status,
-    });
-    refreshCustomers();
-    pushToCloud().catch(() => {});
-    setShowAddModal(false);
-    setNewCustForm({
-      name: '',
-      phone: '',
-      email: '',
-      housePlotNumber: '',
-      streetLocality: '',
-      city: 'Gurugram',
-      state: 'Haryana',
-      pinCode: '122002',
-      status: 'VERIFIED',
-    });
-    success(`Customer ${created.name} successfully added!`);
-  };
-
   const [refreshing, setRefreshing] = useState(false);
+  const activeAdminRole = getActiveAdminRole();
 
   // Load dynamically from central customer store
   const refreshCustomers = (manual = false) => {
     const list = getRegisteredCustomers();
     setCustomers(list);
+    if (selectedCustomer) {
+      const updatedSel = list.find((c) => c.id === selectedCustomer.id);
+      if (updatedSel) setSelectedCustomer(updatedSel);
+    }
     if (manual) {
       success('Customer directory refreshed.');
     }
@@ -120,7 +127,6 @@ export const AdminCustomers: React.FC = () => {
       refreshCustomers(false);
     }).catch(() => {});
 
-    // Auto-refresh silently every 1 minute (60,000 ms)
     const interval = setInterval(() => {
       refreshCustomers(false);
     }, 60000);
@@ -151,86 +157,7 @@ export const AdminCustomers: React.FC = () => {
     };
   }, []);
 
-  const handleStatusChange = (id: string, newStatus: RegisteredCustomer['status']) => {
-    const updated = updateCustomerStatus(id, newStatus);
-    setCustomers(updated);
-    if (selectedCustomer && selectedCustomer.id === id) {
-      setSelectedCustomer({ ...selectedCustomer, status: newStatus });
-    }
-  };
-
-  // Load material orders placed by selected customer
-  const customerOrders = useMemo(() => {
-    if (!selectedCustomer) return [];
-    try {
-      const stored = localStorage.getItem('material_orders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const rawTargetPhone = (selectedCustomer.phone || "").replace(/\D/g, '').slice(-10);
-        return parsed.filter((o: any) => {
-          const oPhone = (o.customerPhone || o.deliveryAddress?.phone || '').replace(/\D/g, '').slice(-10);
-          return (
-            o.customerId === selectedCustomer.id ||
-            (rawTargetPhone && oPhone && oPhone === rawTargetPhone) ||
-            (o.customerName && selectedCustomer.name && String(o.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
-          );
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  }, [selectedCustomer]);
-
-  // Load project requests submitted by selected customer
-  const customerRequests = useMemo(() => {
-    if (!selectedCustomer) return [];
-    try {
-      const all = getPlatformRequests();
-      const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
-      const isGenericName = !selectedCustomer.name || /^(registered homeowner|homeowner|customer|client|user)$/i.test(selectedCustomer.name.trim());
-
-      return all.filter((r: any) => {
-        if (!r) return false;
-        if (r.customerId && r.customerId === selectedCustomer.id) return true;
-        const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
-        if (rawTargetPhone.length === 10 && rPhone.length === 10 && rPhone === rawTargetPhone) return true;
-        if (!isGenericName && r.customerName && selectedCustomer.name && String(r.customerName).trim().toLowerCase() === String(selectedCustomer.name).trim().toLowerCase()) {
-          if (rawTargetPhone.length === 10 && rPhone.length === 10 && rPhone !== rawTargetPhone) return false;
-          return true;
-        }
-        return false;
-      });
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  }, [selectedCustomer]);
-
-  // Load service bookings placed by selected customer
-  const customerBookings = useMemo(() => {
-    if (!selectedCustomer) return [];
-    try {
-      const stored = localStorage.getItem('platform_bookings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const rawTargetPhone = (selectedCustomer.phone || "").replace(/\D/g, '').slice(-10);
-        return parsed.filter((b: any) => {
-          const bPhone = (b.customerPhone || '').replace(/\D/g, '').slice(-10);
-          return (
-            b.customerId === selectedCustomer.id ||
-            (rawTargetPhone && bPhone && bPhone === rawTargetPhone) ||
-            (b.customerName && selectedCustomer.name && String(b.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
-          );
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  }, [selectedCustomer]);
-
-  // Global activity stores for live counts in table
+  // Global stores for matching customer relationships
   const allOrders = useMemo(() => {
     try {
       const stored = localStorage.getItem('material_orders');
@@ -257,6 +184,123 @@ export const AdminCustomers: React.FC = () => {
     }
   }, [customers]);
 
+  const allProjects = useMemo(() => {
+    try {
+      return getExecutionProjects();
+    } catch {
+      return [];
+    }
+  }, [customers]);
+
+  const allTickets = useMemo(() => {
+    try {
+      return getPlatformSupportTickets();
+    } catch {
+      return [];
+    }
+  }, [customers]);
+
+  // Selected Customer Relationships
+  const customerOrders = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    return allOrders.filter((o: any) => {
+      const oPhone = (o.customerPhone || o.deliveryAddress?.phone || '').replace(/\D/g, '').slice(-10);
+      return (
+        o.customerId === selectedCustomer.id ||
+        (rawTargetPhone && oPhone && oPhone === rawTargetPhone) ||
+        (o.customerName && selectedCustomer.name && String(o.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
+      );
+    });
+  }, [selectedCustomer, allOrders]);
+
+  const customerRequests = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    const isGenericName = !selectedCustomer.name || /^(registered homeowner|homeowner|customer|client|user)$/i.test(selectedCustomer.name.trim());
+    return allRequests.filter((r: any) => {
+      if (!r) return false;
+      if (r.customerId && r.customerId === selectedCustomer.id) return true;
+      const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
+      if (rawTargetPhone.length === 10 && rPhone.length === 10 && rPhone === rawTargetPhone) return true;
+      if (!isGenericName && r.customerName && selectedCustomer.name && String(r.customerName).trim().toLowerCase() === String(selectedCustomer.name).trim().toLowerCase()) {
+        if (rawTargetPhone.length === 10 && rPhone.length === 10 && rPhone !== rawTargetPhone) return false;
+        return true;
+      }
+      return false;
+    });
+  }, [selectedCustomer, allRequests]);
+
+  const customerBookings = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    return allBookings.filter((b: any) => {
+      const bPhone = (b.customerPhone || '').replace(/\D/g, '').slice(-10);
+      return (
+        b.customerId === selectedCustomer.id ||
+        (rawTargetPhone && bPhone && bPhone === rawTargetPhone) ||
+        (b.customerName && selectedCustomer.name && String(b.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
+      );
+    });
+  }, [selectedCustomer, allBookings]);
+
+  const customerProjects = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    return allProjects.filter((p: ExecutionProject) => {
+      const pPhone = (p.customerPhone || '').replace(/\D/g, '').slice(-10);
+      return (
+        p.customerId === selectedCustomer.id ||
+        (rawTargetPhone && pPhone && pPhone === rawTargetPhone) ||
+        (p.customerName && selectedCustomer.name && String(p.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
+      );
+    });
+  }, [selectedCustomer, allProjects]);
+
+  const customerTickets = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    return allTickets.filter((t: PlatformSupportTicket) => {
+      const tPhone = (t.userPhone || '').replace(/\D/g, '').slice(-10);
+      return (
+        t.userId === selectedCustomer.id ||
+        (rawTargetPhone && tPhone && tPhone === rawTargetPhone) ||
+        (t.userName && selectedCustomer.name && String(t.userName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
+      );
+    });
+  }, [selectedCustomer, allTickets]);
+
+  // Aggregate customer financial figures
+  const customerFinancials = useMemo(() => {
+    if (!selectedCustomer) return { totalPaidPaise: 0, outstandingPaise: 0 };
+    // 1. Material Orders
+    const materialPaidPaise = customerOrders.reduce((sum: number, o: any) => {
+      return sum + (o.paymentStatus === 'PAID' || o.paymentStatus === 'PAYMENT_SUCCESSFUL' ? o.totalAmountPaise || 0 : 0);
+    }, 0);
+    // 2. Request Fees
+    const requestFeesPaise = customerRequests.reduce((sum: number, r: any) => {
+      return sum + (r.isFeePaid ? r.quoteFeePaise || 99900 : 0);
+    }, 0);
+    // 3. Project Milestones
+    let projectPaidPaise = 0;
+    let projectOutstandingPaise = 0;
+    customerProjects.forEach((prj) => {
+      if (Array.isArray(prj.milestones)) {
+        prj.milestones.forEach((m) => {
+          if (m.status === 'PAID' || m.paidAt) {
+            projectPaidPaise += m.amountPaise || 0;
+          } else if (m.status === 'SUBMITTED_FOR_REVIEW' || m.status === 'PAYMENT_DUE') {
+            projectOutstandingPaise += m.amountPaise || 0;
+          }
+        });
+      }
+    });
+
+    return {
+      totalPaidPaise: materialPaidPaise + requestFeesPaise + projectPaidPaise,
+      outstandingPaise: projectOutstandingPaise,
+    };
+  }, [selectedCustomer, customerOrders, customerRequests, customerProjects]);
 
   // Sync URL search params with selected customer
   useEffect(() => {
@@ -274,6 +318,7 @@ export const AdminCustomers: React.FC = () => {
 
   const handleSelectCustomer = (c: RegisteredCustomer) => {
     setSelectedCustomer(c);
+    setActiveProfileTab('OVERVIEW');
     try {
       window.history.pushState(null, '', `/admin/customers?id=${c.id}`);
     } catch (_) {}
@@ -288,6 +333,213 @@ export const AdminCustomers: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Status Change Handler with Audit Log
+  const handleStatusChange = (id: string, newStatus: RegisteredCustomer['status']) => {
+    const updated = updateCustomerStatus(id, newStatus);
+    setCustomers(updated);
+    if (selectedCustomer && selectedCustomer.id === id) {
+      setSelectedCustomer({ ...selectedCustomer, status: newStatus });
+    }
+    logAdminAuditAction({
+      action: 'UPDATE_CUSTOMER_STATUS',
+      module: 'CUSTOMER_MANAGEMENT',
+      targetId: id,
+      targetName: selectedCustomer?.name || id,
+      details: { previousStatus: selectedCustomer?.status, newStatus },
+    });
+    pushToCloud().catch(() => {});
+    success(`Customer account status updated to ${newStatus}.`);
+  };
+
+  // Verify Customer 1-Click Action
+  const handleVerifyCustomer = (cust: RegisteredCustomer) => {
+    const updated = updateCustomerStatus(cust.id, 'VERIFIED');
+    updateCustomerDetails(cust.id, { otpStatus: 'VERIFIED' });
+    setCustomers(updated);
+    if (selectedCustomer && selectedCustomer.id === cust.id) {
+      setSelectedCustomer({ ...selectedCustomer, status: 'VERIFIED', otpStatus: 'VERIFIED' });
+    }
+    logAdminAuditAction({
+      action: 'VERIFY_CUSTOMER_IDENTITY',
+      module: 'CUSTOMER_MANAGEMENT',
+      targetId: cust.id,
+      targetName: cust.name,
+      details: { verifiedAt: new Date().toISOString() },
+    });
+    pushToCloud().catch(() => {});
+    success(`Customer ${cust.name} (${cust.id}) verified successfully!`);
+  };
+
+  // Open Edit Customer Modal
+  const handleOpenEditModal = (c: RegisteredCustomer) => {
+    setEditForm({
+      name: c.name || '',
+      phone: c.phone || '',
+      email: c.email && c.email !== 'Not Provided' ? c.email : '',
+      housePlotNumber: c.housePlotNumber || '',
+      streetLocality: c.streetLocality || '',
+      landmark: c.landmark || '',
+      city: c.city || 'Gurugram',
+      state: c.state || 'Haryana',
+      pinCode: c.pinCode || '122002',
+    });
+    setShowEditModal(true);
+  };
+
+  // Save Customer Edit Details
+  const handleSaveCustomerEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) return;
+    if (!editForm.name.trim()) {
+      error('Customer full name is required');
+      return;
+    }
+    const cleanPhone = editForm.phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    const updated = updateCustomerDetails(selectedCustomer.id, {
+      name: editForm.name.trim(),
+      phone: `+91 ${cleanPhone}`,
+      email: editForm.email.trim() || 'Not Provided',
+      housePlotNumber: editForm.housePlotNumber.trim(),
+      streetLocality: editForm.streetLocality.trim(),
+      landmark: editForm.landmark.trim(),
+      city: editForm.city.trim(),
+      state: editForm.state.trim(),
+      pinCode: editForm.pinCode.trim(),
+    });
+
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'EDIT_CUSTOMER_PROFILE',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: updated.name,
+        details: editForm,
+      });
+      pushToCloud().catch(() => {});
+      setShowEditModal(false);
+      success('Customer profile details updated successfully!');
+    }
+  };
+
+  // Confirm Suspend with Reason
+  const handleConfirmSuspend = () => {
+    if (!selectedCustomer) return;
+    if (!suspendReason.trim()) {
+      error('Please provide a specific reason for account suspension');
+      return;
+    }
+    const updated = suspendCustomerAccount(selectedCustomer.id, suspendReason.trim(), activeAdminRole);
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'SUSPEND_CUSTOMER_ACCOUNT',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: selectedCustomer.name,
+        details: { reason: suspendReason.trim() },
+      });
+      pushToCloud().catch(() => {});
+      setShowSuspendModal(false);
+      success(`Customer account suspended. Reason: ${suspendReason.trim()}`);
+    }
+  };
+
+  // Restore Suspended Customer
+  const handleRestoreCustomer = () => {
+    if (!selectedCustomer) return;
+    const updated = restoreCustomerAccount(selectedCustomer.id, activeAdminRole);
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'RESTORE_CUSTOMER_ACCOUNT',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: selectedCustomer.name,
+      });
+      pushToCloud().catch(() => {});
+      success(`Customer account restored to ACTIVE.`);
+    }
+  };
+
+  // Add Internal Staff Note
+  const handleAddNote = () => {
+    if (!selectedCustomer) return;
+    if (!newNoteText.trim()) {
+      error('Please enter an internal note');
+      return;
+    }
+    const updated = addCustomerInternalNote(selectedCustomer.id, newNoteText.trim(), activeAdminRole);
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'ADD_CUSTOMER_INTERNAL_NOTE',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: selectedCustomer.name,
+        details: { note: newNoteText.trim() },
+      });
+      setNewNoteText('');
+      success('Internal administrative note recorded.');
+    }
+  };
+
+  // Create Customer Form Handler
+  const handleCreateCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustForm.name.trim()) {
+      error('Customer full name is required');
+      return;
+    }
+    const cleanPhone = newCustForm.phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    const created = registerNewCustomer({
+      name: newCustForm.name.trim(),
+      phone: `+91 ${cleanPhone}`,
+      email: newCustForm.email.trim() || 'Not Provided',
+      housePlotNumber: newCustForm.housePlotNumber.trim() || 'Site Plot',
+      streetLocality: newCustForm.streetLocality.trim() || 'Locality',
+      city: newCustForm.city.trim() || 'Gurugram',
+      state: newCustForm.state.trim() || 'Haryana',
+      pinCode: newCustForm.pinCode.trim() || '122002',
+      status: newCustForm.status,
+    });
+    refreshCustomers();
+    logAdminAuditAction({
+      action: 'CREATE_CUSTOMER_MANUAL',
+      module: 'CUSTOMER_MANAGEMENT',
+      targetId: created.id,
+      targetName: created.name,
+      details: { phone: created.phone, city: created.city },
+    });
+    pushToCloud().catch(() => {});
+    setShowAddModal(false);
+    setNewCustForm({
+      name: '',
+      phone: '',
+      email: '',
+      housePlotNumber: '',
+      streetLocality: '',
+      city: 'Gurugram',
+      state: 'Haryana',
+      pinCode: '122002',
+      status: 'VERIFIED',
+    });
+    success(`Customer ${created.name} successfully created! ID: ${created.id}`);
+  };
+
   const filtered = customers.filter((c) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -296,6 +548,7 @@ export const AdminCustomers: React.FC = () => {
       c.state.toLowerCase().includes(term) ||
       c.pinCode.includes(term) ||
       c.phone.includes(term) ||
+      (c.id && c.id.toLowerCase().includes(term)) ||
       (c.email && c.email.toLowerCase().includes(term));
 
     const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
@@ -303,12 +556,14 @@ export const AdminCustomers: React.FC = () => {
   }).sort((a, b) => new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime());
 
   // =========================================================================
-  // 1. FULL-PAGE CUSTOMER PROFILE VIEW (Opens as a proper dedicated page)
+  // 1. FULL-PAGE CUSTOMER PROFILE VIEW (Section 6 Specification)
   // =========================================================================
   if (selectedCustomer) {
     return (
       <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150 admin-fullscreen-modal">
         <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
+        
+        {/* Top Sticky Header */}
         <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
@@ -329,392 +584,541 @@ export const AdminCustomers: React.FC = () => {
                   <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
                     {selectedCustomer.name}
                   </h2>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    selectedCustomer.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      selectedCustomer.status === 'VERIFIED'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : selectedCustomer.status === 'ACTIVE'
+                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    }`}
+                  >
                     {selectedCustomer.status}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-mono truncate">
-                  Customer ID: {selectedCustomer.id} • {selectedCustomer.city}, {selectedCustomer.state} • +91 {selectedCustomer.phone}
+                  Customer ID: {selectedCustomer.id} • {selectedCustomer.city}, {selectedCustomer.state} • {selectedCustomer.phone}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2 bg-navy-900/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
-              <span className="text-slate-400 font-medium">Status:</span>
-              <select
-                value={selectedCustomer.status}
-                onChange={(e) => handleStatusChange(selectedCustomer.id, e.target.value as any)}
-                className="bg-transparent text-white font-bold focus:outline-none cursor-pointer"
+          {/* Quick Actions in Header */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenEditModal(selectedCustomer)}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Edit className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">Edit Profile</span>
+            </button>
+
+            {selectedCustomer.status !== 'VERIFIED' && (
+              <button
+                type="button"
+                onClick={() => handleVerifyCustomer(selectedCustomer)}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <option value="ACTIVE" className="bg-navy-900 text-white">ACTIVE</option>
-                <option value="VERIFIED" className="bg-navy-900 text-white">VERIFIED</option>
-                <option value="SUSPENDED" className="bg-navy-900 text-white">SUSPENDED</option>
-              </select>
-            </div>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Verify Account</span>
+              </button>
+            )}
+
+            {selectedCustomer.status === 'SUSPENDED' ? (
+              <button
+                type="button"
+                onClick={handleRestoreCustomer}
+                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restore Account</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowSuspendModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <AlertOctagon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Suspend</span>
+              </button>
+            )}
+
             <button
               onClick={handleClearSelected}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              title="Close Profile"
             >
               <X className="w-4 h-4" />
-              <span className="hidden sm:inline">Close</span>
             </button>
           </div>
         </div>
 
         <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-
-        {/* Customer Header Banner */}
-        <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-[#1e3d6b] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex items-center gap-4 relative z-10">
-            <div className="w-16 h-16 rounded-2xl bg-gold-500/20 text-gold-400 border-2 border-gold-500/40 flex items-center justify-center font-bold text-2xl font-display shadow-lg">
-              {(selectedCustomer.name || "CU").slice(0, 2).toUpperCase()}
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-black font-display text-white">{selectedCustomer.name}</h1>
-                <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                    selectedCustomer.status === 'VERIFIED'
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                      : selectedCustomer.status === 'ACTIVE'
-                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                      : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  }`}
-                >
-                  {selectedCustomer.status}
-                </span>
+          {/* Customer Welcome Banner */}
+          <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-[#1e3d6b] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-16 h-16 rounded-2xl bg-gold-500/20 text-gold-400 border-2 border-gold-500/40 flex items-center justify-center font-bold text-2xl font-display shadow-lg">
+                {(selectedCustomer.name || 'CU').slice(0, 2).toUpperCase()}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 font-mono mt-1.5">
-                <span>Customer ID: {selectedCustomer.id}</span>
-                <span>•</span>
-                <span>Onboarded: {formatDate(selectedCustomer.registeredAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 relative z-10">
-            <a
-              href={`tel:${selectedCustomer.phone}`}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition"
-            >
-              <Phone className="w-4 h-4" />
-              <span>Call {selectedCustomer.phone}</span>
-            </a>
-            {selectedCustomer.email && (
-              <a
-                href={`mailto:${selectedCustomer.email}`}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 border border-white/20 transition"
-              >
-                <Mail className="w-4 h-4" />
-                <span>Send Email</span>
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* 4 KPI Metrics Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
-            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Total RFQ Requests</span>
-            <div className="text-2xl font-black font-display text-blue-700 mt-1">{customerRequests.length}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Architectural & Structural Inquiries</div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
-            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Confirmed Bookings</span>
-            <div className="text-2xl font-black font-display text-blue-700 mt-1">{customerBookings.length}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Site Visits & Consultations</div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
-            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Material Purchases</span>
-            <div className="text-2xl font-black font-display text-emerald-700 mt-1">{customerOrders.length}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Depot Orders Placed</div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
-            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Total Spent (GMV)</span>
-            <div className="text-2xl font-black font-display text-navy-950 mt-1">
-              {formatINR(customerOrders.reduce((sum: number, o: any) => sum + (o.totalAmountPaise || 0), 0))}
-            </div>
-            <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">Paid via Escrow / Gateway</div>
-          </div>
-        </div>
-
-        {/* Main 2-Column Wide Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column (5 Cols) - Contact & Address Profile */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Contact Information Card */}
-            <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
-              <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Phone className="w-4 h-4 text-blue-600" />
-                <span>Contact Information</span>
-              </h3>
-
-              <div className="space-y-3">
-                <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Primary Mobile</span>
-                    <span className="font-bold text-navy-950 font-mono text-sm">{selectedCustomer.phone}</span>
-                  </div>
-                  <a
-                    href={`tel:${selectedCustomer.phone}`}
-                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition"
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-2xl sm:text-3xl font-black font-display text-white">{selectedCustomer.name}</h1>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                      selectedCustomer.status === 'VERIFIED'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : selectedCustomer.status === 'ACTIVE'
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    }`}
                   >
-                    <Phone className="w-3 h-3" />
-                    <span>Call</span>
-                  </a>
+                    {selectedCustomer.status}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    OTP: {selectedCustomer.otpStatus || (selectedCustomer.status === 'VERIFIED' ? 'VERIFIED' : 'PENDING')}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 font-mono mt-1.5">
+                  <span>Customer ID: {selectedCustomer.id}</span>
+                  <span>•</span>
+                  <span>Onboarded: {formatDate(selectedCustomer.registeredAt)}</span>
+                  {selectedCustomer.suspensionReason && (
+                    <>
+                      <span>•</span>
+                      <span className="text-rose-400 font-sans">
+                        Suspended: {selectedCustomer.suspensionReason}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 relative z-10">
+              <a
+                href={`tel:${selectedCustomer.phone}`}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call {selectedCustomer.phone}</span>
+              </a>
+              {selectedCustomer.email && (
+                <a
+                  href={`mailto:${selectedCustomer.email}`}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 border border-white/20 transition"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Send Email</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* 4 Financial & Operational KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+              <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">
+                Total Quotation RFQs
+              </span>
+              <div className="text-2xl font-black font-display text-blue-700 mt-1">
+                {customerRequests.length}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Architecture & Design RFQs</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+              <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">
+                Total Projects
+              </span>
+              <div className="text-2xl font-black font-display text-navy-950 mt-1">
+                {customerProjects.length}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Turnkey Construction Sites</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+              <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">
+                Total Customer Payments
+              </span>
+              <div className="text-2xl font-black font-display text-emerald-700 mt-1 truncate">
+                {formatINR(customerFinancials.totalPaidPaise)}
+              </div>
+              <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                Paid via Escrow & Gateway
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-xs">
+              <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">
+                Outstanding Balance
+              </span>
+              <div className="text-2xl font-black font-display text-amber-600 mt-1 truncate">
+                {formatINR(customerFinancials.outstandingPaise)}
+              </div>
+              <div className="text-[11px] text-amber-700 mt-0.5">Pending milestone dues</div>
+            </div>
+          </div>
+
+          {/* Tab Navigation Strip */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+            {[
+              { id: 'OVERVIEW', label: 'Customer Overview', count: null },
+              { id: 'REQUESTS', label: 'Quotation RFQs', count: customerRequests.length },
+              { id: 'PROJECTS', label: 'Active Projects', count: customerProjects.length },
+              { id: 'ORDERS', label: 'Material Orders', count: customerOrders.length },
+              { id: 'COMPLAINTS', label: 'Complaints & Support', count: customerTickets.length },
+              { id: 'NOTES', label: 'Internal Notes', count: selectedCustomer.internalNotes?.length || 0 },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveProfileTab(tab.id as any)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeProfileTab === tab.id
+                    ? 'bg-navy-950 text-white shadow-xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.count !== null && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      activeProfileTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab 1: OVERVIEW */}
+          {activeProfileTab === 'OVERVIEW' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column (5 Cols) - Contact & Address Profile */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Contact Card */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-blue-600" />
+                      <span>Contact Details</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(selectedCustomer)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Primary Mobile</span>
+                        <span className="font-bold text-navy-950 font-mono text-sm">{selectedCustomer.phone}</span>
+                      </div>
+                      <a
+                        href={`tel:${selectedCustomer.phone}`}
+                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition"
+                      >
+                        <Phone className="w-3 h-3" />
+                        <span>Call</span>
+                      </a>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Email Address</span>
+                        <span className="font-bold text-navy-950 truncate block text-xs">
+                          {selectedCustomer.email || 'None'}
+                        </span>
+                      </div>
+                      {selectedCustomer.email && (
+                        <a
+                          href={`mailto:${selectedCustomer.email}`}
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition shrink-0"
+                        >
+                          <Mail className="w-3 h-3" />
+                          <span>Email</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                  <div className="min-w-0 pr-2">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Email Address</span>
-                    <span className="font-bold text-navy-950 truncate block text-xs">
-                      {selectedCustomer.email || 'None'}
-                    </span>
+                {/* Property & Site Address Card */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-blue-600" />
+                      <span>Registered Property Address</span>
+                    </h3>
                   </div>
-                  {selectedCustomer.email && (
-                    <a
-                      href={`mailto:${selectedCustomer.email}`}
-                      className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition shrink-0"
+
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Street & Plot</span>
+                      <div className="font-bold text-slate-900 text-sm mt-0.5">
+                        {selectedCustomer.housePlotNumber}, {selectedCustomer.streetLocality}
+                      </div>
+                    </div>
+
+                    {selectedCustomer.landmark && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Landmark</span>
+                        <div className="text-slate-600 font-medium">{selectedCustomer.landmark}</div>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">City & State</span>
+                        <div className="text-slate-800 font-bold">
+                          {selectedCustomer.city}, {selectedCustomer.state} - {selectedCustomer.pinCode}
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-lg">
+                        {selectedCustomer.city}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column (7 Cols) - Quick Summaries */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* Recent Inquiries Quick Widget */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <span>Recent Quotation Requests ({customerRequests.length})</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveProfileTab('REQUESTS')}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800"
                     >
-                      <Mail className="w-3 h-3" />
-                      <span>Email</span>
-                    </a>
+                      View All →
+                    </button>
+                  </div>
+
+                  {customerRequests.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl">
+                      No quotation requests submitted yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {customerRequests.slice(0, 3).map((req: any) => (
+                        <div
+                          key={req.id}
+                          className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <strong className="text-navy-950 block">{req.requestCode || req.id}</strong>
+                            <span className="text-slate-500 text-[11px]">
+                              {req.categorySlug} • {req.plotArea ? `${req.plotArea} sq ft` : 'Site Plot'}
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                            {req.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {selectedCustomer.alternateContact && (
-                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Alternate Contact</span>
-                    <span className="font-semibold text-slate-800 font-mono text-xs">
-                      {selectedCustomer.alternateContact}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Complete Registered Property Address */}
-            <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
-              <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2 border-b border-slate-100 pb-3">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <span>Registered Site & Residence Address</span>
-              </h3>
-
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Street & Plot</span>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
-                    {selectedCustomer.housePlotNumber}, {selectedCustomer.streetLocality}
-                  </div>
-                </div>
-
-                {selectedCustomer.landmark && (
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Landmark</span>
-                    <div className="text-slate-600 font-medium">{selectedCustomer.landmark}</div>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">City & State</span>
-                    <div className="text-slate-800 font-bold">
-                      {selectedCustomer.city}, {selectedCustomer.state} - {selectedCustomer.pinCode}
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-lg">
-                    {selectedCustomer.city}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column (7 Cols) - Material Purchases, Project Requests & Bookings */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* 🛒 Purchased Materials & Orders */}
-            <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-blue-600" />
-                  <span>Material Purchases & Orders</span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold font-mono">
-                    {customerOrders.length}
-                  </span>
-                </h3>
-              </div>
-
-              {customerOrders.length === 0 ? (
-                <div className="p-8 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center space-y-1">
-                  <div className="text-slate-400 font-bold text-xs">No material orders placed yet</div>
-                  <p className="text-[11px] text-slate-500">
-                    When this customer purchases cement, steel, or sand, items will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {customerOrders.map((ord: any) => (
-                    <div
-                      key={ord.id}
-                      className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition space-y-3"
+                {/* Projects Quick Widget */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <Building className="w-4 h-4 text-indigo-600" />
+                      <span>Construction & Interior Projects ({customerProjects.length})</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveProfileTab('PROJECTS')}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-mono font-black text-navy-950 text-sm">{ord.orderCode}</div>
-                          <span className="text-[11px] text-slate-400">{formatDate(ord.orderDate)}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-black text-base text-navy-950 block">
-                            {formatINR(ord.totalAmountPaise)}
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">
-                            {ord.paymentStatus === 'PAYMENT_SUCCESSFUL' ? '✓ Paid via Escrow' : 'Cash on Delivery'}
-                          </span>
-                        </div>
-                      </div>
+                      View All →
+                    </button>
+                  </div>
 
-                      {/* Items List */}
-                      {ord.items && ord.items.length > 0 && (
-                        <div className="bg-white rounded-xl p-3 border border-slate-200 divide-y divide-slate-100">
-                          {(ord.items || []).map((it: any, iIdx: number) => (
-                            <div key={iIdx} className="py-1.5 flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-800">
-                                {it.name}{' '}
-                                <span className="text-slate-500 font-normal">
-                                  ({it.quantity} {it.unit})
-                                </span>
-                              </span>
-                              <span className="font-mono font-bold text-slate-900">
-                                {formatINR(
-                                  it.totalPaise ||
-                                    (it.unitPricePaise ? it.unitPricePaise * it.quantity : 0)
-                                )}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {ord.associatedProject && (
-                        <div className="text-xs text-slate-500">
-                          Linked Project: <span className="font-bold text-navy-950">{ord.associatedProject}</span>
-                        </div>
-                      )}
+                  {customerProjects.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl">
+                      No active construction projects yet.
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-2.5">
+                      {customerProjects.slice(0, 3).map((prj) => (
+                        <div
+                          key={prj.id}
+                          className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <strong className="text-navy-950 block">{prj.name}</strong>
+                            <span className="text-slate-500 text-[11px]">
+                              Budget: {formatINR(prj.budgetPaise)} • Progress: {prj.progressPercentage}%
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            {prj.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* 📋 Project Quotation Requests */}
-            <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  <span>Submitted Project RFQ Requests</span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold font-mono">
-                    {customerRequests.length}
-                  </span>
-                </h3>
               </div>
+            </div>
+          )}
 
+          {/* Tab 2: REQUESTS */}
+          {activeProfileTab === 'REQUESTS' && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <h3 className="font-bold text-sm text-navy-950">Submitted Quotation Requests</h3>
               {customerRequests.length === 0 ? (
-                <div className="p-8 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center space-y-1">
-                  <div className="text-slate-400 font-bold text-xs">No project requests submitted yet</div>
-                  <p className="text-[11px] text-slate-500">
-                    Custom villa and duplex RFQs will appear here once submitted.
-                  </p>
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No quotation requests on record for this customer.
                 </div>
               ) : (
                 <div className="space-y-3">
                   {customerRequests.map((req: any) => (
                     <div
                       key={req.id}
-                      className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
                       <div>
-                        <div className="font-mono font-black text-navy-950 text-sm">
+                        <span className="font-mono font-bold text-blue-700 block text-sm">
                           {req.requestCode || req.id}
+                        </span>
+                        <strong className="text-slate-900 block mt-0.5">
+                          {req.categorySlug || 'Architecture & Design'}
+                        </strong>
+                        <div className="text-slate-500 text-[11px] mt-0.5">
+                          {req.plotArea ? `${req.plotArea} sq ft` : 'Plot dimensions'} • {req.city}, {req.state}
                         </div>
-                        <div className="text-slate-800 font-bold text-xs capitalize mt-0.5">
-                          {req.categorySlug?.replace(/-/g, ' ') || 'Turnkey Construction & Design'}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          {req.plotArea} sq ft • {req.city || 'Gurugram'}, {req.state || 'Haryana'}
-                        </div>
-                        {req.budgetRange && (
-                          <div className="text-[11px] font-semibold text-blue-800 mt-0.5">
-                            Budget: {req.budgetRange}
-                          </div>
-                        )}
                       </div>
-                      <div className="text-left sm:text-right shrink-0">
-                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 inline-block">
-                          ₹499 Fee Paid
+                      <div className="flex items-center gap-3">
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800">
+                          {req.status}
                         </span>
-                        <span className="text-[11px] text-slate-400 block mt-1">
-                          {formatDate(req.createdAt)}
-                        </span>
+                        <a
+                          href={`/admin/requests`}
+                          className="px-3 py-1.5 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs"
+                        >
+                          View RFQ Desk
+                        </a>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+          )}
 
-            {/* 📅 Confirmed Bookings & Consultations */}
-            <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
-                  <CalendarCheck className="w-4 h-4 text-blue-600" />
-                  <span>Confirmed Bookings & Consultations</span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold font-mono">
-                    {customerBookings.length}
-                  </span>
-                </h3>
-              </div>
-
-              {customerBookings.length === 0 ? (
-                <div className="p-8 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-center space-y-1">
-                  <div className="text-slate-400 font-bold text-xs">No service bookings placed yet</div>
-                  <p className="text-[11px] text-slate-500">
-                    Architect and engineer walkthrough bookings will be listed here.
-                  </p>
+          {/* Tab 3: PROJECTS */}
+          {activeProfileTab === 'PROJECTS' && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <h3 className="font-bold text-sm text-navy-950">Active & Completed Projects</h3>
+              {customerProjects.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No construction sites linked to this customer yet.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {customerBookings.map((b: any) => (
+                  {customerProjects.map((prj) => (
                     <div
-                      key={b.id}
-                      className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      key={prj.id}
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
                       <div>
-                        <div className="font-mono font-black text-navy-950 text-sm">{b.bookingCode}</div>
-                        <div className="text-slate-800 font-bold text-xs mt-0.5">{b.serviceTitle}</div>
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          Visit: {b.visitDate ? formatDate(b.visitDate) : 'On Call'} •{' '}
-                          {b.visitTimeSlot || 'Standard Slot'}
-                        </div>
-                        {b.siteAddress && (
-                          <div className="text-[11px] text-slate-400 truncate max-w-md mt-0.5">
-                            {b.siteAddress}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-left sm:text-right shrink-0">
-                        <span className="font-black text-navy-950 font-display text-sm block">
-                          {formatINR(b.totalAmountPaise)}
+                        <strong className="text-navy-950 block text-sm">{prj.name}</strong>
+                        <span className="text-slate-500 text-[11px]">
+                          Location: {prj.siteLocation?.city || 'Delhi NCR'} • Architect: {prj.architectName || 'Assigned Lead'}
                         </span>
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200 inline-block mt-1">
-                          {b.status}
+                        <div className="text-blue-700 font-mono font-bold mt-1">
+                          Budget: {formatINR(prj.budgetPaise)} • Progress: {prj.progressPercentage}%
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                        {prj.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 4: ORDERS */}
+          {activeProfileTab === 'ORDERS' && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <h3 className="font-bold text-sm text-navy-950">Building Materials Depot Orders</h3>
+              {customerOrders.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No material purchases recorded for this customer.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customerOrders.map((ord: any) => (
+                    <div
+                      key={ord.id}
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <span className="font-mono font-bold text-navy-950">{ord.orderCode || ord.id}</span>
+                        <div className="text-slate-600 font-medium mt-0.5">
+                          {ord.items?.length || 1} material items purchased
+                        </div>
+                        <span className="text-emerald-700 font-mono font-bold block mt-1">
+                          {formatINR(ord.totalAmountPaise)}
+                        </span>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-200 text-slate-800">
+                        {ord.fulfillmentStatus || 'PROCESSING'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 5: COMPLAINTS */}
+          {activeProfileTab === 'COMPLAINTS' && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <h3 className="font-bold text-sm text-navy-950">Customer Support Tickets & Complaints</h3>
+              {customerTickets.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No complaints or support tickets raised by this customer.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customerTickets.map((tkt) => (
+                    <div
+                      key={tkt.id}
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <span className="font-mono font-bold text-rose-700">{tkt.ticketCode}</span>
+                        <strong className="text-slate-900 block mt-0.5">{tkt.subject}</strong>
+                        <p className="text-slate-500 text-[11px] mt-0.5 line-clamp-1">{tkt.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                          {tkt.priority}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                          {tkt.status}
                         </span>
                       </div>
                     </div>
@@ -722,17 +1126,234 @@ export const AdminCustomers: React.FC = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Tab 6: NOTES */}
+          {activeProfileTab === 'NOTES' && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+              <div>
+                <h3 className="font-bold text-sm text-navy-950">Administrative Internal Notes</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Internal notes are strictly confidential and visible only to authorized BuildGhar administrators.
+                </p>
+              </div>
+
+              {/* Add Note Form */}
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Record internal verification note or customer preference..."
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  className="flex-1 px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNote}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Note</span>
+                </button>
+              </div>
+
+              {/* Notes List */}
+              <div className="space-y-3">
+                {(!selectedCustomer.internalNotes || selectedCustomer.internalNotes.length === 0) ? (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    No internal notes recorded yet for this customer.
+                  </div>
+                ) : (
+                  selectedCustomer.internalNotes.map((note) => (
+                    <div key={note.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between text-slate-500 text-[10px]">
+                        <span className="font-bold text-navy-950">{note.adminName}</span>
+                        <span className="font-mono">{formatDate(note.createdAt)}</span>
+                      </div>
+                      <p className="text-slate-800 font-medium">{note.note}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal: Edit Customer Profile */}
+        {showEditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-xl w-full shadow-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-base font-bold text-navy-950 font-display">Edit Customer Profile</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveCustomerEdit} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Mobile Number</label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">House / Plot #</label>
+                    <input
+                      type="text"
+                      value={editForm.housePlotNumber}
+                      onChange={(e) => setEditForm({ ...editForm, housePlotNumber: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Street / Locality</label>
+                    <input
+                      type="text"
+                      value={editForm.streetLocality}
+                      onChange={(e) => setEditForm({ ...editForm, streetLocality: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editForm.city}
+                      onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editForm.state}
+                      onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">PIN Code</label>
+                    <input
+                      type="text"
+                      value={editForm.pinCode}
+                      onChange={(e) => setEditForm({ ...editForm, pinCode: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-        </div>
+        )}
+
+        {/* Modal: Suspend Customer Account */}
+        {showSuspendModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <AlertOctagon className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-navy-950 font-display">
+                  Suspend Customer Account?
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Suspension will restrict this customer from placing new RFQs or orders. Historical projects and payment records remain safely preserved.
+                </p>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 text-xs block mb-1">
+                  Reason for Suspension (Mandatory for Audit Trail)
+                </label>
+                <textarea
+                  rows={3}
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Enter specific audit reason..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSuspendModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSuspend}
+                  className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition cursor-pointer"
+                >
+                  Confirm Suspension
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   // =========================================================================
-  // 2. MAIN CUSTOMER DIRECTORY TABLE
+  // 2. MAIN CUSTOMER DIRECTORY TABLE (Section 6 Specification)
   // =========================================================================
-
   return (
     <div className="space-y-6 font-sans">
       {/* Top Header */}
@@ -741,14 +1362,14 @@ export const AdminCustomers: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
-              Live Homeowner Directory
+              Customer Management Directory
             </span>
           </div>
           <h1 className="text-2xl font-bold font-display text-navy-950 mt-1">
             Registered Customers ({customers.length})
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time directory of all homeowners registered via customer onboarding, site inquiries, and mobile OTP.
+            Centralized control desk for all homeowners registered via customer onboarding, site inquiries, and mobile OTP.
           </p>
         </div>
 
@@ -758,7 +1379,7 @@ export const AdminCustomers: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search name, phone, city, PIN..."
+              placeholder="Search name, phone, city, ID..."
               className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -770,7 +1391,7 @@ export const AdminCustomers: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -788,6 +1409,17 @@ export const AdminCustomers: React.FC = () => {
             <RotateCcw className={`w-3.5 h-3.5 text-slate-500 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
             <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
+
+          <button
+            onClick={() => {
+              setAddCustomerStep(1);
+              setShowAddModal(true);
+            }}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs shrink-0"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Add Customer</span>
+          </button>
         </div>
       </div>
 
@@ -797,14 +1429,14 @@ export const AdminCustomers: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider font-display">
               <tr>
-                <th className="p-4">Customer Details</th>
+                <th className="p-4">Customer Details & ID</th>
                 <th className="p-4">Complete Location</th>
-                <th className="p-4">Project Requests</th>
-                <th className="p-4">Active Bookings</th>
-                <th className="p-4">Material Orders</th>
-                <th className="p-4">Registered Date</th>
-                <th className="p-4">Account Status</th>
-                <th className="p-4 text-right">Action</th>
+                <th className="p-4 text-center">OTP Status</th>
+                <th className="p-4 text-center">Quotation RFQs</th>
+                <th className="p-4 text-center">Active Projects</th>
+                <th className="p-4 text-right">Total Payments</th>
+                <th className="p-4 text-center">Account Status</th>
+                <th className="p-4 text-right">Admin Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -816,574 +1448,352 @@ export const AdminCustomers: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-              filtered.map((c) => {
-                const rawPhone = c.phone.replace(/\D/g, '').slice(-10);
-                const orderCount = allOrders.filter((o: any) => {
-                  const oPhone = (o.customerPhone || o.deliveryAddress?.phone || '').replace(/\D/g, '').slice(-10);
+                filtered.map((c) => {
+                  const rawPhone = c.phone.replace(/\D/g, '').slice(-10);
+                  const isGenericName = !c.name || /^(registered homeowner|homeowner|customer|client|user)$/i.test(c.name.trim());
+                  
+                  const reqCount = allRequests.filter((r: any) => {
+                    if (!r) return false;
+                    if (r.customerId && r.customerId === c.id) return true;
+                    const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
+                    if (rawPhone.length === 10 && rPhone.length === 10 && rPhone === rawPhone) return true;
+                    if (!isGenericName && r.customerName && c.name && String(r.customerName).trim().toLowerCase() === String(c.name).trim().toLowerCase()) {
+                      return true;
+                    }
+                    return false;
+                  }).length;
+
+                  const projCount = allProjects.filter((p: ExecutionProject) => {
+                    const pPhone = (p.customerPhone || '').replace(/\D/g, '').slice(-10);
+                    return p.customerId === c.id || (rawPhone && pPhone && pPhone === rawPhone);
+                  }).length;
+
+                  // Order payments
+                  const custOrders = allOrders.filter((o: any) => {
+                    const oPhone = (o.customerPhone || o.deliveryAddress?.phone || '').replace(/\D/g, '').slice(-10);
+                    return o.customerId === c.id || (rawPhone && oPhone && oPhone === rawPhone);
+                  });
+                  const paidPaise = custOrders.reduce((sum: number, o: any) => {
+                    return sum + (o.paymentStatus === 'PAID' || o.paymentStatus === 'PAYMENT_SUCCESSFUL' ? o.totalAmountPaise || 0 : 0);
+                  }, 0);
+
                   return (
-                    o.customerId === c.id ||
-                    (rawPhone && oPhone && oPhone === rawPhone) ||
-                    (o.customerName && c.name && o.customerName.toLowerCase() === c.name.toLowerCase())
-                  );
-                }).length;
-
-                const bookingCount = allBookings.filter((b: any) => {
-                  const bPhone = (b.customerPhone || '').replace(/\D/g, '').slice(-10);
-                  return (
-                    b.customerId === c.id ||
-                    (rawPhone && bPhone && bPhone === rawPhone) ||
-                    (b.customerName && c.name && b.customerName.toLowerCase() === c.name.toLowerCase())
-                  );
-                }).length;
-
-                const isGenericName = !c.name || /^(registered homeowner|homeowner|customer|client|user)$/i.test(c.name.trim());
-                const reqCount = allRequests.filter((r: any) => {
-                  if (!r) return false;
-                  if (r.customerId && r.customerId === c.id) return true;
-                  const rPhone = (r.customerPhone || '').replace(/\D/g, '').slice(-10);
-                  if (rawPhone.length === 10 && rPhone.length === 10 && rPhone === rawPhone) return true;
-                  if (!isGenericName && r.customerName && c.name && String(r.customerName).trim().toLowerCase() === String(c.name).trim().toLowerCase()) {
-                    if (rawPhone.length === 10 && rPhone.length === 10 && rPhone !== rawPhone) return false;
-                    return true;
-                  }
-                  return false;
-                }).length;
-
-                return (
-                  <tr key={c.id} className="hover:bg-slate-50/80 transition">
-                    {/* Customer Info */}
-                    <td className="p-4">
-                      <div
-                        onClick={() => handleSelectCustomer(c)}
-                        className="cursor-pointer group"
-                        title="Click to view customer details"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-navy-950 group-hover:text-blue-600 transition-colors text-xs font-display">
-                            {c.name}
-                          </span>
-                          {c.isNew && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider animate-pulse">
-                              New
+                    <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                      {/* Customer Details */}
+                      <td className="p-4">
+                        <div
+                          onClick={() => handleSelectCustomer(c)}
+                          className="cursor-pointer group"
+                          title="Click to view full customer profile"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-navy-950 group-hover:text-blue-600 transition-colors text-xs font-display">
+                              {c.name}
                             </span>
-                          )}
+                            <span className="px-1.5 py-0.2 rounded bg-sky-50 border border-sky-200 text-sky-800 font-mono text-[10px] font-bold">
+                              {c.id}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 group-hover:text-slate-700 flex items-center gap-2 mt-0.5 font-mono">
+                            <span className="font-semibold text-slate-700">{c.phone}</span>
+                            {c.email && c.email !== 'Not Provided' && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-500 font-sans">{c.email}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-500 group-hover:text-slate-700 flex items-center gap-2 mt-0.5 font-mono">
-                          <span className="font-semibold text-slate-700">{c.phone}</span>
-  <span className="px-1.5 py-0.2 rounded bg-sky-50 border border-sky-200 text-sky-800 font-mono text-[10px] font-bold">
-    {c.id}
-  </span>
-                          {c.email && c.email !== 'Not Provided' && (
+                      </td>
+
+                      {/* Location */}
+                      <td className="p-4 text-slate-700">
+                        <div className="font-semibold text-xs flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>{c.city}, {c.state}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[180px]">
+                          {c.housePlotNumber}, {c.streetLocality} ({c.pinCode})
+                        </div>
+                      </td>
+
+                      {/* OTP Status */}
+                      <td className="p-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            c.status === 'VERIFIED' || c.otpStatus === 'VERIFIED'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {c.status === 'VERIFIED' || c.otpStatus === 'VERIFIED' ? (
                             <>
-                              <span>•</span>
-                              <span className="text-slate-500 font-sans">{c.email}</span>
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Verified</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Pending</span>
                             </>
                           )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Location */}
-                    <td className="p-4 text-slate-700">
-                      <div className="font-semibold text-xs flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>{c.city}, {c.state}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[180px]" title={`${c.housePlotNumber}, ${c.streetLocality}`}>
-                        {c.housePlotNumber}, {c.streetLocality} ({c.pinCode})
-                      </div>
-                    </td>
-
-                    {/* Project Requests */}
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
-                        <FileText className="w-3 h-3 text-blue-600" />
-                        <span>{reqCount}</span>
-                      </span>
-                    </td>
-
-                    {/* Active Bookings */}
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 font-bold text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg">
-                        <CalendarCheck className="w-3 h-3 text-blue-600" />
-                        <span>{bookingCount}</span>
-                      </span>
-                    </td>
-
-                    {/* Material Orders */}
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                        <Package className="w-3 h-3 text-emerald-600" />
-                        <span>{orderCount}</span>
-                      </span>
-                    </td>
-
-                    {/* Registration Date */}
-                    <td className="p-4 text-slate-500 font-sans text-xs">
-                      {formatDate(c.registeredAt)}
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="p-4">
-                      {c.status === 'VERIFIED' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
                         </span>
-                      ) : c.status === 'ACTIVE' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                          <ShieldCheck className="w-3 h-3 text-blue-600" /> Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                          Suspended
-                        </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Actions */}
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => handleSelectCustomer(c)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-100 text-blue-900 hover:text-blue-950 font-bold text-xs flex items-center gap-1.5 ml-auto transition"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View Details</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
+                      {/* RFQs Count */}
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center gap-1 font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                          <FileText className="w-3 h-3 text-blue-600" />
+                          <span>{reqCount}</span>
+                        </span>
+                      </td>
+
+                      {/* Projects Count */}
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center gap-1 font-bold text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg">
+                          <Building className="w-3 h-3 text-indigo-600" />
+                          <span>{projCount}</span>
+                        </span>
+                      </td>
+
+                      {/* Total Payments */}
+                      <td className="p-4 text-right font-mono font-bold text-slate-900">
+                        {paidPaise > 0 ? formatINR(paidPaise) : '₹0'}
+                      </td>
+
+                      {/* Account Status */}
+                      <td className="p-4 text-center">
+                        {c.status === 'VERIFIED' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                          </span>
+                        ) : c.status === 'ACTIVE' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                            <ShieldCheck className="w-3 h-3 text-blue-600" /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                            Suspended
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-4 text-right space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectCustomer(c)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-100 text-blue-900 font-bold text-xs inline-flex items-center gap-1 transition cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(c)}
+                          className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer inline-flex items-center"
+                          title="Edit Customer Details"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Manual Customer Creation Full-Screen View for Admin (Stepper Wizard) */}
+      {/* Modal: Add Customer 3-Step Wizard */}
       {showAddModal && (
-        <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f0f7ff] flex flex-col font-sans animate-in fade-in duration-150">
-          <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-sky-400 to-transparent pointer-events-none shrink-0" />
-          <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-slate-200 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-navy-950 font-display">Register New Customer</h3>
+                <span className="text-xs text-slate-400">Step {addCustomerStep} of 3</span>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setShowAddModal(false);
-                  setAddCustomerStep(1);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+                onClick={() => setShowAddModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span className="hidden sm:inline">Back to Customer Directory</span>
-                <span className="sm:hidden">Back</span>
+                <X className="w-5 h-5" />
               </button>
-              <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-base font-display shrink-0">
-                  <UserPlus className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
-                    Add New Registered Customer
-                  </h2>
-                  <div className="text-[11px] text-slate-400 font-mono truncate">
-                    Step {addCustomerStep} of 3 • Homeowner Registration Wizard
+            </div>
+
+            <form onSubmit={handleCreateCustomer} className="space-y-4 text-xs">
+              {addCustomerStep === 1 && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Customer Full Name *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar"
+                      value={newCustForm.name}
+                      onChange={(e) => setNewCustForm({ ...newCustForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">10-Digit Mobile Number *</label>
+                    <input
+                      type="tel"
+                      placeholder="9876543210"
+                      value={newCustForm.phone}
+                      onChange={(e) => setNewCustForm({ ...newCustForm, phone: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="ramesh@example.com"
+                      value={newCustForm.email}
+                      onChange={(e) => setNewCustForm({ ...newCustForm, email: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddModal(false);
-                  setAddCustomerStep(1);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-                <span className="hidden sm:inline">Close</span>
-              </button>
-            </div>
-          </div>
+              )}
 
-          <div className="flex-1 max-w-[1100px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-            {/* Stepper Progress Bar */}
-            <div className="bg-white rounded-2xl p-4 sm:p-6 border border-blue-200/80 shadow-sm">
-              <div className="flex items-center justify-between max-w-xl mx-auto">
-                {[
-                  { step: 1, title: 'Identity & Contact', icon: User },
-                  { step: 2, title: 'Site Location', icon: MapPin },
-                  { step: 3, title: 'Account Verification', icon: ShieldCheck },
-                ].map((item, idx, arr) => (
-                  <div key={item.step} className="flex items-center flex-1 last:flex-none">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (item.step < addCustomerStep) setAddCustomerStep(item.step);
-                      }}
-                      className="flex flex-col items-center gap-1 group text-center cursor-pointer"
-                    >
-                      <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs transition ${
-                          addCustomerStep === item.step
-                            ? 'bg-blue-600 text-white shadow-md ring-4 ring-blue-100'
-                            : addCustomerStep > item.step
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-400 border border-slate-200'
-                        }`}
-                      >
-                        {addCustomerStep > item.step ? (
-                          <Check className="w-5 h-5 text-white" />
-                        ) : (
-                          <item.icon className="w-5 h-5" />
-                        )}
-                      </div>
-                      <span
-                        className={`text-[11px] font-bold mt-1 transition ${
-                          addCustomerStep === item.step
-                            ? 'text-blue-900'
-                            : addCustomerStep > item.step
-                            ? 'text-emerald-700'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        {item.title}
-                      </span>
-                    </button>
-                    {idx < arr.length - 1 && (
-                      <div
-                        className={`flex-1 h-0.5 mx-3 mb-5 transition ${
-                          addCustomerStep > item.step ? 'bg-emerald-500' : 'bg-slate-200'
-                        }`}
+              {addCustomerStep === 2 && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">House / Plot #</label>
+                      <input
+                        type="text"
+                        placeholder="Plot #42, Block C"
+                        value={newCustForm.housePlotNumber}
+                        onChange={(e) => setNewCustForm({ ...newCustForm, housePlotNumber: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Step Card Content */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200/80 shadow-xl">
-              <form onSubmit={handleCreateCustomer}>
-                {/* STEP 1: IDENTITY & CONTACT */}
-                {addCustomerStep === 1 && (
-                  <div className="space-y-6 animate-in fade-in duration-150">
-                    <div className="border-b border-slate-100 pb-4">
-                      <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
-                        <span>Step 1 of 3</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-navy-950 font-display">
-                        Customer Identity & Mobile Verification
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Enter primary homeowner identity for instant SMS alerts and quotation dispatches.
-                      </p>
                     </div>
-
-                    <div className="space-y-4 text-xs text-slate-700">
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                          <User className="w-4 h-4 text-blue-600" />
-                          <span>Customer Full Name</span>
-                          <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder=""
-                          value={newCustForm.name}
-                          onChange={(e) => setNewCustForm({ ...newCustForm, name: e.target.value })}
-                          className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <Phone className="w-4 h-4 text-blue-600" />
-                            <span>Primary Mobile Number</span>
-                            <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+91</span>
-                            <input
-                              type="tel"
-                              required
-                              maxLength={10}
-                              placeholder="10-digit mobile number"
-                              value={newCustForm.phone}
-                              onChange={(e) => setNewCustForm({ ...newCustForm, phone: e.target.value })}
-                              className="w-full pl-14 pr-4 py-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                            />
-                          </div>
-                          <span className="text-[10px] text-slate-400">Used for customer OTP authentication & WhatsApp order status.</span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <Mail className="w-4 h-4 text-blue-600" />
-                            <span>Email Address (Optional)</span>
-                          </label>
-                          <input
-                            type="email"
-                            placeholder=""
-                            value={newCustForm.email}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, email: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                          <span className="text-[10px] text-slate-400">Receives official BOQ estimations, PDF invoices, and escrow receipts.</span>
-                        </div>
-                      </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Street / Locality</label>
+                      <input
+                        type="text"
+                        placeholder="Sushant Lok 1"
+                        value={newCustForm.streetLocality}
+                        onChange={(e) => setNewCustForm({ ...newCustForm, streetLocality: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
                     </div>
                   </div>
-                )}
 
-                {/* STEP 2: SITE ADDRESS & GEO-LOCATION */}
-                {addCustomerStep === 2 && (
-                  <div className="space-y-6 animate-in fade-in duration-150">
-                    <div className="border-b border-slate-100 pb-4">
-                      <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
-                        <span>Step 2 of 3</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-navy-950 font-display">
-                        Plot / Site Address & Jurisdiction
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Specify exact site location where civil engineering, architectural design, or materials will be dispatched.
-                      </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">City</label>
+                      <input
+                        type="text"
+                        value={newCustForm.city}
+                        onChange={(e) => setNewCustForm({ ...newCustForm, city: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
                     </div>
-
-                    <div className="space-y-4 text-xs text-slate-700">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <Building className="w-4 h-4 text-blue-600" />
-                            <span>House / Plot / Survey No.</span>
-                            <span className="text-rose-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder=""
-                            value={newCustForm.housePlotNumber}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, housePlotNumber: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <MapPin className="w-4 h-4 text-blue-600" />
-                            <span>Street / Locality / Sector</span>
-                            <span className="text-rose-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder=""
-                            value={newCustForm.streetLocality}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, streetLocality: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm">City / District <span className="text-rose-500">*</span></label>
-                          <input
-                            type="text"
-                            required
-                            placeholder=""
-                            value={newCustForm.city}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, city: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm">State <span className="text-rose-500">*</span></label>
-                          <input
-                            type="text"
-                            required
-                            placeholder=""
-                            value={newCustForm.state}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, state: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-800 text-sm">PIN Code <span className="text-rose-500">*</span></label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={6}
-                            placeholder=""
-                            value={newCustForm.pinCode}
-                            onChange={(e) => setNewCustForm({ ...newCustForm, pinCode: e.target.value })}
-                            className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-2xl font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">State</label>
+                      <input
+                        type="text"
+                        value={newCustForm.state}
+                        onChange={(e) => setNewCustForm({ ...newCustForm, state: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">PIN Code</label>
+                      <input
+                        type="text"
+                        value={newCustForm.pinCode}
+                        onChange={(e) => setNewCustForm({ ...newCustForm, pinCode: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
                     </div>
                   </div>
-                )}
-
-                {/* STEP 3: ACCOUNT VERIFICATION & FINAL REVIEW */}
-                {addCustomerStep === 3 && (
-                  <div className="space-y-6 animate-in fade-in duration-150">
-                    <div className="border-b border-slate-100 pb-4">
-                      <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
-                        <span>Step 3 of 3</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-navy-950 font-display">
-                        Verification Status & Account Activation
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Review homeowner credentials and select account privileges before creating live platform identity.
-                      </p>
-                    </div>
-
-                    <div className="space-y-4 text-xs">
-                      {/* Review Card */}
-                      <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">Customer Full Name</span>
-                          <p className="text-sm font-bold text-navy-950 mt-0.5">{newCustForm.name || 'Not Entered'}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">Mobile Number</span>
-                          <p className="text-sm font-mono font-bold text-navy-950 mt-0.5">+91 {newCustForm.phone || '0000000000'}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">Official Email</span>
-                          <p className="text-xs font-semibold text-slate-700 mt-0.5">{newCustForm.email || 'None (SMS Notifications only)'}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">Site Location</span>
-                          <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                            {newCustForm.housePlotNumber}, {newCustForm.streetLocality}, {newCustForm.city}, {newCustForm.state} ({newCustForm.pinCode})
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="font-bold text-slate-800 text-sm block">
-                          Initial Verification Level <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <label
-                            onClick={() => setNewCustForm({ ...newCustForm, status: 'VERIFIED' })}
-                            className={`p-4 rounded-2xl border cursor-pointer transition flex items-start gap-3 ${
-                              newCustForm.status === 'VERIFIED'
-                                ? 'bg-emerald-50 border-emerald-400 shadow-sm'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="custStatus"
-                              checked={newCustForm.status === 'VERIFIED'}
-                              onChange={() => {}}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-bold text-navy-950 text-xs block">VERIFIED (Instant Full Access)</span>
-                              <span className="text-[11px] text-slate-500">
-                                Pre-authenticated homeowner. Allowed to book instant consultations and order cement/steel without OTP holds.
-                              </span>
-                            </div>
-                          </label>
-
-                          <label
-                            onClick={() => setNewCustForm({ ...newCustForm, status: 'ACTIVE' })}
-                            className={`p-4 rounded-2xl border cursor-pointer transition flex items-start gap-3 ${
-                              newCustForm.status === 'ACTIVE'
-                                ? 'bg-blue-50 border-blue-400 shadow-sm'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="custStatus"
-                              checked={newCustForm.status === 'ACTIVE'}
-                              onChange={() => {}}
-                              className="mt-1"
-                            />
-                            <div>
-                              <span className="font-bold text-navy-950 text-xs block">ACTIVE (Standard Customer)</span>
-                              <span className="text-[11px] text-slate-500">
-                                Requires standard OTP on first inquiry submission. Can browse rates and calculate construction estimates.
-                              </span>
-                            </div>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step Navigation Footer */}
-                <div className="flex items-center justify-between gap-3 pt-6 border-t border-slate-200 mt-6">
-                  {addCustomerStep > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setAddCustomerStep(addCustomerStep - 1)}
-                      className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition flex items-center gap-2 text-xs cursor-pointer"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      <span>Previous Step</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAddModal(false)}
-                      className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  )}
-
-                  <div className="text-xs text-slate-400 font-mono hidden sm:block">
-                    Step {addCustomerStep} of 3
-                  </div>
-
-                  {addCustomerStep < 3 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (addCustomerStep === 1) {
-                          if (!newCustForm.name.trim()) {
-                            error('Please enter the customer full name');
-                            return;
-                          }
-                          const clean = newCustForm.phone.replace(/\D/g, '').slice(-10);
-                          if (clean.length !== 10) {
-                            error('Please enter a valid 10-digit mobile number');
-                            return;
-                          }
-                        }
-                        setAddCustomerStep(addCustomerStep + 1);
-                      }}
-                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md flex items-center gap-2 text-xs transition cursor-pointer"
-                    >
-                      <span>Proceed to Step {addCustomerStep + 1}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md flex items-center gap-2 text-xs transition cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Complete & Create Customer</span>
-                    </button>
-                  )}
                 </div>
-              </form>
-            </div>
+              )}
+
+              {addCustomerStep === 3 && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                    <strong className="block text-sm font-display">Ready to Create Account</strong>
+                    <p>
+                      Customer ID will be auto-generated in standard format (e.g. <code>CUST-2026-001</code>). Account will be verified immediately.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Initial Verification Status</label>
+                    <select
+                      value={newCustForm.status}
+                      onChange={(e) => setNewCustForm({ ...newCustForm, status: e.target.value as any })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                    >
+                      <option value="VERIFIED">VERIFIED (Pre-authorized)</option>
+                      <option value="ACTIVE">ACTIVE (Standard Customer)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                {addCustomerStep > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAddCustomerStep(addCustomerStep - 1)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                {addCustomerStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (addCustomerStep === 1) {
+                        if (!newCustForm.name.trim()) {
+                          error('Please enter customer full name');
+                          return;
+                        }
+                        const clean = newCustForm.phone.replace(/\D/g, '').slice(-10);
+                        if (clean.length !== 10) {
+                          error('Please enter a valid 10-digit mobile number');
+                          return;
+                        }
+                      }
+                      setAddCustomerStep(addCustomerStep + 1);
+                    }}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    Next Step
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    Complete & Register
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}
