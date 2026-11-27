@@ -8,6 +8,15 @@ import {
   clearAllInteriorDesigners,
   getInteriorQuotations,
   saveInteriorQuotation,
+  submitInteriorQuotationToAdmin,
+  createInteriorQuotationRevision,
+  adminReviewInteriorQuotation,
+  adminForwardInteriorQuotationToCustomer,
+  customerAcceptInteriorQuotation,
+  getInteriorAssignments,
+  acceptInteriorAssignment,
+  declineInteriorAssignment,
+  requestAssignmentClarification,
   getInteriorBookings,
   saveInteriorBooking,
   getInteriorProjects,
@@ -62,14 +71,15 @@ describe('Interior Designer Panel & Store Tests', () => {
     expect(rohit?.accountStatus).toBe('SUSPENDED');
   });
 
-  it('contains all 19 Master Interior Design Specializations', () => {
-    expect(ALL_INTERIOR_SPECIALIZATIONS.length).toBe(19);
+  it('contains all 23 Master Interior Design Services (Section 3 Step D)', () => {
+    expect(ALL_INTERIOR_SPECIALIZATIONS.length).toBe(23);
     const specNames = ALL_INTERIOR_SPECIALIZATIONS.map((s) => s.name);
     expect(specNames).toContain('Residential Interior Design');
-    expect(specNames).toContain('Modular Kitchen');
-    expect(specNames).toContain('False Ceiling and Lighting');
-    expect(specNames).toContain('3D Interior Visualization');
-    expect(specNames).toContain('Complete Interior Projects');
+    expect(specNames).toContain('Living Room Design');
+    expect(specNames).toContain('Modular Kitchen Design');
+    expect(specNames).toContain('False Ceiling Design');
+    expect(specNames).toContain('3D Interior Design');
+    expect(specNames).toContain('Site Supervision');
   });
 
   it('allows registering a new interior designer with initial PROFILE_INCOMPLETE status', () => {
@@ -100,14 +110,131 @@ describe('Interior Designer Panel & Store Tests', () => {
     expect(updated?.adminReviewRemarks).toBe('Credentials and portfolio verified.');
   });
 
-  it('computes quotation and room-wise line items properly', () => {
-    const quotes = getInteriorQuotations();
-    expect(quotes.length).toBeGreaterThanOrEqual(2);
+  // -------------------------------------------------------------
+  // PHASE 3 SPECIFIC TESTS: ASSIGNMENTS & QUOTATIONS WORKFLOW
+  // -------------------------------------------------------------
+  it('loads and manages inbound Admin assignments (Section 7 Steps 1 & 2)', () => {
+    const assignments = getInteriorAssignments();
+    expect(assignments.length).toBeGreaterThanOrEqual(4);
 
-    const quote = quotes[0];
-    expect(quote.lineItems.length).toBeGreaterThanOrEqual(1);
-    expect(quote.grandTotal).toBeGreaterThan(0);
-    expect(quote.status).toBe('ACCEPTED');
+    const newAsgn = assignments.find((a) => a.status === 'NEW');
+    expect(newAsgn).toBeDefined();
+    expect(newAsgn?.carpetAreaSqFt).toBeGreaterThan(0);
+    expect(newAsgn?.requiredServices.length).toBeGreaterThan(0);
+
+    // Test designer accepting assignment
+    const accepted = acceptInteriorAssignment(newAsgn!.id);
+    expect(accepted.status).toBe('ACCEPTED_BY_DESIGNER');
+    expect(accepted.respondedAt).toBeDefined();
+  });
+
+  it('allows designer to decline assignment with a transparent reason', () => {
+    const assignments = getInteriorAssignments();
+    const target = assignments[0];
+    const declined = declineInteriorAssignment(target.id, 'Workload fully committed for this quarter');
+    expect(declined.status).toBe('DECLINED_BY_DESIGNER');
+    expect(declined.declineReason).toBe('Workload fully committed for this quarter');
+  });
+
+  it('allows designer to request technical clarification through Admin', () => {
+    const assignments = getInteriorAssignments();
+    const target = assignments[1];
+    const clarified = requestAssignmentClarification(target.id, 'Need ceiling height section drawing from builder');
+    expect(clarified.status).toBe('CLARIFICATION_REQUESTED');
+    expect(clarified.clarificationNote).toBe('Need ceiling height section drawing from builder');
+  });
+
+  it('generates itemized quotation with room-wise scope, deliverable fees, and 18% GST', () => {
+    const created = saveInteriorQuotation({
+      customerName: 'Tarun Varma',
+      projectAddress: 'The Magnolias, Golf Links, Gurugram',
+      propertyType: '4BHK Duplex',
+      carpetAreaSqFt: 3500,
+      roomCount: '4 BHK',
+      lineItems: [
+        {
+          id: 'li-t1',
+          roomName: 'Living Room',
+          serviceCategory: 'Living Room Design',
+          description: 'Italian Statuario Marble Cladding',
+          quantity: 400,
+          unit: 'sq.ft',
+          rate: 500,
+          taxPercent: 18,
+          amount: 200000,
+        },
+        {
+          id: 'li-t2',
+          roomName: 'Modular Kitchen',
+          serviceCategory: 'Modular Kitchen Design',
+          description: 'Acrylic Finish with Blum Tandembox',
+          quantity: 1,
+          unit: 'Set',
+          rate: 600000,
+          taxPercent: 18,
+          amount: 600000,
+        },
+      ],
+      deliverableFees: {
+        fee2DDesign: 30000,
+        fee3DDesign: 45000,
+        feeConsultation: 15000,
+        feeSiteVisit: 5000,
+        feeDesignDevelopment: 15000,
+        feeExecutionSupervision: 35000,
+        feeOtherProfessional: 5000,
+      },
+      discount: 20000,
+      status: 'DRAFT',
+    });
+
+    expect(created.id).toBeDefined();
+    expect(created.quotationNumber).toMatch(/^BG-Q-INT-/);
+    expect(created.version).toBe('1.0');
+    expect(created.subtotal).toBe(800000); // 200000 + 600000
+    expect(created.totalProfessionalFees).toBe(150000);
+    // Taxable base = 800000 + 150000 - 20000 = 930000. 18% = 167400. Grand total = 1097400.
+    expect(created.taxAmount).toBe(167400);
+    expect(created.grandTotal).toBe(1097400);
+    expect(created.paymentSchedule?.length).toBe(4);
+    expect(created.status).toBe('DRAFT');
+  });
+
+  it('routes quotation through Admin review, revision requests, and version control (Section 7)', () => {
+    // 1. Submit quotation to Admin
+    const quotes = getInteriorQuotations();
+    const draftQuote = quotes.find((q) => q.status === 'DRAFT') || quotes[0];
+    const submitted = submitInteriorQuotationToAdmin(draftQuote.id, 'Ready for admin pricing review');
+    expect(submitted.status).toBe('UNDER_ADMIN_REVIEW');
+
+    // 2. Admin requests revision with feedback
+    const revisionReq = adminReviewInteriorQuotation(
+      submitted.id,
+      'REQUEST_REVISION',
+      'Please bifurcate 3D render charges and adjust kitchen cabinet rate',
+      'Internal: home owner has budget constraint'
+    );
+    expect(revisionReq.status).toBe('REVISION_REQUESTED');
+    expect(revisionReq.adminFeedback).toContain('Please bifurcate 3D render charges');
+
+    // 3. Designer generates revision v2.0
+    const revisionV2 = createInteriorQuotationRevision(revisionReq.id);
+    expect(revisionV2.version).toBe('2.0');
+    expect(revisionV2.versionHistory?.length).toBeGreaterThanOrEqual(1);
+    expect(revisionV2.versionHistory?.[0].versionNumber).toBe('1.0');
+    expect(revisionV2.status).toBe('DRAFT');
+
+    // 4. Designer resubmits v2.0
+    submitInteriorQuotationToAdmin(revisionV2.id);
+
+    // 5. Admin approves and forwards to customer
+    adminReviewInteriorQuotation(revisionV2.id, 'APPROVE');
+    const forwarded = adminForwardInteriorQuotationToCustomer(revisionV2.id);
+    expect(forwarded.status).toBe('SENT_TO_CUSTOMER');
+
+    // 6. Customer accepts quotation
+    const accepted = customerAcceptInteriorQuotation(revisionV2.id);
+    expect(accepted.status).toBe('ACCEPTED');
   });
 
   it('manages bookings linked to accepted quotations', () => {
@@ -165,7 +292,6 @@ describe('Interior Designer Panel & Store Tests', () => {
       name: 'Real User',
       phone: '9876543210',
     });
-    // Should NOT have hardcoded dummy values
     expect(designer.state).toBe('');
     expect(designer.city).toBe('');
     expect(designer.specializations).toEqual([]);

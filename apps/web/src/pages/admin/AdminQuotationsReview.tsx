@@ -419,6 +419,37 @@ export const AdminQuotationsReview: React.FC = () => {
       broadcastStoreUpdate('QUOTATIONS_UPDATED', updated);
       pushToCloud().catch(() => {});
 
+      // Also update gd_interior_quotations_v1 if this was an interior designer quotation
+      try {
+        const storedInt = localStorage.getItem('gd_interior_quotations_v1');
+        if (storedInt) {
+          const parsedInt = JSON.parse(storedInt);
+          if (Array.isArray(parsedInt)) {
+            const intIdx = parsedInt.findIndex((iq: any) => iq.id === quoteId || iq.quotationNumber === quoteId);
+            if (intIdx >= 0) {
+              parsedInt[intIdx] = {
+                ...parsedInt[intIdx],
+                status:
+                  action === 'APPROVE'
+                    ? 'APPROVED_BY_ADMIN'
+                    : action === 'PUBLISH'
+                    ? 'SENT_TO_CUSTOMER'
+                    : action === 'REQUEST_CHANGES'
+                    ? 'REVISION_REQUESTED'
+                    : 'REJECTED',
+                adminFeedback: reviewNote || `Quotation ${action.toLowerCase()}ed by administrator.`,
+                updatedAt: new Date().toISOString(),
+              };
+              localStorage.setItem('gd_interior_quotations_v1', JSON.stringify(parsedInt));
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('interior_quotations_updated'));
+                window.dispatchEvent(new Event('storage'));
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
       if (action === 'PUBLISH') {
         const targetQ = quotations.find((q) => q.id === quoteId);
         const reqKey = targetQ?.requestId || targetQ?.requestCode;

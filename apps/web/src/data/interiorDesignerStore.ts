@@ -761,22 +761,431 @@ export const clearAllInteriorDesigners = (): void => {
   } catch {}
 };
 
-// Seed Quotation Requests Assigned to Interior Designers
+// ==========================================
+// SECTION: INTERIOR DESIGNER ASSIGNMENTS (Section 7 Steps 1 & 2)
+// ==========================================
+export type InteriorAssignmentStatus =
+  | 'NEW'
+  | 'ASSIGNED'
+  | 'ACCEPTED_BY_DESIGNER'
+  | 'DECLINED_BY_DESIGNER'
+  | 'CLARIFICATION_REQUESTED'
+  | 'QUOTATION_DRAFTED'
+  | 'QUOTATION_SUBMITTED'
+  | 'CANCELLED';
+
+export interface InteriorDesignerAssignment {
+  id: string; // e.g. 'asgn-int-101'
+  assignmentCode: string; // e.g. 'BG-ASN-INT-101'
+  requestId: string;
+  requestCode?: string;
+  designerId: string;
+  designerName: string;
+  designerPhone?: string;
+  customerName: string;
+  customerPhone?: string;
+  projectLocation: string;
+  city: string;
+  propertyType: string;
+  carpetAreaSqFt: number;
+  roomCount: string;
+  requiredServices: string[];
+  targetBudget: number;
+  preferredTimeline: string;
+  uploadedPhotos?: string[];
+  referenceImages?: string[];
+  additionalInstructions?: string;
+  status: InteriorAssignmentStatus;
+  declineReason?: string;
+  clarificationNote?: string;
+  clarificationReply?: string;
+  adminNotes?: string;
+  assignedAt: string;
+  respondedAt?: string;
+  quotationId?: string;
+  deadlineDate: string;
+}
+
+export const INTERIOR_ASSIGNMENTS_STORAGE_KEY = 'gd_interior_assignments_v1';
+
+export const TEST_ASSIGNMENTS: InteriorDesignerAssignment[] = [
+  {
+    id: 'asgn-int-101',
+    assignmentCode: 'BG-ASN-INT-101',
+    requestId: 'REQ-INT-101',
+    requestCode: 'BG-REQ-901',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Aman Saxena',
+    customerPhone: '9811223344',
+    projectLocation: 'DLF The Crest, Sector 54, Gurugram',
+    city: 'Gurugram',
+    propertyType: '4BHK Luxury Apartment',
+    carpetAreaSqFt: 2800,
+    roomCount: '4 BHK + Servant Room',
+    requiredServices: [
+      'Residential Interior Design',
+      'Living Room Design',
+      'Modular Kitchen Design',
+      'False Ceiling Design',
+      'Lighting Design',
+      'Wardrobe Design',
+    ],
+    targetBudget: 3500000,
+    preferredTimeline: '10-12 Weeks',
+    uploadedPhotos: [
+      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80',
+    ],
+    referenceImages: [
+      'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80',
+    ],
+    additionalInstructions: 'Client insists on bookmatched Italian Statuario marble in living room and German Blum fittings in kitchen.',
+    status: 'ACCEPTED_BY_DESIGNER',
+    quotationId: 'quote-int-1',
+    assignedAt: '2026-10-10T10:00:00Z',
+    respondedAt: '2026-10-11T12:00:00Z',
+    deadlineDate: '2026-10-25',
+  },
+  {
+    id: 'asgn-int-102',
+    assignmentCode: 'BG-ASN-INT-102',
+    requestId: 'REQ-INT-102',
+    requestCode: 'BG-REQ-902',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Meera Chawla',
+    customerPhone: '9822334455',
+    projectLocation: 'Jaypee Greens, Greater Noida',
+    city: 'Greater Noida',
+    propertyType: '3BHK Penthouse',
+    carpetAreaSqFt: 2200,
+    roomCount: '3 BHK',
+    requiredServices: [
+      'Residential Interior Design',
+      'Modular Kitchen Design',
+      'Bedroom Design',
+      '3D Interior Design',
+    ],
+    targetBudget: 2500000,
+    preferredTimeline: '6-8 Weeks',
+    uploadedPhotos: [
+      'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80',
+    ],
+    referenceImages: [
+      'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80',
+    ],
+    additionalInstructions: 'Minimalist Scandinavian aesthetic with light oak woodwork and cove lighting.',
+    status: 'QUOTATION_SUBMITTED',
+    quotationId: 'quote-int-2',
+    assignedAt: '2026-10-18T10:00:00Z',
+    respondedAt: '2026-10-19T11:00:00Z',
+    deadlineDate: '2026-11-02',
+  },
+  {
+    id: 'asgn-int-103',
+    assignmentCode: 'BG-ASN-INT-103',
+    requestId: 'REQ-INT-103',
+    requestCode: 'BG-REQ-905',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Vikramaditya Oberoi',
+    customerPhone: '9844001122',
+    projectLocation: 'Sushant Lok 1, Block C, Gurugram',
+    city: 'Gurugram',
+    propertyType: '4BHK Duplex Villa',
+    carpetAreaSqFt: 3400,
+    roomCount: '4 BHK Duplex + Private Lounge',
+    requiredServices: [
+      'Residential Interior Design',
+      'Living Room Design',
+      'Modular Kitchen Design',
+      'False Ceiling Design',
+      'Lighting Design',
+      'Dining Room Design',
+      'Interior Execution and Implementation',
+    ],
+    targetBudget: 4500000,
+    preferredTimeline: '12-14 Weeks',
+    uploadedPhotos: [
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+    ],
+    additionalInstructions: 'Modern Art Deco theme. Looking for full turnkey delivery including MEP coordination.',
+    status: 'NEW',
+    assignedAt: '2026-11-20T09:30:00Z',
+    deadlineDate: '2026-12-05',
+  },
+  {
+    id: 'asgn-int-104',
+    assignmentCode: 'BG-ASN-INT-104',
+    requestId: 'REQ-INT-104',
+    requestCode: 'BG-REQ-908',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Sunita & Rajiv Singhal',
+    customerPhone: '9899331122',
+    projectLocation: 'Golf Course Extension Road, Sector 65, Gurugram',
+    city: 'Gurugram',
+    propertyType: '3BHK Luxury Apartment',
+    carpetAreaSqFt: 1950,
+    roomCount: '3 BHK',
+    requiredServices: [
+      'Modular Kitchen Design',
+      'Wardrobe Design',
+      'False Ceiling Design',
+      'Material Selection and Consultation',
+    ],
+    targetBudget: 2200000,
+    preferredTimeline: '8 Weeks',
+    uploadedPhotos: [],
+    additionalInstructions: 'Warm Japandi aesthetics. Focus on space saving modular solutions and concealed pantry.',
+    status: 'ACCEPTED_BY_DESIGNER',
+    assignedAt: '2026-11-22T14:00:00Z',
+    respondedAt: '2026-11-23T10:00:00Z',
+    deadlineDate: '2026-12-07',
+  },
+  {
+    id: 'asgn-int-105',
+    assignmentCode: 'BG-ASN-INT-105',
+    requestId: 'REQ-INT-105',
+    requestCode: 'BG-REQ-910',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Kunal Malhotra',
+    customerPhone: '9877443322',
+    projectLocation: 'Sector 128, Expressway Noida',
+    city: 'Noida',
+    propertyType: '4BHK Penthouse',
+    carpetAreaSqFt: 3100,
+    roomCount: '4 BHK Penthouse',
+    requiredServices: [
+      'Residential Interior Design',
+      '2D Interior Design',
+      '3D Interior Design',
+      'Site Supervision',
+    ],
+    targetBudget: 3800000,
+    preferredTimeline: '10 Weeks',
+    uploadedPhotos: [],
+    additionalInstructions: 'Double-height ceiling in drawing room requires structural check before ceiling installation.',
+    status: 'CLARIFICATION_REQUESTED',
+    clarificationNote: 'Please provide structural column clearance and ceiling slab load-bearing CAD drawings from builder.',
+    assignedAt: '2026-11-15T11:00:00Z',
+    respondedAt: '2026-11-16T15:00:00Z',
+    deadlineDate: '2026-11-30',
+  },
+];
+
+export const getInteriorAssignments = (designerId?: string): InteriorDesignerAssignment[] => {
+  try {
+    const data = localStorage.getItem(INTERIOR_ASSIGNMENTS_STORAGE_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return designerId ? parsed.filter((a: InteriorDesignerAssignment) => a.designerId === designerId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return designerId ? TEST_ASSIGNMENTS.filter((a) => a.designerId === designerId) : TEST_ASSIGNMENTS;
+};
+
+export const getInteriorAssignmentById = (id: string): InteriorDesignerAssignment | null => {
+  const all = getInteriorAssignments();
+  return all.find((a) => a.id === id || a.assignmentCode === id || a.requestId === id) || null;
+};
+
+export const saveInteriorAssignment = (a: Partial<InteriorDesignerAssignment>): InteriorDesignerAssignment => {
+  const current = getInteriorAssignments();
+  const existingIdx = current.findIndex((item) => item.id === a.id || (a.assignmentCode && item.assignmentCode === a.assignmentCode));
+  const now = new Date().toISOString();
+
+  let updated: InteriorDesignerAssignment;
+  if (existingIdx >= 0) {
+    updated = {
+      ...current[existingIdx],
+      ...a,
+    } as InteriorDesignerAssignment;
+    current[existingIdx] = updated;
+  } else {
+    updated = {
+      id: a.id || `asgn-int-${Date.now()}`,
+      assignmentCode: a.assignmentCode || `BG-ASN-INT-${Math.floor(100 + Math.random() * 900)}`,
+      requestId: a.requestId || `REQ-INT-${Date.now()}`,
+      requestCode: a.requestCode || `BG-REQ-${Math.floor(100 + Math.random() * 900)}`,
+      designerId: a.designerId || 'id-101',
+      designerName: a.designerName || 'Ar. Pooja Mehra',
+      designerPhone: a.designerPhone || '9899112233',
+      customerName: a.customerName || 'Valued Homeowner',
+      customerPhone: a.customerPhone || '',
+      projectLocation: a.projectLocation || 'Gurugram',
+      city: a.city || 'Gurugram',
+      propertyType: a.propertyType || '3BHK Apartment',
+      carpetAreaSqFt: a.carpetAreaSqFt || 2000,
+      roomCount: a.roomCount || '3 BHK',
+      requiredServices: a.requiredServices || ['Residential Interior Design'],
+      targetBudget: a.targetBudget || 2500000,
+      preferredTimeline: a.preferredTimeline || '8-10 Weeks',
+      uploadedPhotos: a.uploadedPhotos || [],
+      referenceImages: a.referenceImages || [],
+      additionalInstructions: a.additionalInstructions || '',
+      status: a.status || 'NEW',
+      assignedAt: a.assignedAt || now,
+      deadlineDate: a.deadlineDate || new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+    };
+    current.push(updated);
+  }
+
+  try {
+    localStorage.setItem(INTERIOR_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(current));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_assignments_updated'));
+    }
+  } catch (e) {}
+
+  return updated;
+};
+
+export const acceptInteriorAssignment = (assignmentId: string, designerId = 'id-101'): InteriorDesignerAssignment => {
+  const current = getInteriorAssignments();
+  const target = current.find((a) => a.id === assignmentId || a.assignmentCode === assignmentId);
+  if (!target) throw new Error('Assignment not found');
+
+  target.status = 'ACCEPTED_BY_DESIGNER';
+  target.respondedAt = new Date().toISOString();
+  saveInteriorAssignment(target);
+  return target;
+};
+
+export const declineInteriorAssignment = (
+  assignmentId: string,
+  reason: string,
+  designerId = 'id-101'
+): InteriorDesignerAssignment => {
+  const current = getInteriorAssignments();
+  const target = current.find((a) => a.id === assignmentId || a.assignmentCode === assignmentId);
+  if (!target) throw new Error('Assignment not found');
+
+  target.status = 'DECLINED_BY_DESIGNER';
+  target.declineReason = reason;
+  target.respondedAt = new Date().toISOString();
+  saveInteriorAssignment(target);
+  return target;
+};
+
+export const requestAssignmentClarification = (
+  assignmentId: string,
+  note: string,
+  designerId = 'id-101'
+): InteriorDesignerAssignment => {
+  const current = getInteriorAssignments();
+  const target = current.find((a) => a.id === assignmentId || a.assignmentCode === assignmentId);
+  if (!target) throw new Error('Assignment not found');
+
+  target.status = 'CLARIFICATION_REQUESTED';
+  target.clarificationNote = note;
+  target.respondedAt = new Date().toISOString();
+  saveInteriorAssignment(target);
+  return target;
+};
+
+export const adminAssignRequestToDesigner = (params: {
+  requestId: string;
+  requestCode?: string;
+  designerId: string;
+  designerName: string;
+  customerName: string;
+  customerPhone?: string;
+  projectLocation: string;
+  city: string;
+  propertyType: string;
+  carpetAreaSqFt: number;
+  roomCount: string;
+  requiredServices: string[];
+  targetBudget: number;
+  preferredTimeline: string;
+  adminNotes?: string;
+  deadlineDays?: number;
+}): InteriorDesignerAssignment => {
+  const deadlineDays = params.deadlineDays || 14;
+  const deadlineDate = new Date(Date.now() + deadlineDays * 86400000).toISOString().split('T')[0];
+
+  const assignment = saveInteriorAssignment({
+    requestId: params.requestId,
+    requestCode: params.requestCode,
+    designerId: params.designerId,
+    designerName: params.designerName,
+    customerName: params.customerName,
+    customerPhone: params.customerPhone,
+    projectLocation: params.projectLocation,
+    city: params.city,
+    propertyType: params.propertyType,
+    carpetAreaSqFt: params.carpetAreaSqFt,
+    roomCount: params.roomCount,
+    requiredServices: params.requiredServices,
+    targetBudget: params.targetBudget,
+    preferredTimeline: params.preferredTimeline,
+    adminNotes: params.adminNotes,
+    status: 'NEW',
+    deadlineDate,
+  });
+
+  return assignment;
+};
+
+// ==========================================
+// SECTION: INTERIOR QUOTATIONS & VERSION CONTROL (Section 7 Steps 3, 4 & 5)
+// ==========================================
 export interface InteriorQuotationItem {
   id: string;
-  roomName: string;
-  serviceCategory: string;
+  roomName: string; // e.g. 'Living Room', 'Modular Kitchen', 'Master Bedroom'
+  serviceCategory: string; // from MASTER_INTERIOR_SERVICES
   description: string;
   quantity: number;
-  unit: string;
+  unit: string; // 'sq.ft', 'rft', 'Set', 'Job', 'Nos', 'L.S.'
   rate: number;
-  taxPercent: number;
+  taxPercent: number; // default 18
   amount: number;
+}
+
+export interface InteriorQuotationDeliverableFees {
+  fee2DDesign: number; // 2D Floor Plans & Electrical Working Drawings
+  fee3DDesign: number; // 3D Perspectives & High-Res Photorealistic Renders
+  feeConsultation: number; // Concept Consultation & Theme Selection
+  feeSiteVisit: number; // Site Dimension Verification & Feasibility
+  feeDesignDevelopment: number; // Material Swatches & Specification Sheets
+  feeExecutionSupervision: number; // On-Site Implementation Supervision
+  feeOtherProfessional: number; // Administrative & Handover Documentation
+}
+
+export interface QuotationPaymentMilestone {
+  id: string;
+  stageName: string;
+  percentage: number;
+  amount: number;
+  deliverableDescription: string;
+}
+
+export interface InteriorQuotationVersion {
+  versionNumber: string; // '1.0', '2.0', etc.
+  createdAt: string;
+  submittedAt?: string;
+  grandTotal: number;
+  subtotal: number;
+  totalProfessionalFees: number;
+  taxAmount: number;
+  status: string;
+  adminFeedback?: string;
+  lineItemsCount: number;
+  summaryNotes?: string;
 }
 
 export interface InteriorQuotation {
   id: string;
-  quotationNumber: string;
+  quotationNumber: string; // BG-Q-INT-XXXX
+  version: string; // '1.0', '2.0', etc.
+  versionHistory?: InteriorQuotationVersion[];
+  assignmentId?: string;
   requestId: string;
   designerId: string;
   designerName: string;
@@ -787,36 +1196,74 @@ export interface InteriorQuotation {
   carpetAreaSqFt: number;
   roomCount: string;
   preferredStyle: string;
+  scopeSummary?: string;
   targetBudget: number;
   status:
     | 'DRAFT'
     | 'SUBMITTED'
     | 'UNDER_ADMIN_REVIEW'
+    | 'APPROVED_BY_ADMIN'
     | 'REVISION_REQUESTED'
     | 'SENT_TO_CUSTOMER'
     | 'ACCEPTED'
     | 'REJECTED'
     | 'EXPIRED';
   lineItems: InteriorQuotationItem[];
+  deliverableFees?: InteriorQuotationDeliverableFees;
   subtotal: number;
+  totalProfessionalFees?: number;
   discount: number;
-  taxAmount: number;
+  taxAmount: number; // 18% GST
   grandTotal: number;
   estimatedTimelineWeeks: number;
   revisionRoundsIncluded: number;
+  validityDays?: number; // default 30
+  paymentSchedule?: QuotationPaymentMilestone[];
   terms: string;
+  attachments?: string[];
   adminFeedback?: string;
+  adminInternalNotes?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-
-
+export const DEFAULT_PAYMENT_SCHEDULE: QuotationPaymentMilestone[] = [
+  {
+    id: 'ms-1',
+    stageName: 'Stage 1: Advance Booking & 2D Layout Approval',
+    percentage: 25,
+    amount: 0,
+    deliverableDescription: 'Initial conceptual layout, 2D floor plans, moodboards, and material swatches sign-off.',
+  },
+  {
+    id: 'ms-2',
+    stageName: 'Stage 2: Woodwork Carcass & Frame Approval',
+    percentage: 35,
+    amount: 0,
+    deliverableDescription: 'Modular carcass manufacturing, electrical roughing-in, and false ceiling framing completed.',
+  },
+  {
+    id: 'ms-3',
+    stageName: 'Stage 3: Veneer/Laminate Pressing & False Ceiling',
+    percentage: 25,
+    amount: 0,
+    deliverableDescription: 'Shutters installed, quartz countertop fitted, surface paint primer, and lighting installations.',
+  },
+  {
+    id: 'ms-4',
+    stageName: 'Stage 4: Snag Clearance & Final Handover',
+    percentage: 15,
+    amount: 0,
+    deliverableDescription: 'Deep cleaning, soft furnishings alignment, snag rectification, and formal handover certificate.',
+  },
+];
 
 const TEST_QUOTATIONS: InteriorQuotation[] = [
   {
     id: 'quote-int-1',
     quotationNumber: 'BG-Q-INT-101',
+    version: '1.0',
+    assignmentId: 'asgn-int-101',
     requestId: 'REQ-INT-101',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
@@ -830,24 +1277,42 @@ const TEST_QUOTATIONS: InteriorQuotation[] = [
     scopeSummary: 'Complete interior design including Italian marble flooring, false ceiling, and bespoke modular kitchen.',
     status: 'ACCEPTED',
     lineItems: [
-      { id: 'li-1', roomCategory: 'Living Room', workDescription: 'Italian Marble Honing & Italian Wall Paneling', unit: 'sq.ft', quantity: 650, rate: 350, amount: 227500 },
-      { id: 'li-2', roomCategory: 'Modular Kitchen', workDescription: 'Acrylic Finish Cabinets with Blum Soft-Close Hardware', unit: 'rft', quantity: 38, rate: 4500, amount: 171000 },
+      { id: 'li-1', roomName: 'Living Room', serviceCategory: 'Residential Interior Design', description: 'Italian Statuario Marble Honing & Fluted Wall Paneling', unit: 'sq.ft', quantity: 650, rate: 350, taxPercent: 18, amount: 227500 },
+      { id: 'li-2', roomName: 'Modular Kitchen', serviceCategory: 'Modular Kitchen Design', description: 'Acrylic Finish Cabinets with Blum Soft-Close Tandem Hardware', unit: 'rft', quantity: 38, rate: 4500, taxPercent: 18, amount: 171000 },
+      { id: 'li-3', roomName: 'Master Bedroom', serviceCategory: 'Wardrobe Design', description: 'Floor to ceiling tinted lacquered glass sliding wardrobes', unit: 'Set', quantity: 1, rate: 220000, taxPercent: 18, amount: 220000 },
     ],
-    materialsTotal: 398500,
-    laborTotal: 120000,
-    designFeeTotal: 85000,
-    subtotal: 603500,
-    taxGstPaise: 10863000,
-    grandTotal: 712130,
+    deliverableFees: {
+      fee2DDesign: 35000,
+      fee3DDesign: 50000,
+      feeConsultation: 25000,
+      feeSiteVisit: 10000,
+      feeDesignDevelopment: 20000,
+      feeExecutionSupervision: 40000,
+      feeOtherProfessional: 10000,
+    },
+    subtotal: 618500,
+    totalProfessionalFees: 190000,
+    discount: 25000,
+    taxAmount: 140940, // 18% of (618500 + 190000 - 25000)
+    grandTotal: 924440,
     estimatedTimelineWeeks: 10,
     revisionRoundsIncluded: 3,
-    terms: '50% advance before execution, 30% after woodwork, 20% on handover.',
+    validityDays: 30,
+    paymentSchedule: [
+      { id: 'ms-1', stageName: 'Stage 1: Advance Booking & 2D Layout Approval', percentage: 25, amount: 231110, deliverableDescription: 'Concept and 2D sign-off.' },
+      { id: 'ms-2', stageName: 'Stage 2: Woodwork Carcass & Frame Approval', percentage: 35, amount: 323554, deliverableDescription: 'Carpentry and framing.' },
+      { id: 'ms-3', stageName: 'Stage 3: Veneer/Laminate Pressing & False Ceiling', percentage: 25, amount: 231110, deliverableDescription: 'Finishes and lighting.' },
+      { id: 'ms-4', stageName: 'Stage 4: Snag Clearance & Final Handover', percentage: 15, amount: 138666, deliverableDescription: 'Deep cleaning and handover.' },
+    ],
+    terms: '100% Escrow Milestone Payouts. All revisions beyond 3 rounds chargeable at INR 5,000 per room render.',
     createdAt: '2026-10-15T10:00:00Z',
     updatedAt: '2026-10-18T12:00:00Z',
   },
   {
     id: 'quote-int-2',
     quotationNumber: 'BG-Q-INT-102',
+    version: '1.0',
+    assignmentId: 'asgn-int-102',
     requestId: 'REQ-INT-102',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
@@ -858,129 +1323,177 @@ const TEST_QUOTATIONS: InteriorQuotation[] = [
     carpetAreaSqFt: 2200,
     roomCount: '3 BHK',
     preferredStyle: 'Minimalist Scandinavian',
-    scopeSummary: 'Scandinavian oak woodwork and warm acoustic lighting design.',
-    status: 'PUBLISHED_TO_CUSTOMER',
+    scopeSummary: 'Scandinavian oak woodwork, warm acoustic cove lighting, and bespoke pantry unit.',
+    status: 'SENT_TO_CUSTOMER',
     lineItems: [
-      { id: 'li-3', roomCategory: 'Master Bedroom', workDescription: 'Fluted Panel Headboard & Walk-in Wardrobe', unit: 'sq.ft', quantity: 220, rate: 650, amount: 143000 }
+      { id: 'li-4', roomName: 'Master Bedroom', serviceCategory: 'Bedroom Design', description: 'Fluted Panel Headboard & Built-in Walk-in Wardrobe', unit: 'sq.ft', quantity: 220, rate: 650, taxPercent: 18, amount: 143000 },
+      { id: 'li-5', roomName: 'Living Room', serviceCategory: 'False Ceiling Design', description: 'Recessed perimeter Gyproc ceiling with magnetic 3000K tracks', unit: 'sq.ft', quantity: 450, rate: 190, taxPercent: 18, amount: 85500 },
     ],
-    materialsTotal: 143000,
-    laborTotal: 45000,
-    designFeeTotal: 40000,
-    subtotal: 228000,
-    taxGstPaise: 4104000,
-    grandTotal: 269040,
+    deliverableFees: {
+      fee2DDesign: 25000,
+      fee3DDesign: 35000,
+      feeConsultation: 15000,
+      feeSiteVisit: 8000,
+      feeDesignDevelopment: 12000,
+      feeExecutionSupervision: 25000,
+      feeOtherProfessional: 5000,
+    },
+    subtotal: 228500,
+    totalProfessionalFees: 125000,
+    discount: 10000,
+    taxAmount: 61830,
+    grandTotal: 405330,
     estimatedTimelineWeeks: 6,
     revisionRoundsIncluded: 2,
-    terms: 'Standard BuildGhar Escrow Terms',
+    validityDays: 30,
+    terms: 'BuildGhar verified escrow protection with stage-wise releases.',
     createdAt: '2026-10-20T11:00:00Z',
     updatedAt: '2026-10-21T09:00:00Z',
-  }
-];
-
-const TEST_BOOKINGS: InteriorBooking[] = [
-  {
-    id: 'bk-int-1',
-    bookingId: 'BG-BKG-INT-101',
-    customerId: 'cust-101',
-    customerName: 'Aman Saxena',
-    customerPhone: '9811223344',
-    quotationId: 'quote-int-1',
-    quotationNumber: 'BG-Q-INT-101',
-    projectAddress: 'DLF The Crest, Sector 54, Gurugram',
-    selectedServices: ['Turnkey Execution', 'Modular Woodwork'],
-    bookingDate: '2026-10-19T10:00:00Z',
-    scheduledStartDate: '2026-11-01',
-    estimatedCompletionDate: '2027-01-15',
-    designerId: 'id-101',
-    designerName: 'Ar. Pooja Mehra',
-    bookingAmount: 142000,
-    advancePaymentStatus: 'PAID',
-    status: 'CONFIRMED',
   },
   {
-    id: 'bk-int-2',
-    bookingId: 'BG-BKG-INT-102',
-    customerId: 'cust-102',
-    customerName: 'Meera Chawla',
-    customerPhone: '9822334455',
-    quotationId: 'quote-int-2',
-    quotationNumber: 'BG-Q-INT-102',
-    projectAddress: 'Jaypee Greens, Greater Noida',
-    selectedServices: ['Design & Supervision'],
-    bookingDate: '2026-10-22T10:00:00Z',
-    scheduledStartDate: '2026-11-05',
-    estimatedCompletionDate: '2026-12-20',
+    id: 'quote-int-3',
+    quotationNumber: 'BG-Q-INT-103',
+    version: '1.0',
+    assignmentId: 'asgn-int-104',
+    requestId: 'REQ-INT-104',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
-    bookingAmount: 50000,
-    advancePaymentStatus: 'PAID',
-    status: 'SITE_VISIT_SCHEDULED',
-  }
-];
-
-const TEST_PROJECTS: InteriorProject[] = [
-  {
-    id: 'prj-int-1',
-    projectNumber: 'BG-PRJ-INT-101',
-    bookingId: 'bk-int-1',
-    quotationId: 'quote-int-1',
-    customerName: 'Aman Saxena',
-    customerPhone: '9811223344',
-    designerId: 'id-101',
-    designerName: 'Ar. Pooja Mehra',
-    projectAddress: 'DLF The Crest, Sector 54, Gurugram',
-    propertyType: '4BHK Apartment',
-    scopeSummary: 'Complete turnkey interior styling and execution',
-    status: 'IN_EXECUTION',
-    startDate: '2026-11-01',
-    estimatedHandoverDate: '2027-01-15',
-    totalContractValue: 712130,
-    amountReceived: 350000,
-    overallProgressPercent: 35,
-    milestones: [
-      { id: 'm-1', milestoneNumber: 1, title: 'Concept Approval & 3D Renders', description: 'All room layouts and 3D walkthroughs approved', weightPercentage: 20, status: 'COMPLETED', dueDate: '2026-11-10', completionDate: '2026-11-08' },
-      { id: 'm-2', milestoneNumber: 2, title: 'Civil & Flooring Demarcation', description: 'Tile hacking, conduit piping, and electrical points', weightPercentage: 20, status: 'IN_PROGRESS', dueDate: '2026-11-25' },
-      { id: 'm-3', milestoneNumber: 3, title: 'Modular Woodwork Carcass', description: 'Kitchen and wardrobe plywood framework installed', weightPercentage: 25, status: 'PENDING', dueDate: '2026-12-15' },
-      { id: 'm-4', milestoneNumber: 4, title: 'Finishes, Veneers & Lighting', description: 'PU Polish, laminate pressing, and false ceiling LED', weightPercentage: 20, status: 'PENDING', dueDate: '2027-01-05' },
-      { id: 'm-5', milestoneNumber: 5, title: 'Deep Cleaning & Snag Handover', description: 'Final inspection, touch-ups, and handover certificate', weightPercentage: 15, status: 'PENDING', dueDate: '2027-01-15' },
+    customerName: 'Sunita & Rajiv Singhal',
+    customerPhone: '9899331122',
+    projectAddress: 'Golf Course Extension Road, Sector 65, Gurugram',
+    propertyType: '3BHK Luxury Apartment',
+    carpetAreaSqFt: 1950,
+    roomCount: '3 BHK',
+    preferredStyle: 'Warm Japandi',
+    scopeSummary: 'Modular kitchen in marine ply with PU finish shutters and concealed sliding pantry.',
+    status: 'UNDER_ADMIN_REVIEW',
+    lineItems: [
+      { id: 'li-6', roomName: 'Modular Kitchen', serviceCategory: 'Modular Kitchen Design', description: 'Marine Ply IS:710 Carcass, Blum Tandembox drawers, Quartz counter', unit: 'Set', quantity: 1, rate: 480000, taxPercent: 18, amount: 480000 },
+      { id: 'li-7', roomName: 'Living & Dining', serviceCategory: 'Furniture Layout', description: 'Oak wood fluted wall panelling and dining console buffet', unit: 'sq.ft', quantity: 320, rate: 450, taxPercent: 18, amount: 144000 },
     ],
+    deliverableFees: {
+      fee2DDesign: 20000,
+      fee3DDesign: 30000,
+      feeConsultation: 15000,
+      feeSiteVisit: 5000,
+      feeDesignDevelopment: 10000,
+      feeExecutionSupervision: 20000,
+      feeOtherProfessional: 0,
+    },
+    subtotal: 624000,
+    totalProfessionalFees: 100000,
+    discount: 15000,
+    taxAmount: 127620,
+    grandTotal: 836620,
+    estimatedTimelineWeeks: 8,
+    revisionRoundsIncluded: 3,
+    validityDays: 30,
+    terms: 'Escrow backed milestone payments on progressive completion.',
+    createdAt: '2026-11-24T10:00:00Z',
+    updatedAt: '2026-11-24T10:00:00Z',
   },
   {
-    id: 'prj-int-2',
-    projectNumber: 'BG-PRJ-INT-102',
-    bookingId: 'bk-int-2',
-    quotationId: 'quote-int-2',
-    customerName: 'Meera Chawla',
-    customerPhone: '9822334455',
+    id: 'quote-int-4',
+    quotationNumber: 'BG-Q-INT-104',
+    version: '1.0',
+    versionHistory: [
+      {
+        versionNumber: '1.0',
+        createdAt: '2026-11-18T10:00:00Z',
+        submittedAt: '2026-11-18T11:00:00Z',
+        grandTotal: 1250000,
+        subtotal: 950000,
+        totalProfessionalFees: 150000,
+        taxAmount: 198000,
+        status: 'REVISION_REQUESTED',
+        adminFeedback: 'Please bifurcate false ceiling track lighting installation charges and add 3D walkthrough video fee in deliverables.',
+        lineItemsCount: 4,
+        summaryNotes: 'First draft submitted.',
+      },
+    ],
+    assignmentId: 'asgn-int-105',
+    requestId: 'REQ-INT-105',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
-    projectAddress: 'Jaypee Greens, Greater Noida',
-    propertyType: '3BHK Penthouse',
-    scopeSummary: 'Scandinavian minimalist living room and master suite',
-    status: 'INITIAL_CONSULTATION',
-    startDate: '2026-11-05',
-    estimatedHandoverDate: '2026-12-20',
-    totalContractValue: 269040,
-    amountReceived: 50000,
-    overallProgressPercent: 15,
-    milestones: [
-      { id: 'm-11', milestoneNumber: 1, title: 'Site Inspection & Moodboard', description: 'Material sample selection', weightPercentage: 20, status: 'COMPLETED', dueDate: '2026-11-10', completionDate: '2026-11-09' },
-      { id: 'm-12', milestoneNumber: 2, title: '2D Layout & Elevations', description: 'Furniture placement drawings', weightPercentage: 20, status: 'IN_PROGRESS', dueDate: '2026-11-20' },
-      { id: 'm-13', milestoneNumber: 3, title: 'Woodwork Orders Placed', description: 'Factory order placement', weightPercentage: 25, status: 'PENDING', dueDate: '2026-12-01' },
-      { id: 'm-14', milestoneNumber: 4, title: 'Site Assembly', description: 'Installation of wall paneling', weightPercentage: 20, status: 'PENDING', dueDate: '2026-12-12' },
-      { id: 'm-15', milestoneNumber: 5, title: 'Final Handover', description: 'Snag sign-off', weightPercentage: 15, status: 'PENDING', dueDate: '2026-12-20' },
+    customerName: 'Kunal Malhotra',
+    customerPhone: '9877443322',
+    projectAddress: 'Sector 128, Expressway Noida',
+    propertyType: '4BHK Penthouse',
+    carpetAreaSqFt: 3100,
+    roomCount: '4 BHK Penthouse',
+    preferredStyle: 'Neo-Classical Luxury',
+    scopeSummary: 'Double-height drawing room paneling with motorized drapery and chandelier reinforcement.',
+    status: 'REVISION_REQUESTED',
+    adminFeedback: 'Please bifurcate false ceiling track lighting installation charges and add 3D walkthrough video fee in deliverables.',
+    lineItems: [
+      { id: 'li-8', roomName: 'Double Height Living', serviceCategory: 'Residential Interior Design', description: 'DuPont Corian & Charcoal Louver Wall Cladding', unit: 'sq.ft', quantity: 550, rate: 850, taxPercent: 18, amount: 467500 },
+      { id: 'li-9', roomName: 'Master Suite', serviceCategory: 'Bedroom Design', description: 'Acoustic Suede Padded Headboard & Walk-in Wardrobe', unit: 'Job', quantity: 1, rate: 320000, taxPercent: 18, amount: 320000 },
     ],
-  }
+    deliverableFees: {
+      fee2DDesign: 30000,
+      fee3DDesign: 45000,
+      feeConsultation: 20000,
+      feeSiteVisit: 10000,
+      feeDesignDevelopment: 15000,
+      feeExecutionSupervision: 30000,
+      feeOtherProfessional: 10000,
+    },
+    subtotal: 787500,
+    totalProfessionalFees: 160000,
+    discount: 20000,
+    taxAmount: 167850,
+    grandTotal: 1095350,
+    estimatedTimelineWeeks: 10,
+    revisionRoundsIncluded: 3,
+    validityDays: 30,
+    terms: 'Escrow release per milestone verified by BuildGhar site engineer.',
+    createdAt: '2026-11-18T10:00:00Z',
+    updatedAt: '2026-11-20T14:00:00Z',
+  },
+  {
+    id: 'quote-int-5',
+    quotationNumber: 'BG-Q-INT-105',
+    version: '1.0',
+    assignmentId: 'asgn-int-103',
+    requestId: 'REQ-INT-103',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    customerName: 'Vikramaditya Oberoi',
+    customerPhone: '9844001122',
+    projectAddress: 'Sushant Lok 1, Block C, Gurugram',
+    propertyType: '4BHK Duplex Villa',
+    carpetAreaSqFt: 3400,
+    roomCount: '4 BHK Duplex + Private Lounge',
+    preferredStyle: 'Modern Art Deco',
+    scopeSummary: 'Initial draft for duplex villa interior execution.',
+    status: 'DRAFT',
+    lineItems: [
+      { id: 'li-10', roomName: 'Foyer & Entrance', serviceCategory: 'False Ceiling Design', description: 'Brass inlay CNC wooden ceiling with indirect warm LEDs', unit: 'sq.ft', quantity: 180, rate: 380, taxPercent: 18, amount: 68400 },
+    ],
+    deliverableFees: {
+      fee2DDesign: 35000,
+      fee3DDesign: 50000,
+      feeConsultation: 25000,
+      feeSiteVisit: 10000,
+      feeDesignDevelopment: 20000,
+      feeExecutionSupervision: 45000,
+      feeOtherProfessional: 15000,
+    },
+    subtotal: 68400,
+    totalProfessionalFees: 200000,
+    discount: 0,
+    taxAmount: 48312,
+    grandTotal: 316712,
+    estimatedTimelineWeeks: 12,
+    revisionRoundsIncluded: 3,
+    validityDays: 30,
+    terms: 'Draft terms under review.',
+    createdAt: '2026-11-25T11:00:00Z',
+    updatedAt: '2026-11-25T11:00:00Z',
+  },
 ];
 
-const TEST_BOQ: InteriorBOQItem[] = [
-  { id: 'boq-1', projectId: 'prj-int-1', category: 'Woodwork & Boards', itemName: 'Greenlam Marine Plywood (BWP 710)', brandSpecification: 'Greenlam 18mm BWP IS:710 Marine Grade', unit: 'sq.ft', quantity: 24, unitRate: 4200, laborInstallationRate: 500, totalAmount: 112800, isMaterialApproved: true, status: 'PROCURED' },
-  { id: 'boq-2', projectId: 'prj-int-1', category: 'Hardware', itemName: 'Blum Soft-Close Tandembox Drawers', brandSpecification: 'Blum Austria Antaro 500mm', unit: 'sets', quantity: 8, unitRate: 3800, laborInstallationRate: 350, totalAmount: 33200, isMaterialApproved: true, status: 'DELIVERED_TO_SITE' },
-  { id: 'boq-3', projectId: 'prj-int-1', category: 'Laminates & Veneers', itemName: 'Century Natural Teak Veneer 4mm', brandSpecification: 'CenturyVeneers Group 1 Teak', unit: 'sheets', quantity: 12, unitRate: 2400, laborInstallationRate: 400, totalAmount: 33600, isMaterialApproved: true, status: 'INSTALLED' },
-  { id: 'boq-4', projectId: 'prj-int-1', category: 'Paints & Finishes', itemName: 'Asian Paints Royale Luxury Emulsion', brandSpecification: 'Asian Paints White Base Matt', unit: 'litres', quantity: 40, unitRate: 550, laborInstallationRate: 150, totalAmount: 28000, isMaterialApproved: true, status: 'INSTALLED' },
-];
-
-export const SEED_INTERIOR_QUOTATIONS: InteriorQuotation[] = isTest ? TEST_QUOTATIONS : [];
+export const SEED_INTERIOR_QUOTATIONS: InteriorQuotation[] = TEST_QUOTATIONS;
 
 export const getInteriorQuotations = (designerId?: string): InteriorQuotation[] => {
   try {
@@ -992,8 +1505,12 @@ export const getInteriorQuotations = (designerId?: string): InteriorQuotation[] 
       }
     }
   } catch (e) {}
-  const defaults = isTest ? TEST_QUOTATIONS : [];
-  return designerId ? defaults.filter((q) => q.designerId === designerId) : defaults;
+  return designerId ? TEST_QUOTATIONS.filter((q) => q.designerId === designerId) : TEST_QUOTATIONS;
+};
+
+export const getInteriorQuotationById = (id: string): InteriorQuotation | null => {
+  const all = getInteriorQuotations();
+  return all.find((q) => q.id === id || q.quotationNumber === id) || null;
 };
 
 export const saveInteriorQuotation = (q: Partial<InteriorQuotation>): InteriorQuotation => {
@@ -1010,9 +1527,30 @@ export const saveInteriorQuotation = (q: Partial<InteriorQuotation>): InteriorQu
     } as InteriorQuotation;
     current[existingIdx] = updated;
   } else {
+    const subtotal = q.subtotal || (q.lineItems ? q.lineItems.reduce((acc, curr) => acc + curr.amount, 0) : 0);
+    const deliverableFees = q.deliverableFees || {
+      fee2DDesign: 25000,
+      fee3DDesign: 35000,
+      feeConsultation: 15000,
+      feeSiteVisit: 5000,
+      feeDesignDevelopment: 10000,
+      feeExecutionSupervision: 25000,
+      feeOtherProfessional: 5000,
+    };
+    const totalProfessionalFees =
+      q.totalProfessionalFees ??
+      Object.values(deliverableFees).reduce((acc: number, val: number) => acc + (Number(val) || 0), 0);
+    const discount = q.discount || 0;
+    const taxableBase = Math.max(0, subtotal + totalProfessionalFees - discount);
+    const taxAmount = q.taxAmount ?? Math.round(taxableBase * 0.18);
+    const grandTotal = q.grandTotal ?? Math.round(taxableBase + taxAmount);
+
     updated = {
       id: q.id || `quote-int-${Date.now()}`,
       quotationNumber: q.quotationNumber || `BG-Q-INT-${Math.floor(1000 + Math.random() * 9000)}`,
+      version: q.version || '1.0',
+      versionHistory: q.versionHistory || [],
+      assignmentId: q.assignmentId,
       requestId: q.requestId || `REQ-INT-${Date.now()}`,
       designerId: q.designerId || 'id-101',
       designerName: q.designerName || 'Ar. Pooja Mehra',
@@ -1023,25 +1561,167 @@ export const saveInteriorQuotation = (q: Partial<InteriorQuotation>): InteriorQu
       carpetAreaSqFt: q.carpetAreaSqFt || 2200,
       roomCount: q.roomCount || '3 Bedrooms + Living/Dining',
       preferredStyle: q.preferredStyle || 'Contemporary Luxury',
+      scopeSummary: q.scopeSummary || '',
       targetBudget: q.targetBudget || 2500000,
-      status: q.status || 'SUBMITTED',
+      status: q.status || 'DRAFT',
       lineItems: q.lineItems || [],
-      subtotal: q.subtotal || 0,
-      discount: q.discount || 0,
-      taxAmount: q.taxAmount || 0,
-      grandTotal: q.grandTotal || 0,
+      deliverableFees,
+      subtotal,
+      totalProfessionalFees,
+      discount,
+      taxAmount,
+      grandTotal,
       estimatedTimelineWeeks: q.estimatedTimelineWeeks || 8,
       revisionRoundsIncluded: q.revisionRoundsIncluded || 3,
+      validityDays: q.validityDays || 30,
+      paymentSchedule: q.paymentSchedule || DEFAULT_PAYMENT_SCHEDULE.map((p) => ({
+        ...p,
+        amount: Math.round((grandTotal * p.percentage) / 100),
+      })),
       terms: q.terms || '100% Escrow Milestone Payouts on client stage approval.',
+      attachments: q.attachments || [],
+      adminFeedback: q.adminFeedback,
+      adminInternalNotes: q.adminInternalNotes,
       createdAt: now,
       updatedAt: now,
     };
     current.push(updated);
   }
 
-  localStorage.setItem('gd_interior_quotations_v1', JSON.stringify(current));
+  try {
+    localStorage.setItem('gd_interior_quotations_v1', JSON.stringify(current));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_quotations_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
   return updated;
 };
+
+export const submitInteriorQuotationToAdmin = (quotationId: string, notes?: string): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  quote.status = 'UNDER_ADMIN_REVIEW';
+  quote.updatedAt = new Date().toISOString();
+  if (notes) {
+    quote.scopeSummary = quote.scopeSummary ? `${quote.scopeSummary} | Note: ${notes}` : notes;
+  }
+
+  saveInteriorQuotation(quote);
+
+  // Also update associated assignment status if linked
+  if (quote.assignmentId) {
+    const assignment = getInteriorAssignmentById(quote.assignmentId);
+    if (assignment) {
+      assignment.status = 'QUOTATION_SUBMITTED';
+      assignment.quotationId = quote.id;
+      saveInteriorAssignment(assignment);
+    }
+  }
+
+  return quote;
+};
+
+export const createInteriorQuotationRevision = (quotationId: string): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  const prevVersion = quote.version || '1.0';
+  const nextMajor = Math.floor(parseFloat(prevVersion) || 1) + 1;
+  const newVersion = `${nextMajor}.0`;
+
+  // Push previous version snapshot into history
+  const historySnapshot: InteriorQuotationVersion = {
+    versionNumber: prevVersion,
+    createdAt: quote.createdAt,
+    submittedAt: quote.updatedAt,
+    grandTotal: quote.grandTotal,
+    subtotal: quote.subtotal,
+    totalProfessionalFees: quote.totalProfessionalFees || 0,
+    taxAmount: quote.taxAmount,
+    status: quote.status,
+    adminFeedback: quote.adminFeedback,
+    lineItemsCount: quote.lineItems.length,
+    summaryNotes: `Snapshot preserved before revision to ${newVersion}`,
+  };
+
+  quote.versionHistory = [...(quote.versionHistory || []), historySnapshot];
+  quote.version = newVersion;
+  quote.status = 'DRAFT'; // Designer can now edit and re-submit
+  quote.updatedAt = new Date().toISOString();
+
+  saveInteriorQuotation(quote);
+  return quote;
+};
+
+export const adminReviewInteriorQuotation = (
+  quotationId: string,
+  action: 'APPROVE' | 'REJECT' | 'REQUEST_REVISION',
+  feedback?: string,
+  internalNotes?: string
+): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  if (action === 'APPROVE') {
+    quote.status = 'APPROVED_BY_ADMIN';
+  } else if (action === 'REJECT') {
+    quote.status = 'REJECTED';
+  } else if (action === 'REQUEST_REVISION') {
+    quote.status = 'REVISION_REQUESTED';
+  }
+
+  if (feedback) quote.adminFeedback = feedback;
+  if (internalNotes) quote.adminInternalNotes = internalNotes;
+  quote.updatedAt = new Date().toISOString();
+
+  saveInteriorQuotation(quote);
+  return quote;
+};
+
+export const adminForwardInteriorQuotationToCustomer = (quotationId: string): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  quote.status = 'SENT_TO_CUSTOMER';
+  quote.updatedAt = new Date().toISOString();
+
+  saveInteriorQuotation(quote);
+  return quote;
+};
+
+export const customerAcceptInteriorQuotation = (quotationId: string): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  quote.status = 'ACCEPTED';
+  quote.updatedAt = new Date().toISOString();
+
+  saveInteriorQuotation(quote);
+  return quote;
+};
+
+export const customerRejectInteriorQuotation = (quotationId: string, reason?: string): InteriorQuotation => {
+  const current = getInteriorQuotations();
+  const quote = current.find((q) => q.id === quotationId || q.quotationNumber === quotationId);
+  if (!quote) throw new Error('Quotation not found');
+
+  quote.status = 'REJECTED';
+  if (reason) quote.adminFeedback = `Customer declined: ${reason}`;
+  quote.updatedAt = new Date().toISOString();
+
+  saveInteriorQuotation(quote);
+  return quote;
+};
+
 
 // ==========================================
 // SECTION B: BOOKING MANAGEMENT
@@ -1075,7 +1755,50 @@ export interface InteriorBooking {
   createdAt: string;
 }
 
-export const SEED_INTERIOR_BOOKINGS: InteriorBooking[] = [];
+export const TEST_BOOKINGS: InteriorBooking[] = [
+  {
+    id: 'bk-int-1',
+    bookingId: 'BG-BKG-INT-101',
+    customerId: 'cust-101',
+    customerName: 'Aman Saxena',
+    customerPhone: '9811223344',
+    quotationId: 'quote-int-1',
+    quotationNumber: 'BG-Q-INT-101',
+    projectAddress: 'DLF The Crest, Sector 54, Gurugram',
+    selectedServices: ['Turnkey Execution', 'Modular Woodwork'],
+    bookingDate: '2026-10-19T10:00:00Z',
+    scheduledStartDate: '2026-11-01',
+    estimatedCompletionDate: '2027-01-15',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    bookingAmount: 142000,
+    advancePaymentStatus: 'PAID',
+    status: 'CONFIRMED',
+    createdAt: '2026-10-19T10:00:00Z',
+  },
+  {
+    id: 'bk-int-2',
+    bookingId: 'BG-BKG-INT-102',
+    customerId: 'cust-102',
+    customerName: 'Meera Chawla',
+    customerPhone: '9822334455',
+    quotationId: 'quote-int-2',
+    quotationNumber: 'BG-Q-INT-102',
+    projectAddress: 'Jaypee Greens, Greater Noida',
+    selectedServices: ['Design & Supervision'],
+    bookingDate: '2026-10-22T10:00:00Z',
+    scheduledStartDate: '2026-11-05',
+    estimatedCompletionDate: '2026-12-20',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    bookingAmount: 50000,
+    advancePaymentStatus: 'PAID',
+    status: 'SITE_VISIT_SCHEDULED',
+    createdAt: '2026-10-22T10:00:00Z',
+  },
+];
+
+export const SEED_INTERIOR_BOOKINGS: InteriorBooking[] = TEST_BOOKINGS;
 
 export const getInteriorBookings = (designerId?: string): InteriorBooking[] => {
   try {
@@ -1180,7 +1903,68 @@ export interface InteriorProject {
   updatedAt: string;
 }
 
-export const SEED_INTERIOR_PROJECTS: InteriorProject[] = [];
+export const TEST_PROJECTS: InteriorProject[] = [
+  {
+    id: 'prj-int-1',
+    projectId: 'BG-PRJ-INT-101',
+    bookingId: 'bk-int-1',
+    quotationId: 'quote-int-1',
+    customerId: 'cust-101',
+    customerName: 'Aman Saxena',
+    customerPhone: '9811223344',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    title: 'DLF The Crest Penthouse Oasis',
+    propertyType: '4BHK Apartment',
+    location: 'DLF The Crest, Sector 54, Gurugram',
+    currentStage: 'SITE_EXECUTION',
+    overallProgressPercent: 35,
+    startDate: '2026-11-01',
+    targetEndDate: '2027-01-15',
+    totalContractValue: 712130,
+    paidAmount: 350000,
+    pendingEscrowAmount: 362130,
+    updatedAt: '2026-11-20T10:00:00Z',
+    milestones: [
+      { id: 'm-1', name: 'Concept Approval & 3D Renders', weightPercent: 20, status: 'COMPLETED', dueDate: '2026-11-10', payoutAmount: 142426, escrowStatus: 'RELEASED_TO_DESIGNER' },
+      { id: 'm-2', name: 'Civil & Flooring Demarcation', weightPercent: 20, status: 'IN_PROGRESS', dueDate: '2026-11-25', payoutAmount: 142426, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-3', name: 'Modular Woodwork Carcass', weightPercent: 25, status: 'PENDING', dueDate: '2026-12-15', payoutAmount: 178032, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-4', name: 'Finishes, Veneers & Lighting', weightPercent: 20, status: 'PENDING', dueDate: '2027-01-05', payoutAmount: 142426, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-5', name: 'Deep Cleaning & Snag Handover', weightPercent: 15, status: 'PENDING', dueDate: '2027-01-15', payoutAmount: 106820, escrowStatus: 'LOCKED_IN_ESCROW' },
+    ],
+  },
+  {
+    id: 'prj-int-2',
+    projectId: 'BG-PRJ-INT-102',
+    bookingId: 'bk-int-2',
+    quotationId: 'quote-int-2',
+    customerId: 'cust-102',
+    customerName: 'Meera Chawla',
+    customerPhone: '9822334455',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    title: 'Scandinavian Minimalist Penthouse',
+    propertyType: '3BHK Penthouse',
+    location: 'Jaypee Greens, Greater Noida',
+    currentStage: 'INITIAL_CONSULTATION',
+    overallProgressPercent: 15,
+    startDate: '2026-11-05',
+    targetEndDate: '2026-12-20',
+    totalContractValue: 269040,
+    paidAmount: 50000,
+    pendingEscrowAmount: 219040,
+    updatedAt: '2026-11-22T12:00:00Z',
+    milestones: [
+      { id: 'm-11', name: 'Site Inspection & Moodboard', weightPercent: 20, status: 'COMPLETED', dueDate: '2026-11-10', payoutAmount: 53808, escrowStatus: 'RELEASED_TO_DESIGNER' },
+      { id: 'm-12', name: '2D Layout & Elevations', weightPercent: 20, status: 'IN_PROGRESS', dueDate: '2026-11-20', payoutAmount: 53808, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-13', name: 'Woodwork Orders Placed', weightPercent: 25, status: 'PENDING', dueDate: '2026-12-01', payoutAmount: 67260, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-14', name: 'Site Assembly', weightPercent: 20, status: 'PENDING', dueDate: '2026-12-12', payoutAmount: 53808, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-15', name: 'Final Handover', weightPercent: 15, status: 'PENDING', dueDate: '2026-12-20', payoutAmount: 40356, escrowStatus: 'LOCKED_IN_ESCROW' },
+    ],
+  },
+];
+
+export const SEED_INTERIOR_PROJECTS: InteriorProject[] = TEST_PROJECTS;
 
 export const getInteriorProjects = (designerId?: string): InteriorProject[] => {
   try {
@@ -1290,7 +2074,14 @@ export interface InteriorBOQItem {
   status: 'ESTIMATED' | 'APPROVED' | 'ORDERED' | 'DELIVERED_TO_SITE';
 }
 
-export const SEED_INTERIOR_BOQ_ITEMS: InteriorBOQItem[] = [];
+export const TEST_BOQ: InteriorBOQItem[] = [
+  { id: 'boq-1', projectId: 'prj-int-1', roomName: 'Kitchen', category: 'Plywood & Hardware', itemName: 'Greenlam Marine Plywood (BWP 710)', specification: 'Greenlam 18mm BWP IS:710 Marine Grade', brand: 'Greenlam', unit: 'sq.ft', quantity: 24, unitRate: 4200, wastagePercent: 5, labourCost: 500, taxPercent: 18, totalAmount: 112800, supplierName: 'Greenply Industries Ltd', status: 'ORDERED' },
+  { id: 'boq-2', projectId: 'prj-int-1', roomName: 'Kitchen', category: 'Modular Fittings', itemName: 'Blum Soft-Close Tandembox Drawers', specification: 'Blum Austria Antaro 500mm', brand: 'Blum', unit: 'sets', quantity: 8, unitRate: 3800, wastagePercent: 0, labourCost: 350, taxPercent: 18, totalAmount: 33200, supplierName: 'Hafele India Pvt Ltd', status: 'DELIVERED_TO_SITE' },
+  { id: 'boq-3', projectId: 'prj-int-1', roomName: 'Master Bedroom', category: 'Laminates & Veneer', itemName: 'Century Natural Teak Veneer 4mm', specification: 'CenturyVeneers Group 1 Teak', brand: 'CenturyPly', unit: 'sheets', quantity: 12, unitRate: 2400, wastagePercent: 8, labourCost: 400, taxPercent: 18, totalAmount: 33600, supplierName: 'Century Plyboards Ltd', status: 'APPROVED' },
+  { id: 'boq-4', projectId: 'prj-int-1', roomName: 'Living Room', category: 'Paint & Finishes', itemName: 'Asian Paints Royale Luxury Emulsion', specification: 'Asian Paints White Base Matt', brand: 'Asian Paints', unit: 'litres', quantity: 40, unitRate: 550, wastagePercent: 2, labourCost: 150, taxPercent: 18, totalAmount: 28000, supplierName: 'Asian Paints Colour Ideas', status: 'APPROVED' },
+];
+
+export const SEED_INTERIOR_BOQ_ITEMS: InteriorBOQItem[] = TEST_BOQ;
 
 export const getInteriorBOQItems = (projectId?: string): InteriorBOQItem[] => {
   try {
@@ -1335,7 +2126,28 @@ export interface InteriorSnagItem {
   assignedContractor: string;
 }
 
-export const SEED_INTERIOR_SITE_VISITS: InteriorSiteVisit[] = [];
+export const TEST_SITE_VISITS: InteriorSiteVisit[] = [
+  {
+    id: 'sv-101',
+    projectId: 'prj-int-1',
+    scheduledDate: '2026-12-02',
+    timeSlot: '11:00 AM - 01:00 PM',
+    purpose: 'Modular kitchen carcass alignment and countertop measurement verification',
+    status: 'SCHEDULED',
+    findingsNotes: 'Pending site inspection with contractor.',
+  },
+  {
+    id: 'sv-102',
+    projectId: 'prj-int-2',
+    scheduledDate: '2026-12-05',
+    timeSlot: '02:30 PM - 04:30 PM',
+    purpose: 'False ceiling electrical points and perimeter cove light trough inspection',
+    status: 'SCHEDULED',
+    findingsNotes: 'Verify LED channel dimensions.',
+  },
+];
+
+export const SEED_INTERIOR_SITE_VISITS: InteriorSiteVisit[] = TEST_SITE_VISITS;
 
 export const SEED_INTERIOR_SNAG_ITEMS: InteriorSnagItem[] = [];
 
@@ -1396,9 +2208,65 @@ export interface InteriorPayoutRequest {
   utrNumber?: string;
 }
 
-export const SEED_INTERIOR_INVOICES: InteriorInvoice[] = [];
+export const TEST_INVOICES: InteriorInvoice[] = [
+  {
+    id: 'inv-101',
+    invoiceNumber: 'BG-INV-2026-081',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Luxury Suite',
+    clientName: 'Aman Saxena',
+    amount: 195856,
+    taxAmount: 35254,
+    totalAmount: 231110,
+    status: 'PAID',
+    date: '2026-10-25',
+    dueDate: '2026-10-30',
+    milestoneName: 'Stage 1: Advance Booking & 2D Layout Approval',
+  },
+  {
+    id: 'inv-102',
+    invoiceNumber: 'BG-INV-2026-094',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Luxury Suite',
+    clientName: 'Aman Saxena',
+    amount: 274198,
+    taxAmount: 49356,
+    totalAmount: 323554,
+    status: 'ISSUED',
+    date: '2026-11-20',
+    dueDate: '2026-11-28',
+    milestoneName: 'Stage 2: Woodwork Carcass & Frame Approval',
+  },
+];
 
-export const SEED_INTERIOR_PAYOUTS: InteriorPayoutRequest[] = [];
+export const TEST_PAYOUTS: InteriorPayoutRequest[] = [
+  {
+    id: 'pay-101',
+    requestId: 'REQ-INT-101',
+    designerId: 'id-101',
+    amount: 185000,
+    bankAccount: '••••••••8910',
+    ifsc: 'HDFC0001234',
+    status: 'PROCESSED',
+    requestedAt: '2026-10-28T10:00:00Z',
+    processedAt: '2026-10-29T14:30:00Z',
+    utrNumber: 'CMS2026102988123',
+  },
+  {
+    id: 'pay-102',
+    requestId: 'REQ-INT-101',
+    designerId: 'id-101',
+    amount: 250000,
+    bankAccount: '••••••••8910',
+    ifsc: 'HDFC0001234',
+    status: 'PENDING_ADMIN_APPROVAL',
+    requestedAt: '2026-11-21T11:00:00Z',
+  },
+];
+
+export const SEED_INTERIOR_INVOICES: InteriorInvoice[] = TEST_INVOICES;
+
+export const SEED_INTERIOR_PAYOUTS: InteriorPayoutRequest[] = TEST_PAYOUTS;
 
 export const getInteriorInvoices = (): InteriorInvoice[] => {
   try {
