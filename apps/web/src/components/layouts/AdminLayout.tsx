@@ -58,6 +58,7 @@ import {
   Sparkles,
   HelpCircle,
   FolderGit2,
+  Globe,
 } from 'lucide-react';
 /**
  * AdminAuthGate
@@ -362,6 +363,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/support': true,
     '/admin/reports': true,
     '/admin/notifications': true,
+    '/admin/cms': true,
   });
   const { success } = useToast();
 
@@ -407,6 +409,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/notifications')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/notifications': true }));
+    }
+    if (location.pathname.startsWith('/admin/cms')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/cms': true }));
     }
   }, [location.pathname]);
 
@@ -783,6 +788,21 @@ export const AdminLayout: React.FC = () => {
         },
         { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
         { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
+        {
+          label: 'CMS & Platform Content Management',
+          path: '/admin/cms',
+          icon: Globe,
+          subItems: [
+            { label: 'Homepage Content', path: '/admin/cms?view=HOMEPAGE_CONTENT', view: 'HOMEPAGE_CONTENT' },
+            { label: 'About Us', path: '/admin/cms?view=ABOUT_US', view: 'ABOUT_US' },
+            { label: 'Contact Us', path: '/admin/cms?view=CONTACT_US', view: 'CONTACT_US' },
+            { label: 'FAQ', path: '/admin/cms?view=FAQ', view: 'FAQ' },
+            { label: 'Terms & Conditions', path: '/admin/cms?view=TERMS_CONDITIONS', view: 'TERMS_CONDITIONS' },
+            { label: 'Privacy Policy', path: '/admin/cms?view=PRIVACY_POLICY', view: 'PRIVACY_POLICY' },
+            { label: 'Cancellation Policy', path: '/admin/cms?view=CANCELLATION_POLICY', view: 'CANCELLATION_POLICY' },
+            { label: 'Refund Policy', path: '/admin/cms?view=REFUND_POLICY', view: 'REFUND_POLICY' },
+          ],
+        },
       ],
     },
   ];
@@ -1020,7 +1040,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT')));
 
                               return (
                                 <Link
