@@ -347,7 +347,16 @@ export const AdminLayout: React.FC = () => {
   const [activeRole, setActiveRoleState] = useState<MasterAdminRole>(getActiveAdminRole());
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    '/admin/architects': true,
+  });
   const { success } = useToast();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin/architects')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/architects': true }));
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const onRoleSwitched = (e: any) => {
@@ -475,7 +484,25 @@ export const AdminLayout: React.FC = () => {
       title: '2. Stakeholder Ecosystem & KYC',
       items: [
         { label: 'Customer Management', path: '/admin/customers', icon: Users },
-        { label: 'Architect Management & COA', path: '/admin/architects', icon: Compass },
+        {
+          label: 'Architect Management & COA',
+          path: '/admin/architects',
+          icon: Compass,
+          subItems: [
+            { label: 'All Architects', path: '/admin/architects?view=ALL', view: 'ALL' },
+            { label: 'New Applications', path: '/admin/architects?view=NEW_APPLICATIONS', view: 'NEW_APPLICATIONS' },
+            { label: 'Pending Verification', path: '/admin/architects?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
+            { label: 'KYC Verification', path: '/admin/architects?view=KYC_VERIFICATION', view: 'KYC_VERIFICATION' },
+            { label: 'Business Verification', path: '/admin/architects?view=BUSINESS_VERIFICATION', view: 'BUSINESS_VERIFICATION' },
+            { label: 'Qualification Verification', path: '/admin/architects?view=QUALIFICATION_VERIFICATION', view: 'QUALIFICATION_VERIFICATION' },
+            { label: 'Portfolio Review', path: '/admin/architects?view=PORTFOLIO_REVIEW', view: 'PORTFOLIO_REVIEW' },
+            { label: 'Approved Architects', path: '/admin/architects?view=APPROVED', view: 'APPROVED' },
+            { label: 'Rejected Applications', path: '/admin/architects?view=REJECTED', view: 'REJECTED' },
+            { label: 'Suspended Architects', path: '/admin/architects?view=SUSPENDED', view: 'SUSPENDED' },
+            { label: 'Architect Performance', path: '/admin/architects?view=PERFORMANCE', view: 'PERFORMANCE' },
+            { label: 'Architect Payment Details', path: '/admin/architects?view=PAYMENT_DETAILS', view: 'PAYMENT_DETAILS' },
+          ],
+        },
         { label: 'Contractor Directory & KYC', path: '/admin/contractors', icon: HardHat },
         { label: 'Interior Designers Network', path: '/admin/interior-designers', icon: Palette },
         { label: 'Material Vendors & Depots', path: '/admin/vendors', icon: Store },
@@ -699,11 +726,86 @@ export const AdminLayout: React.FC = () => {
                   <span>{sec.title}</span>
                   {secIdx === 0 && <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>}
                 </div>
-                {(sec.items || []).map((item) => {
+                {(sec.items || []).map((item: any) => {
                   const isActive = item.exact
                     ? location.pathname === item.path
                     : location.pathname.startsWith(item.path);
                   const Icon = item.icon;
+                  const hasSubItems = item.subItems && item.subItems.length > 0;
+                  const isExpanded = Boolean(expandedMenus[item.path]);
+
+                  if (hasSubItems) {
+                    return (
+                      <div key={item.path} className="space-y-0.5">
+                        <div
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl font-medium transition cursor-pointer select-none ${
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30'
+                              : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
+                          }`}
+                          onClick={() => {
+                            setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                            if (!location.pathname.startsWith(item.path)) {
+                              navigate(item.path);
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                            <span className="truncate text-xs">{item.label}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                            }}
+                            className={`p-0.5 rounded-md hover:bg-white/20 transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                            aria-label="Toggle Submenu"
+                          >
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Collapsible Submenu Dropdown */}
+                        {isExpanded && (
+                          <div className="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-blue-300/80 ml-4.5 animate-in fade-in duration-150">
+                            {item.subItems.map((sub: any) => {
+                              const currentViewParam = new URLSearchParams(location.search).get('view');
+                              const isSubActive =
+                                location.pathname.startsWith(item.path) &&
+                                (currentViewParam === sub.view || (!currentViewParam && sub.view === 'ALL'));
+
+                              return (
+                                <Link
+                                  key={sub.path}
+                                  to={sub.path}
+                                  onClick={() => setSidebarOpen(false)}
+                                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition font-medium ${
+                                    isSubActive
+                                      ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                                      : 'text-slate-600 hover:text-blue-950 hover:bg-blue-100/60'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      isSubActive ? 'bg-amber-300 scale-125' : 'bg-slate-300'
+                                    }`}
+                                  />
+                                  <span className="truncate">{sub.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <Link
                       key={item.path}

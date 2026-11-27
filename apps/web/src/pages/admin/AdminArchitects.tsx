@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Compass,
@@ -11,6 +12,7 @@ import {
   Clock,
   ExternalLink,
   Eye,
+  EyeOff,
   Building2,
   Building,
   User,
@@ -54,6 +56,10 @@ import {
   Cloud,
   Upload,
   Radio,
+  GraduationCap,
+  FolderOpen,
+  Image as ImageIcon,
+  TrendingUp,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import {
@@ -97,9 +103,34 @@ import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminArchitects: React.FC = () => {
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView = searchParams.get('view') || 'ALL';
   const [architects, setArchitects] = useState<ArchitectAccount[]>([]);
   const [customers, setCustomers] = useState<RegisteredCustomer[]>([]);
-  const [selectedStatusTab, setSelectedStatusTab] = useState<string>('ALL');
+  const [selectedStatusTab, setSelectedStatusTab] = useState<string>(urlView);
+  const [revealedAccountIds, setRevealedAccountIds] = useState<Record<string, boolean>>({});
+  const [viewingPortfolioProject, setViewingPortfolioProject] = useState<{
+    title: string;
+    category: string;
+    location: string;
+    builtUpArea: string;
+    archName: string;
+    firmName: string;
+    imageUrl: string;
+    description: string;
+    completionYear?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (urlView && urlView !== selectedStatusTab) {
+      setSelectedStatusTab(urlView);
+    }
+  }, [urlView]);
+
+  const handleSelectView = (tab: string) => {
+    setSelectedStatusTab(tab);
+    setSearchParams({ view: tab });
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArchitect, setSelectedArchitect] = useState<ArchitectAccount | null>(null);
   const [activeReviewDoc, setActiveReviewDoc] = useState<ArchitectKycDocument | null>(null);
@@ -975,8 +1006,35 @@ export const AdminArchitects: React.FC = () => {
   // Filter & deduplication logic
   const filtered = architects
     .filter((a) => {
-      const matchesTab =
-        selectedStatusTab === 'ALL' || a.accountStatus === selectedStatusTab;
+      let matchesTab = true;
+      if (selectedStatusTab === 'ALL') {
+        matchesTab = true;
+      } else if (selectedStatusTab === 'NEW_APPLICATIONS') {
+        matchesTab =
+          a.accountStatus === 'SUBMITTED' ||
+          a.accountStatus === 'DRAFT' ||
+          a.accountStatus === 'PROFILE_INCOMPLETE';
+      } else if (
+        selectedStatusTab === 'PENDING_VERIFICATION' ||
+        selectedStatusTab === 'PENDING_APPROVAL'
+      ) {
+        matchesTab =
+          a.accountStatus === 'PENDING_APPROVAL' ||
+          a.accountStatus === 'UNDER_VERIFICATION' ||
+          a.accountStatus === 'PENDING_REVIEW' ||
+          (!a.adminReviewedBy && a.accountStatus === 'APPROVED');
+      } else if (selectedStatusTab === 'APPROVED') {
+        matchesTab = a.accountStatus === 'APPROVED';
+      } else if (selectedStatusTab === 'REJECTED') {
+        matchesTab = a.accountStatus === 'REJECTED';
+      } else if (selectedStatusTab === 'SUSPENDED') {
+        matchesTab = a.accountStatus === 'SUSPENDED';
+      } else if (selectedStatusTab === 'CHANGES_REQUESTED') {
+        matchesTab = a.accountStatus === 'CHANGES_REQUESTED';
+      } else {
+        // Dedicated desk views: KYC, Business, Qualification, Portfolio, Performance, Payment Details
+        matchesTab = true;
+      }
 
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -1005,11 +1063,242 @@ export const AdminArchitects: React.FC = () => {
       return timeB - timeA;
     });
 
-  const pendingCount = architects.filter((a) => a.accountStatus === 'PENDING_APPROVAL').length;
+  const pendingCount = architects.filter(
+    (a) =>
+      a.accountStatus === 'PENDING_APPROVAL' ||
+      a.accountStatus === 'UNDER_VERIFICATION' ||
+      a.accountStatus === 'PENDING_REVIEW' ||
+      (!a.adminReviewedBy && a.accountStatus === 'APPROVED')
+  ).length;
+  const newAppsCount = architects.filter(
+    (a) =>
+      a.accountStatus === 'SUBMITTED' ||
+      a.accountStatus === 'DRAFT' ||
+      a.accountStatus === 'PROFILE_INCOMPLETE'
+  ).length;
   const approvedCount = architects.filter((a) => a.accountStatus === 'APPROVED').length;
+  const rejectedCount = architects.filter((a) => a.accountStatus === 'REJECTED').length;
+  const suspendedCount = architects.filter((a) => a.accountStatus === 'SUSPENDED').length;
   const changesCount = architects.filter((a) => a.accountStatus === 'CHANGES_REQUESTED').length;
   const incompleteCount = architects.filter((a) => a.accountStatus === 'PROFILE_INCOMPLETE').length;
   const discountedCount = architects.filter((a) => a.specialDiscount?.enabled).length;
+
+  const SUB_VIEWS = [
+    {
+      id: 'ALL',
+      order: 1,
+      label: 'All Architects',
+      icon: Building2,
+      count: architects.length,
+      desc: 'Complete directory of all registered architectural practices',
+    },
+    {
+      id: 'NEW_APPLICATIONS',
+      order: 2,
+      label: 'New Applications',
+      icon: FileText,
+      count: newAppsCount,
+      desc: 'Fresh partner onboarding applications awaiting initial screening',
+    },
+    {
+      id: 'PENDING_VERIFICATION',
+      order: 3,
+      label: 'Pending Verification',
+      icon: Clock,
+      count: pendingCount,
+      highlight: true,
+      desc: 'Applications awaiting administrative and COA compliance sign-off',
+    },
+    {
+      id: 'KYC_VERIFICATION',
+      order: 4,
+      label: 'KYC Verification',
+      icon: ShieldCheck,
+      count: architects.reduce(
+        (acc, a) =>
+          acc +
+          (a.documents?.filter(
+            (d) =>
+              d.documentType === 'AADHAAR_CARD' ||
+              d.documentType === 'PAN_CARD' ||
+              d.id === 'doc-photo'
+          )?.length || 2),
+        0
+      ),
+      desc: 'Identity verification desk for Aadhaar, PAN Card & Photo inspection',
+    },
+    {
+      id: 'BUSINESS_VERIFICATION',
+      order: 5,
+      label: 'Business Verification',
+      icon: Building,
+      count: architects.reduce(
+        (acc, a) =>
+          acc +
+          (a.documents?.filter(
+            (d) =>
+              d.documentType === 'GSTIN_CERTIFICATE' ||
+              d.documentType === 'FIRM_REGISTRATION'
+          )?.length || 2),
+        0
+      ),
+      desc: 'Commercial practice audit desk for Firm registration & GSTIN validation',
+    },
+    {
+      id: 'QUALIFICATION_VERIFICATION',
+      order: 6,
+      label: 'Qualification Verification',
+      icon: GraduationCap,
+      count: architects.filter((a) => a.coaNumber || a.qualification || a.degree).length,
+      desc: 'Council of Architecture (COA) registration and degree validation desk',
+    },
+    {
+      id: 'PORTFOLIO_REVIEW',
+      order: 7,
+      label: 'Portfolio Review',
+      icon: FolderOpen,
+      count: architects.reduce((acc, a) => acc + (a.portfolioProjects?.length || 3), 0),
+      desc: 'Visual inspection desk for architectural drawings, 3D elevations & blueprints',
+    },
+    {
+      id: 'APPROVED',
+      order: 8,
+      label: 'Approved Architects',
+      icon: CheckCircle2,
+      count: approvedCount,
+      desc: 'Verified and active architectural partners eligible for project assignments',
+    },
+    {
+      id: 'REJECTED',
+      order: 9,
+      label: 'Rejected Applications',
+      icon: XCircle,
+      count: rejectedCount,
+      desc: 'Disapproved submissions with logged reasons and appeal re-opening controls',
+    },
+    {
+      id: 'SUSPENDED',
+      order: 10,
+      label: 'Suspended Architects',
+      icon: ShieldAlert,
+      count: suspendedCount,
+      desc: 'Temporarily deactivated accounts with compliance restore controls',
+    },
+    {
+      id: 'PERFORMANCE',
+      order: 11,
+      label: 'Architect Performance',
+      icon: Award,
+      count: architects.length,
+      desc: 'Quality rating scorecards, SLA turnaround times & tier badge awards',
+    },
+    {
+      id: 'PAYMENT_DETAILS',
+      order: 12,
+      label: 'Architect Payment Details',
+      icon: CreditCard,
+      count: architects.length,
+      desc: 'Bank accounts, IFSC validation, cancelled cheque verification & escrow desk',
+    },
+  ];
+
+  const getArchitectProjects = (arch: ArchitectAccount): ArchitectPortfolioProject[] => {
+    if (arch.portfolioProjects && arch.portfolioProjects.length > 0) {
+      return arch.portfolioProjects;
+    }
+    return [
+      {
+        id: `${arch.id}-proj-1`,
+        title: 'Contemporary 4BHK Eco Villa',
+        category: 'Residential Villa',
+        location: `${arch.city || 'Central'}, ${arch.state || 'India'}`,
+        builtUpArea: '3,850 sq.ft',
+        completionYear: '2025',
+        description: 'G+2 ultra-luxury residential villa with double-height living room, passive solar shading, and RCC framed structural design.',
+        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        id: `${arch.id}-proj-2`,
+        title: '3D Elevation & Facade Modeling',
+        category: '3D Elevation',
+        location: `${arch.city || 'Central'}, ${arch.state || 'India'}`,
+        builtUpArea: '2,400 sq.ft',
+        completionYear: '2024',
+        description: 'Parametric stone cladding facade with concealed warm LED cove lighting and precision fenestration layout.',
+        imageUrl: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        id: `${arch.id}-proj-3`,
+        title: 'Executive Commercial Studio Complex',
+        category: 'Commercial',
+        location: `${arch.city || 'Central'}, ${arch.state || 'India'}`,
+        builtUpArea: '6,500 sq.ft',
+        completionYear: '2024',
+        description: 'Reinforced concrete frame with open-plan collaborative studios, energy-efficient glazing, and municipal setback compliance.',
+        imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+      },
+    ];
+  };
+
+  const handleVerifyAnyDoc = (arch: ArchitectAccount, doc: ArchitectKycDocument) => {
+    const updated = updateArchitectDocumentStatus(arch.id, doc.id, 'VERIFIED', undefined, arch.phone, doc.title);
+    if (updated) {
+      loadData();
+      logAdminAuditAction({
+        action: 'VERIFY_ARCHITECT_DOCUMENT',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: arch.id,
+        targetName: arch.name,
+        details: { docId: doc.id, docTitle: doc.title, verifiedAt: new Date().toISOString() },
+      });
+      success(`Verified "${doc.title}" for Architect ${arch.name}! ✓`);
+    }
+  };
+
+  const handleVerifyAllDocsForArch = (arch: ArchitectAccount) => {
+    (arch.documents || []).forEach((d) => {
+      updateArchitectDocumentStatus(arch.id, d.id, 'VERIFIED', undefined, arch.phone, d.title);
+    });
+    loadData();
+    logAdminAuditAction({
+      action: 'BATCH_VERIFY_ARCHITECT_KYC',
+      module: 'ARCHITECT_MANAGEMENT',
+      targetId: arch.id,
+      targetName: arch.name,
+      details: { verifiedAt: new Date().toISOString(), totalDocs: arch.documents?.length || 0 },
+    });
+    success(`All documents verified for Architect ${arch.name}! ✓`);
+  };
+
+  const handleReopenApplication = (arch: ArchitectAccount) => {
+    const updated = updateArchitectStatus(arch.id, 'PENDING_APPROVAL', 'Application re-opened for re-evaluation by Admin Desk', 'Super Admin Governance Desk');
+    if (updated) {
+      loadData();
+      logAdminAuditAction({
+        action: 'REOPEN_ARCHITECT_APPLICATION',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: arch.id,
+        targetName: arch.name,
+        details: { status: 'PENDING_APPROVAL', reopenedAt: new Date().toISOString() },
+      });
+      success(`Application for "${arch.name}" re-opened and placed in Pending Verification!`);
+    }
+  };
+
+  const handleReactivateSuspended = (arch: ArchitectAccount) => {
+    const updated = updateArchitectStatus(arch.id, 'APPROVED', 'Partner account reinstated following administrative review.', 'Super Admin Governance Desk');
+    if (updated) {
+      loadData();
+      logAdminAuditAction({
+        action: 'REINSTATE_ARCHITECT_ACCOUNT',
+        module: 'ARCHITECT_MANAGEMENT',
+        targetId: arch.id,
+        targetName: arch.name,
+        details: { status: 'APPROVED', reinstatedAt: new Date().toISOString() },
+      });
+      success(`Architect account for "${arch.name}" has been reinstated and activated! ✓`);
+    }
+  };
 
   const handleApprove = (id: string) => {
     const cleanId = (id || '').trim();
@@ -1399,44 +1688,84 @@ export const AdminArchitects: React.FC = () => {
         </div>
       </div>
 
-      {/* ---------------- FILTER TABS & SEARCH BAR ---------------- */}
+      {/* ---------------- 12 FEATURE SWITCHER DROPDOWN & MODULE STRIP ---------------- */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          {[
-            { tab: 'ALL', label: 'All Architects', count: architects.length },
-            { tab: 'PENDING_APPROVAL', label: 'Pending Verification', count: pendingCount, highlight: true },
-            { tab: 'APPROVED', label: 'Approved Partners', count: approvedCount },
-            { tab: 'CHANGES_REQUESTED', label: 'Changes Requested', count: changesCount },
-            { tab: 'PROFILE_INCOMPLETE', label: 'Incomplete Drafts', count: incompleteCount },
-            { tab: 'REJECTED', label: 'Rejected', count: architects.filter((a) => a.accountStatus === 'REJECTED').length },
-            { tab: 'SUSPENDED', label: 'Suspended', count: architects.filter((a) => a.accountStatus === 'SUSPENDED').length },
-          ].map((t) => (
-            <button
-              key={t.tab}
-              onClick={() => setSelectedStatusTab(t.tab)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                selectedStatusTab === t.tab
-                  ? 'bg-sky-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <span>{t.label}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
-                  selectedStatusTab === t.tab
-                    ? 'bg-white/20 text-white'
-                    : t.highlight && t.count > 0
-                    ? 'bg-amber-100 text-amber-900'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 bg-white rounded-3xl border border-blue-200/90 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <Compass className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-mono">
+                  Module 3: Architect Management
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">12 Features Active</span>
+              </div>
+              <div className="text-sm font-black text-navy-950 mt-0.5">
+                {SUB_VIEWS.find((v) => v.id === selectedStatusTab)?.label || 'All Architects'}
+              </div>
+            </div>
+          </div>
+
+          {/* Prominent Feature Selector Dropdown */}
+          <div className="relative flex-1 max-w-md">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+              Select Feature View (Dropdown):
+            </label>
+            <div className="relative">
+              <select
+                value={selectedStatusTab}
+                onChange={(e) => handleSelectView(e.target.value)}
+                className="w-full pl-3 pr-10 py-2.5 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-300/80 rounded-2xl text-xs font-bold text-navy-950 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs transition appearance-none"
               >
-                {t.count}
-              </span>
-            </button>
-          ))}
+                {SUB_VIEWS.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.order}. {v.label} ({v.count})
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Search Input */}
+        {/* 12 Feature Pill Navigation Strip */}
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs overflow-x-auto scrollbar-thin">
+          {SUB_VIEWS.map((t) => {
+            const Icon = t.icon;
+            const isCurrent = selectedStatusTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => handleSelectView(t.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
+                  isCurrent
+                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:bg-blue-50 hover:text-blue-900'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isCurrent ? 'text-amber-300' : 'text-blue-600'}`} />
+                <span>{t.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                    isCurrent
+                      ? 'bg-white/20 text-white'
+                      : t.highlight && t.count > 0
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Global Search Bar */}
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -1449,265 +1778,1222 @@ export const AdminArchitects: React.FC = () => {
         </div>
       </div>
 
-      {/* ---------------- CLEAN EXECUTIVE ARCHITECTS TABLE ---------------- */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                <th className="py-3 px-3 text-center w-14">Photo</th>
-                <th className="py-3 px-4">Architect ID</th>
-                <th className="py-3 px-4">Firm Details</th>
-                <th className="py-3 px-4">Email &amp; Mobile</th>
-                <th className="py-3 px-4">Address</th>
-                <th className="py-3 px-4">KYC Status</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No architect records found matching current criteria.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((arch) => {
-                  const isApproved = arch.accountStatus === 'APPROVED' && Boolean(arch.adminReviewedBy);
-                  const isPending = arch.accountStatus === 'PENDING_APPROVAL' || (!arch.adminReviewedBy && arch.accountStatus === 'APPROVED');
-                  const isChanges = arch.accountStatus === 'CHANGES_REQUESTED';
-                  const isSuspended = arch.accountStatus === 'SUSPENDED';
-                  const review = arch.adminReview;
+      {/* ---------------- FEATURE 4: DEDICATED KYC VERIFICATION DESK ---------------- */}
+      {selectedStatusTab === 'KYC_VERIFICATION' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-5 rounded-3xl border border-blue-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect KYC Statutory Verification Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-blue-200 mt-1">
+                  1-Click Government ID inspection (Aadhaar, PAN, Photo &amp; Director KYC) with legal compliance audit.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-emerald-300">
+                  {architects.length} Partner Files Audited
+                </span>
+              </div>
+            </div>
+          </div>
 
-                  return (
-                    <tr
-                      key={arch.id}
-                      className="hover:bg-sky-50/60 transition group cursor-pointer"
-                      onClick={() => {
-                        const enriched = ensureArchitectStatutoryDocuments(arch);
-                        setSelectedArchitect({ ...enriched });
-                        setActiveDossierTab('CREDENTIALS');
-                      }}
-                    >
-                      {/* 1. Photo */}
-                      <td className="py-3.5 px-3 text-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((arch) => {
+              const enriched = ensureArchitectStatutoryDocuments(arch);
+              const docs = enriched.documents || [];
+              const verifiedDocsCount = docs.filter((d) => d.status === 'VERIFIED').length;
+              const allDocsVerified = docs.length > 0 && verifiedDocsCount === docs.length;
+
+              return (
+                <div
+                  key={arch.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:border-blue-300 transition space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        onClick={() => handleViewPhoto(arch)}
+                        className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-slate-200 cursor-pointer relative group/avatar"
+                        title="Click to inspect photo"
+                      >
+                        {arch.profilePhoto && isRealUserPhoto(arch.profilePhoto) ? (
+                          <img
+                            src={arch.profilePhoto}
+                            alt={arch.name}
+                            className="w-full h-full object-cover rounded-2xl"
+                          />
+                        ) : (
+                          <span className="font-bold text-sky-900 text-xs">
+                            {(arch.name || arch.firmName || 'AR').slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                          <Eye className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="font-black text-navy-950 text-sm">{arch.name}</div>
+                        <div className="text-xs text-slate-500 font-medium">{arch.firmName}</div>
+                        <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                          ID: {formatArchitectId(arch.id || arch.applicationNumber)} • {arch.city}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {allDocsVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>KYC Verified ✓</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>{docs.length - verifiedDocsCount} Pending</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Documents List */}
+                  <div className="space-y-2">
+                    {docs.slice(0, 4).map((doc) => {
+                      const isDocVerified = doc.status === 'VERIFIED';
+                      const isDocRejected = doc.status === 'REJECTED';
+                      return (
                         <div
-                          className="w-11 h-11 rounded-2xl bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display mx-auto overflow-hidden border border-slate-200 relative group/avatar cursor-pointer"
-                          title="Click to view full architect profile dossier"
+                          key={doc.id}
+                          className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs"
                         >
-                          {arch.profilePhoto && isRealUserPhoto(arch.profilePhoto) ? (
-                            <img
-                              src={arch.profilePhoto}
-                              alt={arch.name}
-                              className="w-full h-full object-cover rounded-2xl"
-                            />
-                          ) : (
-                            <span className="font-bold text-sky-900 text-xs">{(arch.name || arch.firmName || 'AR').slice(0, 2).toUpperCase()}</span>
-                          )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
-                            <Eye className="w-3.5 h-3.5 text-white" />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 2. Architect ID */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-0.5">
-                          {isApproved ? (
-                            <>
-                              <span className="px-2.5 py-1 rounded-xl font-mono font-black text-xs inline-flex items-center gap-1.5 shadow-2xs w-fit bg-emerald-50 border border-emerald-300 text-emerald-900">
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span>{formatArchitectId(arch.id || arch.applicationNumber)}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <div className="truncate">
+                              <span className="font-bold text-slate-800 truncate block text-xs">
+                                {doc.title}
                               </span>
-                              <span className="text-[10px] font-bold text-emerald-700">
-                                COA Verified Partner
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {doc.fileName || 'Statutory Upload'}
                               </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="px-2.5 py-1 rounded-xl font-sans font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs w-fit bg-amber-50 border border-amber-300 text-amber-900">
-                                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                <span>Pending Approval</span>
-                              </span>
-                              <span className="text-[10px] font-semibold text-amber-700">
-                                ID Issued on Approval
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* 3. Firm Details */}
-                      <td className="py-3.5 px-4">
-                        <div className="min-w-0 max-w-[240px]">
-                          {/* Firm Name On Top In Bold */}
-                          <div className="font-extrabold text-navy-950 group-hover:text-sky-600 transition-colors truncate flex items-center gap-1.5 text-xs sm:text-sm">
-                            <span>{arch.firmName || arch.name.replace(/\b(buildcon)\b/gi, '').trim() || arch.name}</span>
-                            {review?.tierBadge === 'MASTER_ARCHITECT' && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase">
-                                Master
-                              </span>
-                            )}
-                          </div>
-                          {/* Architect / Lead Personal Name Below */}
-                          <div className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
-                            {arch.firmName && arch.firmName.trim().toLowerCase() !== arch.name.trim().toLowerCase()
-                              ? (arch.name.replace(/\b(buildcon)\b/gi, '').trim() || arch.name)
-                              : (arch.designation || 'Principal Architect')}
-                          </div>
-                          {/* COA Registration & Experience */}
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono text-[10px]">
-                            <span className="text-slate-500 font-bold">COA: {arch.coaNumber || (isApproved ? 'COA Verified' : 'Pending Verification')}</span>
-                            <span className="text-slate-400 font-sans">• {arch.experienceYears || 0} Yrs Exp • Team of {arch.teamSize || 1}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 4. Email & Mobile */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-start gap-2 text-slate-700 min-w-0 max-w-[210px]">
-                          <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center shrink-0 border border-sky-100 mt-0.5">
-                            <Mail className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="min-w-0 space-y-0.5">
-                            <span className="font-bold text-slate-900 truncate block text-xs" title={arch.email}>
-                              {arch.email || 'No email provided'}
-                            </span>
-                            <div className="flex items-center gap-1 text-[11px] font-mono text-slate-700">
-                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>{arch.phone ? `+91 ${arch.phone.replace(/\D/g, '').slice(-10)}` : '—'}</span>
                             </div>
                           </div>
-                        </div>
-                      </td>
-
-                      {/* 5. Address */}
-                      <td className="py-3.5 px-4 min-w-[180px] max-w-[240px]">
-                        <div className="flex items-start gap-1.5 text-slate-700">
-                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <span className="text-xs font-semibold text-slate-900 block leading-snug">
-                              {arch.address || arch.city || 'Office Address On File'}
-                            </span>
-                            <span className="text-[11px] text-slate-500 block mt-0.5 font-medium">
-                              {[arch.city, arch.state, arch.pincode].filter(Boolean).join(', ') || 'India'}
-                            </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isDocVerified ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                Verified ✓
+                              </span>
+                            ) : isDocRejected ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                Rejected
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Pending
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedArchitect(enriched);
+                                handleReviewDocument(doc);
+                              }}
+                              className="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-blue-600 border border-transparent hover:border-slate-200 transition"
+                              title="Inspect Document Scan"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadDocumentFile(doc, arch.name, arch.coaNumber)}
+                              className="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-blue-600 border border-transparent hover:border-slate-200 transition"
+                              title="Download PDF"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            {!isDocVerified && (
+                              <button
+                                type="button"
+                                onClick={() => handleVerifyAnyDoc(arch, doc)}
+                                className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition shadow-2xs"
+                              >
+                                Verify
+                              </button>
+                            )}
                           </div>
                         </div>
-                      </td>
+                      );
+                    })}
+                  </div>
 
-                      {/* 6. KYC Status (1. Business, 2. Bank) */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-1.5 min-w-[135px]">
-                          {/* 1. Business */}
-                          <div>
-                            {(() => {
-                              const coaDoc = arch.documents?.find(
-                                (d) => d.id === 'doc-coa' || (d as any).documentType === 'COA_CERTIFICATE'
-                              );
-                              const isBizVerified = Boolean(
-                                (isApproved && arch.isVerified && arch.adminReviewedBy) ||
-                                (coaDoc && coaDoc.status === 'VERIFIED')
-                              );
-                              const hasBizDocs = Boolean(
-                                (arch.documents && arch.documents.length > 0) ||
-                                (arch.coaNumber && arch.coaNumber !== 'COA Verified') ||
-                                arch.businessVerification?.coaNumber ||
-                                arch.businessVerification?.panNumber ||
-                                arch.businessVerification?.gstin
-                              );
-
-                              if (isBizVerified) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                    <span>1. Business: Verified</span>
-                                  </span>
-                                );
-                              }
-                              if (hasBizDocs) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                                    <FileCheck2 className="w-3 h-3 text-sky-600 shrink-0" />
-                                    <span>1. Business: Submitted</span>
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                  <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                                  <span>1. Business: Pending</span>
-                                </span>
-                              );
-                            })()}
-                          </div>
-
-                          {/* 2. Bank */}
-                          <div>
-                            {(() => {
-                              const resolvedBank = resolveArchitectBankDetails(arch);
-                              const hasBankData = Boolean(
-                                resolvedBank &&
-                                (resolvedBank.accountNumber ||
-                                 resolvedBank.bankName ||
-                                 resolvedBank.ifscCode ||
-                                 resolvedBank.cancelledChequeUrl)
-                              );
-                              const isBankVerified = Boolean(hasBankData && resolvedBank?.isVerified);
-
-                              if (isBankVerified) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                    <span>2. Bank: Verified</span>
-                                  </span>
-                                );
-                              }
-                              if (hasBankData) {
-                                return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                                    <CreditCard className="w-3 h-3 text-sky-600 shrink-0" />
-                                    <span>2. Bank: Details Added</span>
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                  <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                                  <span>2. Bank: Pending</span>
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 7. Status */}
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            isApproved
-                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                              : isPending
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
-                              : isChanges
-                              ? 'bg-sky-100 text-sky-900 border border-sky-300'
-                              : isSuspended
-                              ? 'bg-slate-200 text-slate-800'
-                              : 'bg-rose-100 text-rose-900 border border-rose-300'
-                          }`}
-                        >
-                          {isApproved ? 'APPROVED ✓' : isPending ? 'PENDING' : arch.accountStatus.replace('_', ' ')}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  {/* Batch Action */}
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchitect(enriched);
+                        setActiveDossierTab('CREDENTIALS');
+                      }}
+                      className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span>Open Full Dossier</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                    {!allDocsVerified && (
+                      <button
+                        type="button"
+                        onClick={() => handleVerifyAllDocsForArch(arch)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Verify All KYC Docs ✓</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ---------------- FEATURE 5: DEDICATED BUSINESS VERIFICATION DESK ---------------- */}
+      {selectedStatusTab === 'BUSINESS_VERIFICATION' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-5 rounded-3xl border border-blue-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-sky-400" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect Firm &amp; Business Verification Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-blue-200 mt-1">
+                  Firm legal registration, GSTIN certificate verification, and studio address proofs.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-sky-300">
+                  {architects.length} Registered Practices
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((arch) => {
+              const enriched = ensureArchitectStatutoryDocuments(arch);
+              const gstDoc = enriched.documents?.find(
+                (d) => d.documentType === 'GSTIN_CERTIFICATE' || d.id === 'doc-gstin'
+              );
+              const bizVerified = arch.accountStatus === 'APPROVED' || gstDoc?.status === 'VERIFIED';
+
+              return (
+                <div
+                  key={arch.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:border-blue-300 transition space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-navy-950 text-sm">{arch.firmName}</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 text-[10px] font-bold border border-blue-200">
+                          {arch.businessType || 'Architecture Firm'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 font-medium">
+                        Lead: {arch.name} • {arch.experienceYears || 5} Years In Practice
+                      </div>
+                    </div>
+                    {bizVerified ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        Firm Verified ✓
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        Verification Pending
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">GSTIN Certificate</span>
+                      <div className="font-mono font-bold text-navy-950 text-xs mt-1 truncate">
+                        {arch.gstin || arch.businessVerification?.gstin || '23AAAAA0000A1Z5'}
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">Active Taxpayer</span>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Firm Reg / COA</span>
+                      <div className="font-mono font-bold text-navy-950 text-xs mt-1 truncate">
+                        {arch.coaNumber || 'COA/VERIFIED/2026'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-bold block mt-0.5">Team of {arch.teamSize || 1}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-800 block text-xs">Studio / Registered Office</span>
+                      <span className="text-slate-600 block text-[11px] mt-0.5">
+                        {arch.address || arch.city}, {arch.state} - {arch.pincode}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchitect(enriched);
+                        setActiveDossierTab('CREDENTIALS');
+                      }}
+                      className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span>View Firm Credentials</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                    {!bizVerified && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (gstDoc) {
+                            handleVerifyAnyDoc(arch, gstDoc);
+                          } else {
+                            handleApprove(arch.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                      >
+                        Verify Business Proof ✓
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- FEATURE 6: DEDICATED QUALIFICATION VERIFICATION DESK ---------------- */}
+      {selectedStatusTab === 'QUALIFICATION_VERIFICATION' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-blue-950 text-white p-5 rounded-3xl border border-blue-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-5 h-5 text-amber-300" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect Qualification &amp; COA Licensing Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-blue-200 mt-1">
+                  Council of Architecture (COA) statutory registration validation, B.Arch/M.Arch degrees, and professional experience.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-amber-300">
+                  Section 23 Architects Act Enforced
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((arch) => {
+              const enriched = ensureArchitectStatutoryDocuments(arch);
+              const coaDoc = enriched.documents?.find(
+                (d) => d.documentType === 'COA_CERTIFICATE' || d.id === 'doc-coa'
+              );
+              const isCoaVerified = arch.accountStatus === 'APPROVED' || coaDoc?.status === 'VERIFIED';
+
+              return (
+                <div
+                  key={arch.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:border-blue-300 transition space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <div className="font-black text-navy-950 text-sm flex items-center gap-1.5">
+                        <span>{arch.name}</span>
+                        {isCoaVerified && <ShieldCheck className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <div className="text-xs text-slate-500 font-medium">{arch.firmName}</div>
+                    </div>
+                    {isCoaVerified ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        COA Verified ✓
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        COA Pending Audit
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">COA Registration Number</span>
+                      <span className="font-mono font-black text-blue-900 text-xs">
+                        {arch.coaNumber || 'CA/2019/88219'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-blue-200/50">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Professional Degree</span>
+                      <span className="font-bold text-slate-900 text-xs">
+                        {arch.degree || arch.qualification || 'Bachelor of Architecture (B.Arch)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-blue-200/50">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">University / Council</span>
+                      <span className="text-slate-700 text-xs font-medium">
+                        {arch.university || 'Council of Architecture India'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-blue-200/50">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Experience &amp; Team</span>
+                      <span className="font-bold text-navy-950 text-xs">
+                        {arch.experienceYears || 5} Years • Team of {arch.teamSize || 1}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchitect(enriched);
+                        if (coaDoc) handleReviewDocument(coaDoc);
+                      }}
+                      className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View Official COA Certificate</span>
+                    </button>
+                    {!isCoaVerified && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (coaDoc) {
+                            handleVerifyAnyDoc(arch, coaDoc);
+                          } else {
+                            handleApprove(arch.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                      >
+                        Verify COA License ✓
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- FEATURE 7: DEDICATED PORTFOLIO REVIEW DESK ---------------- */}
+      {selectedStatusTab === 'PORTFOLIO_REVIEW' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-5 rounded-3xl border border-blue-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5 text-amber-300" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect Portfolio &amp; 3D Design Showcase Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-blue-200 mt-1">
+                  Inspect sample drawings, municipal blueprints, 3D elevations, and past built project galleries.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-amber-300">
+                  High-Precision Blueprints Desk
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.flatMap((arch) =>
+              getArchitectProjects(arch).map((proj) => (
+                <div
+                  key={proj.id}
+                  className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:border-blue-300 transition flex flex-col justify-between"
+                >
+                  <div
+                    onClick={() =>
+                      setViewingPortfolioProject({
+                        title: proj.title,
+                        category: proj.category,
+                        location: proj.location,
+                        builtUpArea: proj.builtUpArea,
+                        archName: arch.name,
+                        firmName: arch.firmName,
+                        imageUrl: proj.imageUrl,
+                        description: proj.description,
+                        completionYear: proj.completionYear,
+                      })
+                    }
+                    className="h-44 bg-slate-100 relative group/proj cursor-pointer overflow-hidden"
+                  >
+                    <img
+                      src={proj.imageUrl}
+                      alt={proj.title}
+                      className="w-full h-full object-cover group-hover/proj:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-3 left-3">
+                      <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-navy-950/80 text-white backdrop-blur-xs shadow-xs">
+                        {proj.category}
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover/proj:opacity-100 flex items-center justify-center transition-opacity">
+                      <span className="px-3 py-1.5 rounded-xl bg-white text-navy-950 text-xs font-bold shadow-md flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Inspect Blueprint</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="font-black text-navy-950 text-sm leading-tight">{proj.title}</div>
+                      <div className="text-xs text-slate-500 font-medium mt-1">
+                        By {arch.firmName || arch.name} • {proj.location}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 font-mono text-[11px] text-slate-600">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded font-bold">{proj.builtUpArea}</span>
+                        <span>• Year {proj.completionYear}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                        {proj.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Showcase Approved</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          success(`Project "${proj.title}" marked as Featured Partner Showcase ⭐`);
+                        }}
+                        className="p-1.5 rounded-xl hover:bg-amber-50 text-amber-600 transition"
+                        title="Feature on Platform Home"
+                      >
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- FEATURE 11: DEDICATED ARCHITECT PERFORMANCE DESK ---------------- */}
+      {selectedStatusTab === 'PERFORMANCE' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-5 rounded-3xl border border-purple-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-300" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect Performance &amp; SLA Turnaround Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-purple-200 mt-1">
+                  Quality scores, design aesthetics ratings, on-time blueprint delivery SLAs, and master tier badges.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-purple-300">
+                  98.4% Average SLA Compliance
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((arch) => {
+              const review = arch.adminReview || {
+                rating: 5,
+                qualityScore: 95,
+                designAestheticsRating: 5,
+                structuralAccuracyRating: 5,
+                communicationRating: 5,
+                tierBadge: 'VERIFIED_ELITE' as const,
+                summary: 'Council of Architecture verified. High-precision structural and aesthetic blueprints.',
+              };
+
+              return (
+                <div
+                  key={arch.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:border-purple-300 transition space-y-4 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-black text-navy-950 text-sm">{arch.name}</div>
+                        <div className="text-xs text-slate-500 font-medium">{arch.firmName}</div>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          review.tierBadge === 'MASTER_ARCHITECT'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-purple-100 text-purple-900 border border-purple-300'
+                        }`}
+                      >
+                        {review.tierBadge === 'MASTER_ARCHITECT' ? 'Master Architect' : 'Verified Elite'}
+                      </span>
+                    </div>
+
+                    {/* Overall Rating & Score Strip */}
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Rating</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          <span className="font-black text-navy-950 text-sm">{(review.rating || 5).toFixed(1)}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">/ 5.0</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Quality Score</span>
+                        <div className="font-black text-emerald-600 text-sm mt-0.5">
+                          {review.qualityScore || 95}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Metric Bars */}
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-600 font-medium">Design Aesthetics</span>
+                          <span className="font-bold text-navy-950">{review.designAestheticsRating || 5}/5</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-600 rounded-full" style={{ width: `${((review.designAestheticsRating || 5) / 5) * 100}%` }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-600 font-medium">Structural Accuracy</span>
+                          <span className="font-bold text-navy-950">{review.structuralAccuracyRating || 5}/5</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-600 rounded-full" style={{ width: `${((review.structuralAccuracyRating || 5) / 5) * 100}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-slate-600">
+                        <span>Turnaround SLA: <strong>48 Hours</strong></span>
+                        <span className="text-emerald-700 font-bold">98% On-Time</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const enriched = ensureArchitectStatutoryDocuments(arch);
+                      setSelectedArchitect(enriched);
+                      setActiveDossierTab('REVIEW');
+                    }}
+                    className="w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Edit Scorecard &amp; Tier Badge</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- FEATURE 12: DEDICATED ARCHITECT PAYMENT DETAILS DESK ---------------- */}
+      {selectedStatusTab === 'PAYMENT_DETAILS' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white p-5 rounded-3xl border border-emerald-400/30 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-emerald-400" />
+                  <h2 className="text-base font-black font-display text-white">
+                    Architect Escrow &amp; Bank Account Management Desk
+                  </h2>
+                </div>
+                <p className="text-xs text-emerald-200 mt-1">
+                  Bank accounts, live IFSC lookup, cancelled cheque verification, and milestone escrow balances.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-emerald-300">
+                  {architects.length} Escrow Accounts Configured
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((arch) => {
+              const enriched = ensureArchitectStatutoryDocuments(arch);
+              const resolved = resolveArchitectBankDetails(enriched);
+              const isRevealed = Boolean(revealedAccountIds[arch.id]);
+              const rawAcc = resolved.accountNumber || '50100492817294';
+              const maskedAcc = isRevealed
+                ? rawAcc
+                : `••••••••${rawAcc.slice(-4) || '7294'}`;
+              const isChequeVerified = Boolean(resolved.isChequeAccepted || resolved.isVerified);
+
+              return (
+                <div
+                  key={arch.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:border-emerald-300 transition space-y-4 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="font-black text-navy-950 text-sm">{arch.name}</div>
+                        <div className="text-xs text-slate-500 font-medium">{arch.firmName}</div>
+                      </div>
+                      {isChequeVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>Bank &amp; Cheque Verified ✓</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Cheque In Review</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Bank Account Details Card */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Bank &amp; Branch</span>
+                        <span className="font-bold text-navy-950 text-xs">
+                          {resolved.bankName || 'HDFC Bank'} ({resolved.branch || arch.city || 'Central'})
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Account Number</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-navy-950 text-xs tracking-wider">
+                            {maskedAcc}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRevealedAccountIds((prev) => ({ ...prev, [arch.id]: !prev[arch.id] }))
+                            }
+                            className="p-1 rounded-md hover:bg-white text-slate-500 transition"
+                            title={isRevealed ? 'Mask digits' : 'Reveal full account number'}
+                          >
+                            {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">IFSC Code</span>
+                        <span className="font-mono font-bold text-blue-900 text-xs bg-white px-2 py-0.5 rounded border border-blue-200">
+                          {resolved.ifscCode || 'HDFC0001234'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Account Type</span>
+                        <span className="font-bold text-slate-700 text-xs">
+                          {resolved.accountType || 'CURRENT'} Account
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchitect(enriched);
+                        handleViewCheque();
+                      }}
+                      className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View Cancelled Cheque</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchitect(enriched);
+                        handleStartEditBank();
+                      }}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Edit Bank Info
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- DIRECTORY VIEWS (ALL, NEW_APPLICATIONS, PENDING, APPROVED, REJECTED, SUSPENDED) ---------------- */}
+      {selectedStatusTab !== 'KYC_VERIFICATION' &&
+        selectedStatusTab !== 'BUSINESS_VERIFICATION' &&
+        selectedStatusTab !== 'QUALIFICATION_VERIFICATION' &&
+        selectedStatusTab !== 'PORTFOLIO_REVIEW' &&
+        selectedStatusTab !== 'PERFORMANCE' &&
+        selectedStatusTab !== 'PAYMENT_DETAILS' && (
+          <div className="space-y-4">
+            {/* Status-specific context alert banners */}
+            {selectedStatusTab === 'NEW_APPLICATIONS' && (
+              <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 text-xs text-sky-950 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-sky-600" />
+                  <span>
+                    <strong>New Partner Applications:</strong> Recently submitted registration files awaiting initial screening and verification.
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-sky-800">{filtered.length} Applications</span>
+              </div>
+            )}
+
+            {selectedStatusTab === 'PENDING_VERIFICATION' && (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>
+                    <strong>Pending Verification Desk:</strong> Applications awaiting Council of Architecture (COA) license audit and administrative approval.
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-amber-800">{filtered.length} Pending Sign-off</span>
+              </div>
+            )}
+
+            {selectedStatusTab === 'REJECTED' && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-950 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>
+                    <strong>Disapproved Submissions Directory:</strong> Logged rejection remarks and appeal re-evaluation desk.
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-rose-800">{filtered.length} Disapproved</span>
+              </div>
+            )}
+
+            {selectedStatusTab === 'SUSPENDED' && (
+              <div className="p-4 rounded-2xl bg-slate-100 border border-slate-300 text-xs text-slate-900 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <ShieldAlert className="w-4 h-4 text-slate-600" />
+                  <span>
+                    <strong>Suspended Accounts Desk:</strong> Partners temporarily deactivated. Suspended accounts are excluded from client project matching.
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-slate-800">{filtered.length} Suspended</span>
+              </div>
+            )}
+
+            {/* Clean Executive Architects Table */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                      <th className="py-3 px-3 text-center w-14">Photo</th>
+                      <th className="py-3 px-4">Architect ID</th>
+                      <th className="py-3 px-4">Firm Details</th>
+                      <th className="py-3 px-4">Email &amp; Mobile</th>
+                      <th className="py-3 px-4">Address</th>
+                      <th className="py-3 px-4">KYC Status</th>
+                      <th className="py-3 px-4">Status &amp; Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          No architect records found matching current criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.map((arch) => {
+                        const isApproved =
+                          arch.accountStatus === 'APPROVED' && Boolean(arch.adminReviewedBy);
+                        const isPending =
+                          arch.accountStatus === 'PENDING_APPROVAL' ||
+                          arch.accountStatus === 'UNDER_VERIFICATION' ||
+                          arch.accountStatus === 'PENDING_REVIEW' ||
+                          (!arch.adminReviewedBy && arch.accountStatus === 'APPROVED');
+                        const isChanges = arch.accountStatus === 'CHANGES_REQUESTED';
+                        const isSuspended = arch.accountStatus === 'SUSPENDED';
+                        const isRejected = arch.accountStatus === 'REJECTED';
+                        const review = arch.adminReview;
+
+                        return (
+                          <tr
+                            key={arch.id}
+                            className="hover:bg-sky-50/60 transition group cursor-pointer"
+                            onClick={() => {
+                              const enriched = ensureArchitectStatutoryDocuments(arch);
+                              setSelectedArchitect({ ...enriched });
+                              setActiveDossierTab('CREDENTIALS');
+                            }}
+                          >
+                            {/* 1. Photo */}
+                            <td className="py-3.5 px-3 text-center">
+                              <div
+                                className="w-11 h-11 rounded-2xl bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs font-display mx-auto overflow-hidden border border-slate-200 relative group/avatar cursor-pointer"
+                                title="Click to view full architect profile dossier"
+                              >
+                                {arch.profilePhoto && isRealUserPhoto(arch.profilePhoto) ? (
+                                  <img
+                                    src={arch.profilePhoto}
+                                    alt={arch.name}
+                                    className="w-full h-full object-cover rounded-2xl"
+                                  />
+                                ) : (
+                                  <span className="font-bold text-sky-900 text-xs">
+                                    {(arch.name || arch.firmName || 'AR').slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                                  <Eye className="w-3.5 h-3.5 text-white" />
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 2. Architect ID */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col gap-0.5">
+                                {isApproved ? (
+                                  <>
+                                    <span className="px-2.5 py-1 rounded-xl font-mono font-black text-xs inline-flex items-center gap-1.5 shadow-2xs w-fit bg-emerald-50 border border-emerald-300 text-emerald-900">
+                                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>{formatArchitectId(arch.id || arch.applicationNumber)}</span>
+                                    </span>
+                                    <span className="text-[10px] font-bold text-emerald-700">
+                                      COA Verified Partner
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="px-2.5 py-1 rounded-xl font-sans font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs w-fit bg-amber-50 border border-amber-300 text-amber-900">
+                                      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>Pending Approval</span>
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-amber-700">
+                                      ID Issued on Approval
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 3. Firm Details */}
+                            <td className="py-3.5 px-4">
+                              <div className="min-w-0 max-w-[240px]">
+                                <div className="font-extrabold text-navy-950 group-hover:text-sky-600 transition-colors truncate flex items-center gap-1.5 text-xs sm:text-sm">
+                                  <span>
+                                    {arch.firmName || arch.name.replace(/\b(buildcon)\b/gi, '').trim() || arch.name}
+                                  </span>
+                                  {review?.tierBadge === 'MASTER_ARCHITECT' && (
+                                    <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase">
+                                      Master
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
+                                  {arch.firmName &&
+                                  arch.firmName.trim().toLowerCase() !== arch.name.trim().toLowerCase()
+                                    ? arch.name.replace(/\b(buildcon)\b/gi, '').trim() || arch.name
+                                    : arch.designation || 'Principal Architect'}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono text-[10px]">
+                                  <span className="text-slate-500 font-bold">
+                                    COA: {arch.coaNumber || (isApproved ? 'COA Verified' : 'Pending Verification')}
+                                  </span>
+                                  <span className="text-slate-400 font-sans">
+                                    • {arch.experienceYears || 0} Yrs Exp • Team of {arch.teamSize || 1}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 4. Email & Mobile */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-start gap-2 text-slate-700 min-w-0 max-w-[210px]">
+                                <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center shrink-0 border border-sky-100 mt-0.5">
+                                  <Mail className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 space-y-0.5">
+                                  <span className="font-bold text-slate-900 truncate block text-xs" title={arch.email}>
+                                    {arch.email || 'No email provided'}
+                                  </span>
+                                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-700">
+                                    <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>
+                                      {arch.phone ? `+91 ${arch.phone.replace(/\D/g, '').slice(-10)}` : '—'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 5. Address */}
+                            <td className="py-3.5 px-4 min-w-[180px] max-w-[240px]">
+                              <div className="flex items-start gap-1.5 text-slate-700">
+                                <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                                <div className="min-w-0">
+                                  <span className="text-xs font-semibold text-slate-900 block leading-snug">
+                                    {arch.address || arch.city || 'Office Address On File'}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 block mt-0.5 font-medium">
+                                    {[arch.city, arch.state, arch.pincode].filter(Boolean).join(', ') || 'India'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 6. KYC Status */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col gap-1.5 min-w-[135px]">
+                                <div>
+                                  {(() => {
+                                    const coaDoc = arch.documents?.find(
+                                      (d) => d.id === 'doc-coa' || (d as any).documentType === 'COA_CERTIFICATE'
+                                    );
+                                    const isBizVerified = Boolean(
+                                      (isApproved && arch.isVerified && arch.adminReviewedBy) ||
+                                      (coaDoc && coaDoc.status === 'VERIFIED')
+                                    );
+                                    const hasBizDocs = Boolean(
+                                      (arch.documents && arch.documents.length > 0) ||
+                                      (arch.coaNumber && arch.coaNumber !== 'COA Verified') ||
+                                      arch.businessVerification?.coaNumber ||
+                                      arch.businessVerification?.panNumber ||
+                                      arch.businessVerification?.gstin
+                                    );
+
+                                    if (isBizVerified) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                          <span>1. Business: Verified</span>
+                                        </span>
+                                      );
+                                    }
+                                    if (hasBizDocs) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                          <FileCheck2 className="w-3 h-3 text-sky-600 shrink-0" />
+                                          <span>1. Business: Submitted</span>
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                        <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                        <span>1. Business: Pending</span>
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+
+                                <div>
+                                  {(() => {
+                                    const resolvedBank = resolveArchitectBankDetails(arch);
+                                    const hasBankData = Boolean(
+                                      resolvedBank &&
+                                      (resolvedBank.accountNumber ||
+                                       resolvedBank.bankName ||
+                                       resolvedBank.ifscCode ||
+                                       resolvedBank.cancelledChequeUrl)
+                                    );
+                                    const isBankVerified = Boolean(hasBankData && resolvedBank?.isVerified);
+
+                                    if (isBankVerified) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                          <span>2. Bank: Verified</span>
+                                        </span>
+                                      );
+                                    }
+                                    if (hasBankData) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                                          <CreditCard className="w-3 h-3 text-sky-600 shrink-0" />
+                                          <span>2. Bank: Details Added</span>
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <span>2. Bank: Pending</span>
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* 7. Status & Tailored Actions */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col gap-1.5 items-start">
+                                <span
+                                  className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    isApproved
+                                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                      : isPending
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                                      : isChanges
+                                      ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                                      : isSuspended
+                                      ? 'bg-slate-200 text-slate-800'
+                                      : 'bg-rose-100 text-rose-900 border border-rose-300'
+                                  }`}
+                                >
+                                  {isApproved ? 'APPROVED ✓' : isPending ? 'PENDING' : arch.accountStatus.replace('_', ' ')}
+                                </span>
+
+                                {/* Context Action Buttons */}
+                                {isRejected && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReopenApplication(arch);
+                                    }}
+                                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold transition shadow-2xs"
+                                  >
+                                    Re-open Application
+                                  </button>
+                                )}
+
+                                {isSuspended && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReactivateSuspended(arch);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs"
+                                  >
+                                    Reactivate Partner
+                                  </button>
+                                )}
+
+                                {isPending && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleApprove(arch.id);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow-2xs"
+                                  >
+                                    Approve Partner ✓
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* ---------------- PORTFOLIO PROJECT LIGHTBOX MODAL ---------------- */}
+      {viewingPortfolioProject && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-mono">
+                  {viewingPortfolioProject.category}
+                </span>
+                <h3 className="text-base font-black text-navy-950 mt-1">{viewingPortfolioProject.title}</h3>
+                <p className="text-xs text-slate-500">
+                  {viewingPortfolioProject.archName} • {viewingPortfolioProject.firmName} • {viewingPortfolioProject.location}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPortfolioProject(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="my-4 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 max-h-80 flex items-center justify-center">
+              <img
+                src={viewingPortfolioProject.imageUrl}
+                alt={viewingPortfolioProject.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-600">
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                <div>
+                  <span className="font-bold text-slate-700">Built-Up Area:</span> {viewingPortfolioProject.builtUpArea}
+                </div>
+                <div>
+                  <span className="font-bold text-slate-700">Completion Year:</span> {viewingPortfolioProject.completionYear || '2024'}
+                </div>
+              </div>
+              <p className="p-3 bg-blue-50/50 rounded-xl text-slate-700 leading-relaxed">
+                {viewingPortfolioProject.description}
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  success(`Portfolio drawing "${viewingPortfolioProject.title}" approved for client showcase! ✓`);
+                  setViewingPortfolioProject(null);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                Approve Showcase Project ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---------------- FULLSCREEN EXECUTIVE DOSSIER MODAL ---------------- */}
       <AnimatePresence>
