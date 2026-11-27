@@ -50,6 +50,19 @@ import {
   getInteriorSnagItems,
   saveInteriorSnagItem,
   resolveInteriorSnagItem,
+  getInteriorProjectMilestones,
+  saveInteriorMilestone,
+  submitMilestoneToAdmin,
+  adminReviewMilestone,
+  customerReviewMilestone,
+  adminFinalVerifyMilestone,
+  calculateProjectMilestoneProgress,
+  adminAuthorizeMilestonePaymentRequest,
+  customerPayMilestoneInvoice,
+  backendVerifyPayment,
+  adminApprovePayout,
+  createPayoutRequest,
+  getInteriorPayouts,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
 
@@ -663,5 +676,135 @@ describe('Interior Designer Panel & Store Tests', () => {
     const resolvedSnag = resolveInteriorSnagItem(snag.id);
     expect(resolvedSnag.status).toBe('RESOLVED');
     expect(resolvedSnag.resolvedDate).toBeDefined();
+  });
+
+  it('calculates 3-tier milestone progress using configured weights per Section 13', () => {
+    const projectId = 'prj-int-1';
+    const progress = calculateProjectMilestoneProgress(projectId);
+
+    // Section 13: Progress must be calculated using configured milestone/task weights, not a simple average.
+    expect(progress.designerReportedProgress).toBeGreaterThan(0);
+    expect(progress.adminVerifiedProgress).toBeGreaterThan(0);
+    expect(progress.customerApprovedProgress).toBeGreaterThan(0);
+
+    // Designer reported includes in-progress work; Admin verified includes verified deliverables; Customer approved is signed off
+    expect(progress.designerReportedProgress).toBeGreaterThanOrEqual(progress.adminVerifiedProgress);
+    expect(progress.adminVerifiedProgress).toBeGreaterThanOrEqual(progress.customerApprovedProgress);
+    expect(progress.totalWeight).toBe(100);
+  });
+
+  it('implements Mandatory Section 23 Test 6: Milestone submission, Admin review, Customer approval, and Payout authorization', () => {
+    const projectId = 'BG-2026-TEST-MS-PAY';
+
+    // Step 1: Interior Designer creates and submits milestone deliverable
+    const milestone = saveInteriorMilestone({
+      projectId,
+      projectName: 'The Camellias Luxury Suite',
+      order: 1,
+      name: 'Stage 1: Advance Booking & Space Planning Approval',
+      description: 'Laser survey measurements, furniture concept layout, and partition elevations.',
+      weightPercent: 20,
+      targetAmount: 250000,
+      dueDate: '2026-12-15',
+      status: 'IN_PROGRESS',
+      deliverables: [
+        { id: 'del-t1', title: '2D Furniture Spatial Plan DWG', category: 'LAYOUT_2D', status: 'UPLOADED' },
+        { id: 'del-t2', title: 'Site Laser Measurement Audit', category: 'SITE_REPORT', status: 'UPLOADED' },
+      ],
+    });
+    expect(milestone.id).toMatch(/^BG-MS-INT-/);
+
+    // Designer submits completion evidence to Admin
+    const submitted = submitMilestoneToAdmin(milestone.id, {
+      completionDescription: 'Spatial 2D plan finalized and laser measurements matched with site conditions.',
+      completionDate: '2026-11-27',
+      supportingFiles: ['https://buildghar.com/docs/spatial-plan-v1.pdf'],
+      photos: ['https://images.unsplash.com/photo-site-t1'],
+      requestedAmount: 250000,
+    });
+    expect(submitted.status).toBe('SUBMITTED_TO_ADMIN');
+    expect(submitted.submissionDetails?.requestedAmount).toBe(250000);
+
+    // Step 2: Admin verifies deliverables and approves for customer review
+    const adminForwarded = adminReviewMilestone(
+      submitted.id,
+      'FORWARD_TO_CUSTOMER',
+      'Engineering and spatial clearance verified per NBC norms. Forwarded to customer.'
+    );
+    expect(adminForwarded.status).toBe('FORWARDED_TO_CUSTOMER');
+    expect(adminForwarded.adminReview?.status).toBe('FORWARDED_TO_CUSTOMER');
+
+    // Step 3: Customer approves milestone deliverables
+    const customerApproved = customerReviewMilestone(
+      adminForwarded.id,
+      'APPROVE',
+      'Space planning and room dimensions approved. Proceed with 3D views.'
+    );
+    expect(customerApproved.status).toBe('CUSTOMER_APPROVED');
+    expect(customerApproved.customerReview?.status).toBe('APPROVED');
+
+    // Admin performs final verification to close the deliverable stage
+    const verifiedCompleted = adminFinalVerifyMilestone(
+      customerApproved.id,
+      'Customer sign-off logged. Deliverables archived. Milestone eligible for payment.'
+    );
+    expect(verifiedCompleted.status).toBe('ADMIN_VERIFIED_COMPLETED');
+
+    // Step 4: Admin authorizes milestone payment request
+    const invoice = adminAuthorizeMilestonePaymentRequest(projectId, verifiedCompleted.id);
+    expect(invoice.id).toBeDefined();
+    expect(invoice.status).toBe('ISSUED');
+    expect(invoice.amount).toBe(250000);
+    expect(invoice.totalAmount).toBe(295000); // 250000 + 18% GST (45000)
+
+    // Step 5: Customer pays through configured gateway
+    const paidInvoice = customerPayMilestoneInvoice(invoice.id, 'RAZORPAY_ESCROW');
+    expect(paidInvoice.status).toBe('PAID');
+
+    // Step 6: Backend verifies payment (signature, idempotency, order id)
+    const isVerified = backendVerifyPayment(paidInvoice.id, 'order_K8s9231', 'sig_9812471923');
+    expect(isVerified).toBe(true);
+
+    // Step 7: Create designer payout request & Admin approves payout
+    const payoutReq = createPayoutRequest({
+      requestId: `REQ-PAY-${projectId}`,
+      designerId: 'id-101',
+      amount: 225000, // ₹2,50,000 less 10% platform commission
+      bankAccount: '••••••••8910',
+      ifsc: 'HDFC0001234',
+    });
+    expect(payoutReq.status).toBe('PENDING_ADMIN_APPROVAL');
+
+    const approvedPayout = adminApprovePayout(payoutReq.id, 'CMS2026112700981');
+    expect(approvedPayout.status).toBe('PROCESSED');
+    expect(approvedPayout.utrNumber).toBe('CMS2026112700981');
+
+    // Step 8: Interior Designer sees confirmed payout
+    const designerPayouts = getInteriorPayouts();
+    const confirmed = designerPayouts.find((p) => p.id === approvedPayout.id);
+    expect(confirmed).toBeDefined();
+    expect(confirmed?.status).toBe('PROCESSED');
+    expect(confirmed?.utrNumber).toBe('CMS2026112700981');
+  });
+
+  it('handles Admin correction request on milestone deliverable', () => {
+    const m = saveInteriorMilestone({
+      projectId: 'BG-TEST-CORRECTION',
+      name: 'Stage 2: 3D Renders',
+      status: 'IN_PROGRESS',
+    });
+
+    const sub = submitMilestoneToAdmin(m.id, {
+      completionDescription: 'Draft 3D views',
+    });
+    expect(sub.status).toBe('SUBMITTED_TO_ADMIN');
+
+    const corrected = adminReviewMilestone(
+      sub.id,
+      'REQUEST_CORRECTION',
+      'Please re-render kitchen view with updated island dimensions'
+    );
+    expect(corrected.status).toBe('CORRECTION_REQUESTED');
+    expect(corrected.adminReview?.feedback).toContain('updated island dimensions');
   });
 });

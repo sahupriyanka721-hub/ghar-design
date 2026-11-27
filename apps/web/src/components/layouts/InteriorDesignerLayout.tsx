@@ -63,12 +63,13 @@ export const InteriorDesignerLayout: React.FC = () => {
     { label: 'E. Design & 3D', path: '/interior-designer/designs', icon: Box },
     { label: 'F. Estimation & BOQ', path: '/interior-designer/boq', icon: Layers },
     { label: 'G. Site & Snag List', path: '/interior-designer/site-management', icon: Camera },
-    { label: 'H. Client Management', path: '/interior-designer/clients', icon: Users },
-    { label: 'I. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
-    { label: 'J. Billing & Payments', path: '/interior-designer/billing', icon: CreditCard },
-    { label: 'K. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
-    { label: 'L. Support Desk', path: '/interior-designer/support', icon: LifeBuoy },
-    { label: 'M. Settings', path: '/interior-designer/settings', icon: Sliders },
+    { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
+    { label: 'I. Client Management', path: '/interior-designer/clients', icon: Users },
+    { label: 'J. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
+    { label: 'K. Billing & Payments', path: '/interior-designer/billing', icon: CreditCard },
+    { label: 'L. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
+    { label: 'M. Support Desk', path: '/interior-designer/support', icon: LifeBuoy },
+    { label: 'N. Settings', path: '/interior-designer/settings', icon: Sliders },
   ];
 
   return (

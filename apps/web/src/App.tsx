@@ -133,6 +133,7 @@ import { InteriorDesignerProjects } from './pages/interior-designer/InteriorDesi
 import { InteriorDesignerDesignStudio } from './pages/interior-designer/InteriorDesignerDesignStudio.js';
 import { InteriorDesignerBOQ } from './pages/interior-designer/InteriorDesignerBOQ.js';
 import { InteriorDesignerSiteManagement } from './pages/interior-designer/InteriorDesignerSiteManagement.js';
+import { InteriorDesignerMilestones } from './pages/interior-designer/InteriorDesignerMilestones.js';
 import { InteriorDesignerClients } from './pages/interior-designer/InteriorDesignerClients.js';
 import { InteriorDesignerTeam } from './pages/interior-designer/InteriorDesignerTeam.js';
 import { InteriorDesignerBilling } from './pages/interior-designer/InteriorDesignerBilling.js';
@@ -384,6 +385,8 @@ export const App: React.FC = () => {
           <Route path="design-studio" element={<InteriorDesignerDesignStudio />} />
           <Route path="boq" element={<InteriorDesignerBOQ />} />
           <Route path="site-management" element={<InteriorDesignerSiteManagement />} />
+          <Route path="milestones" element={<InteriorDesignerMilestones />} />
+          <Route path="deliverables" element={<InteriorDesignerMilestones />} />
           <Route path="clients" element={<InteriorDesignerClients />} />
           <Route path="team" element={<InteriorDesignerTeam />} />
           <Route path="billing" element={<InteriorDesignerBilling />} />

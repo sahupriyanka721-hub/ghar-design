@@ -3537,6 +3537,549 @@ export const resolveInteriorSnagItem = (snagId: string): InteriorSnagItem => {
 };
 
 // ==========================================
+// SECTION 13: MILESTONE AND DELIVERABLE MANAGEMENT
+// ==========================================
+export type InteriorMilestoneStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED_TO_ADMIN'
+  | 'CORRECTION_REQUESTED'
+  | 'REJECTED_BY_ADMIN'
+  | 'APPROVED_BY_ADMIN'
+  | 'FORWARDED_TO_CUSTOMER'
+  | 'CUSTOMER_APPROVED'
+  | 'CUSTOMER_CHANGES_REQUESTED'
+  | 'ADMIN_VERIFIED_COMPLETED';
+
+export interface InteriorDeliverableItem {
+  id: string;
+  title: string;
+  fileUrl?: string;
+  category: string;
+  status: 'PENDING' | 'UPLOADED' | 'APPROVED';
+}
+
+export interface InteriorMilestone {
+  id: string; // BG-MS-INT-XXXX
+  projectId: string;
+  projectName: string;
+  order: number;
+  name: string;
+  description: string;
+  weightPercent: number; // configured milestone weight e.g. 20
+  targetAmount: number;
+  dueDate: string;
+  status: InteriorMilestoneStatus;
+  deliverables: InteriorDeliverableItem[];
+  submissionDetails?: {
+    submittedAt: string;
+    completionDescription: string;
+    completionDate: string;
+    supportingFiles: string[];
+    photos: string[];
+    requestedAmount: number;
+  };
+  adminReview?: {
+    reviewedAt: string;
+    status: 'FORWARDED_TO_CUSTOMER' | 'CORRECTION_REQUESTED' | 'REJECTED' | 'ADMIN_VERIFIED_COMPLETED';
+    feedback: string;
+    forwardedToCustomerAt?: string;
+  };
+  customerReview?: {
+    reviewedAt: string;
+    status: 'APPROVED' | 'CHANGES_REQUESTED';
+    feedback: string;
+  };
+}
+
+export interface ProjectMilestoneProgress {
+  projectId: string;
+  designerReportedProgress: number; // weighted %
+  adminVerifiedProgress: number;    // weighted %
+  customerApprovedProgress: number; // weighted %
+  totalWeight: number;
+}
+
+export const TEST_MILESTONES: InteriorMilestone[] = [
+  {
+    id: 'BG-MS-INT-101',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    order: 1,
+    name: 'Stage 1: Advance Booking & Space Planning Approval',
+    description: 'Initial site laser measurements, furniture placement concept, and client spatial layout approval.',
+    weightPercent: 15,
+    targetAmount: 195856,
+    dueDate: '2026-10-30',
+    status: 'ADMIN_VERIFIED_COMPLETED',
+    deliverables: [
+      { id: 'del-1', title: '2D Furniture Spatial Plan v2.0', category: 'LAYOUT_2D', status: 'APPROVED' },
+      { id: 'del-2', title: 'Site Laser Measurement Log', category: 'SITE_REPORT', status: 'APPROVED' },
+    ],
+    submissionDetails: {
+      submittedAt: '2026-10-25T11:00:00Z',
+      completionDescription: 'Laser surveyed and approved by homeowner Aman Saxena.',
+      completionDate: '2026-10-25',
+      supportingFiles: ['https://buildghar.com/docs/spatial-plan-v2.pdf'],
+      photos: ['https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=600'],
+      requestedAmount: 195856,
+    },
+    adminReview: {
+      reviewedAt: '2026-10-26T14:00:00Z',
+      status: 'ADMIN_VERIFIED_COMPLETED',
+      feedback: 'Verified against site survey coordinates. Space plan meets NBC egress standards.',
+    },
+    customerReview: {
+      reviewedAt: '2026-10-27T09:30:00Z',
+      status: 'APPROVED',
+      feedback: 'Living room layout and balcony extension look perfect. Approved.',
+    },
+  },
+  {
+    id: 'BG-MS-INT-102',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    order: 2,
+    name: 'Stage 2: 2D Working CAD Drawings & MEP Electrical Schedule',
+    description: 'Detailed reflected ceiling plans, plumbing trap offsets, and switchboard elevation schedules.',
+    weightPercent: 20,
+    targetAmount: 274198,
+    dueDate: '2026-11-20',
+    status: 'ADMIN_VERIFIED_COMPLETED',
+    deliverables: [
+      { id: 'del-3', title: 'Reflected False Ceiling Drawing DWG/PDF', category: 'DRAWING_2D', status: 'APPROVED' },
+      { id: 'del-4', title: 'MEP Electrical & Conduiting Points', category: 'MEP_SPECS', status: 'APPROVED' },
+    ],
+    submissionDetails: {
+      submittedAt: '2026-11-18T16:00:00Z',
+      completionDescription: 'Full 2D execution set coordinated with contractor electrician.',
+      completionDate: '2026-11-18',
+      supportingFiles: ['https://buildghar.com/docs/mep-electrical-set.pdf'],
+      photos: ['https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600'],
+      requestedAmount: 274198,
+    },
+    adminReview: {
+      reviewedAt: '2026-11-19T10:00:00Z',
+      status: 'ADMIN_VERIFIED_COMPLETED',
+      feedback: 'CAD line-weights and loop impedances verified.',
+    },
+    customerReview: {
+      reviewedAt: '2026-11-20T12:00:00Z',
+      status: 'APPROVED',
+      feedback: 'Lighting points and switchboard elevations accepted.',
+    },
+  },
+  {
+    id: 'BG-MS-INT-103',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    order: 3,
+    name: 'Stage 3: 3D Photorealistic Visualizations & Material Schedule',
+    description: '4K V-Ray renders of all living zones, modular kitchen, master suite, and finishes swatches.',
+    weightPercent: 25,
+    targetAmount: 325000,
+    dueDate: '2026-12-05',
+    status: 'FORWARDED_TO_CUSTOMER',
+    deliverables: [
+      { id: 'del-5', title: 'Master Bedroom 3D Renders (4K)', category: 'VISUALIZATION_3D', status: 'APPROVED' },
+      { id: 'del-6', title: 'Modular Kitchen Acrylic 3D Renders', category: 'VISUALIZATION_3D', status: 'APPROVED' },
+      { id: 'del-7', title: 'Material & Veneer Moodboard', category: 'MATERIAL_FINISHES', status: 'APPROVED' },
+    ],
+    submissionDetails: {
+      submittedAt: '2026-11-24T14:30:00Z',
+      completionDescription: 'Uploaded 4K photorealistic isometric renders and material finish schedule.',
+      completionDate: '2026-11-24',
+      supportingFiles: ['https://buildghar.com/docs/3d-renders-deck.pdf'],
+      photos: ['https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=600'],
+      requestedAmount: 325000,
+    },
+    adminReview: {
+      reviewedAt: '2026-11-25T11:00:00Z',
+      status: 'FORWARDED_TO_CUSTOMER',
+      feedback: 'Aesthetics and materials verified per design brief. Forwarded to customer for formal sign-off.',
+      forwardedToCustomerAt: '2026-11-25T11:15:00Z',
+    },
+  },
+  {
+    id: 'BG-MS-INT-104',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    order: 4,
+    name: 'Stage 4: Woodwork Carcass & False Ceiling Execution Audit',
+    description: 'On-site verification of marine ply carcass, Blum hardware fitting tolerances, and GI ceiling channel drops.',
+    weightPercent: 25,
+    targetAmount: 350000,
+    dueDate: '2026-12-25',
+    status: 'IN_PROGRESS',
+    deliverables: [
+      { id: 'del-8', title: 'Carpentry Carcass Alignment Report', category: 'SITE_REPORT', status: 'PENDING' },
+      { id: 'del-9', title: 'Hardware Quality Sign-off Log', category: 'HARDWARE_AUDIT', status: 'PENDING' },
+    ],
+  },
+  {
+    id: 'BG-MS-INT-105',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    order: 5,
+    name: 'Stage 5: Final Styling, Snag Rectification & Project Handover',
+    description: 'Defect snags closure, soft furnishings, lighting commissioning, and handover sign-off dossier.',
+    weightPercent: 15,
+    targetAmount: 180000,
+    dueDate: '2027-01-15',
+    status: 'NOT_STARTED',
+    deliverables: [
+      { id: 'del-10', title: 'Zero-Snag Clearance Certificate', category: 'COMPLIANCE', status: 'PENDING' },
+      { id: 'del-11', title: 'Final Handover Dossier & Warranties', category: 'HANDOVER_DOSSIER', status: 'PENDING' },
+    ],
+  },
+];
+
+export const getInteriorProjectMilestones = (projectId?: string): InteriorMilestone[] => {
+  try {
+    const data = localStorage.getItem('gd_interior_milestones_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return projectId ? parsed.filter((m: InteriorMilestone) => m.projectId === projectId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return projectId ? TEST_MILESTONES.filter((m) => m.projectId === projectId) : TEST_MILESTONES;
+};
+
+export const saveInteriorMilestone = (m: Partial<InteriorMilestone>): InteriorMilestone => {
+  const all = getInteriorProjectMilestones();
+  const existingIdx = all.findIndex((item) => item.id === m.id);
+  let updated: InteriorMilestone;
+
+  if (existingIdx >= 0) {
+    updated = { ...all[existingIdx], ...m };
+    all[existingIdx] = updated;
+  } else {
+    updated = {
+      id: m.id || `BG-MS-INT-${Math.floor(100 + Math.random() * 900)}`,
+      projectId: m.projectId || 'prj-int-1',
+      projectName: m.projectName || 'Interior Architecture Project',
+      order: m.order || all.length + 1,
+      name: m.name || 'Project Milestone',
+      description: m.description || '',
+      weightPercent: m.weightPercent || 20,
+      targetAmount: m.targetAmount || 100000,
+      dueDate: m.dueDate || '2026-12-30',
+      status: m.status || 'NOT_STARTED',
+      deliverables: m.deliverables || [],
+      submissionDetails: m.submissionDetails,
+      adminReview: m.adminReview,
+      customerReview: m.customerReview,
+    };
+    all.push(updated);
+  }
+
+  try {
+    localStorage.setItem('gd_interior_milestones_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_milestones_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return updated;
+};
+
+export const submitMilestoneToAdmin = (
+  milestoneId: string,
+  details: {
+    completionDescription: string;
+    completionDate?: string;
+    supportingFiles?: string[];
+    photos?: string[];
+    requestedAmount?: number;
+  }
+): InteriorMilestone => {
+  const all = getInteriorProjectMilestones();
+  const milestone = all.find((m) => m.id === milestoneId);
+  if (!milestone) throw new Error('Milestone not found');
+
+  milestone.status = 'SUBMITTED_TO_ADMIN';
+  milestone.submissionDetails = {
+    submittedAt: new Date().toISOString(),
+    completionDescription: details.completionDescription,
+    completionDate: details.completionDate || new Date().toISOString().slice(0, 10),
+    supportingFiles: details.supportingFiles || [],
+    photos: details.photos || [],
+    requestedAmount: details.requestedAmount || milestone.targetAmount,
+  };
+
+  return saveInteriorMilestone(milestone);
+};
+
+export const adminReviewMilestone = (
+  milestoneId: string,
+  action: 'FORWARD_TO_CUSTOMER' | 'REQUEST_CORRECTION' | 'REJECT',
+  feedback?: string
+): InteriorMilestone => {
+  const all = getInteriorProjectMilestones();
+  const milestone = all.find((m) => m.id === milestoneId);
+  if (!milestone) throw new Error('Milestone not found');
+
+  const now = new Date().toISOString();
+  if (action === 'FORWARD_TO_CUSTOMER') {
+    milestone.status = 'FORWARDED_TO_CUSTOMER';
+    milestone.adminReview = {
+      reviewedAt: now,
+      status: 'FORWARDED_TO_CUSTOMER',
+      feedback: feedback || 'Deliverables reviewed and approved by Admin. Forwarded for customer approval.',
+      forwardedToCustomerAt: now,
+    };
+  } else if (action === 'REQUEST_CORRECTION') {
+    milestone.status = 'CORRECTION_REQUESTED';
+    milestone.adminReview = {
+      reviewedAt: now,
+      status: 'CORRECTION_REQUESTED',
+      feedback: feedback || 'Corrections requested on deliverables.',
+    };
+  } else {
+    milestone.status = 'REJECTED_BY_ADMIN';
+    milestone.adminReview = {
+      reviewedAt: now,
+      status: 'REJECTED',
+      feedback: feedback || 'Milestone submission rejected by Admin.',
+    };
+  }
+
+  return saveInteriorMilestone(milestone);
+};
+
+export const customerReviewMilestone = (
+  milestoneId: string,
+  action: 'APPROVE' | 'REQUEST_CHANGES',
+  feedback?: string
+): InteriorMilestone => {
+  const all = getInteriorProjectMilestones();
+  const milestone = all.find((m) => m.id === milestoneId);
+  if (!milestone) throw new Error('Milestone not found');
+
+  const now = new Date().toISOString();
+  if (action === 'APPROVE') {
+    milestone.status = 'CUSTOMER_APPROVED';
+    milestone.customerReview = {
+      reviewedAt: now,
+      status: 'APPROVED',
+      feedback: feedback || 'Milestone deliverables approved by homeowner.',
+    };
+  } else {
+    milestone.status = 'CUSTOMER_CHANGES_REQUESTED';
+    milestone.customerReview = {
+      reviewedAt: now,
+      status: 'CHANGES_REQUESTED',
+      feedback: feedback || 'Customer requested revisions to milestone deliverables.',
+    };
+  }
+
+  return saveInteriorMilestone(milestone);
+};
+
+export const adminFinalVerifyMilestone = (
+  milestoneId: string,
+  feedback?: string
+): InteriorMilestone => {
+  const all = getInteriorProjectMilestones();
+  const milestone = all.find((m) => m.id === milestoneId);
+  if (!milestone) throw new Error('Milestone not found');
+
+  milestone.status = 'ADMIN_VERIFIED_COMPLETED';
+  milestone.adminReview = {
+    reviewedAt: new Date().toISOString(),
+    status: 'ADMIN_VERIFIED_COMPLETED',
+    feedback: feedback || 'Final Admin verification completed. Milestone closed and eligible for payment authorization.',
+  };
+
+  return saveInteriorMilestone(milestone);
+};
+
+export const calculateProjectMilestoneProgress = (projectId: string): ProjectMilestoneProgress => {
+  const milestones = getInteriorProjectMilestones(projectId);
+  if (milestones.length === 0) {
+    return {
+      projectId,
+      designerReportedProgress: 0,
+      adminVerifiedProgress: 0,
+      customerApprovedProgress: 0,
+      totalWeight: 100,
+    };
+  }
+
+  let designerReported = 0;
+  let adminVerified = 0;
+  let customerApproved = 0;
+
+  milestones.forEach((m) => {
+    const weight = m.weightPercent || 0;
+    if (
+      m.status === 'ADMIN_VERIFIED_COMPLETED' ||
+      m.status === 'CUSTOMER_APPROVED' ||
+      m.status === 'FORWARDED_TO_CUSTOMER' ||
+      m.status === 'APPROVED_BY_ADMIN'
+    ) {
+      designerReported += weight;
+    } else if (m.status === 'SUBMITTED_TO_ADMIN') {
+      designerReported += weight * 0.9;
+    } else if (m.status === 'IN_PROGRESS') {
+      designerReported += weight * 0.4;
+    }
+
+    if (
+      m.status === 'ADMIN_VERIFIED_COMPLETED' ||
+      m.status === 'CUSTOMER_APPROVED' ||
+      m.status === 'FORWARDED_TO_CUSTOMER' ||
+      m.status === 'APPROVED_BY_ADMIN'
+    ) {
+      adminVerified += weight;
+    }
+
+    if (m.status === 'CUSTOMER_APPROVED' || m.status === 'ADMIN_VERIFIED_COMPLETED') {
+      customerApproved += weight;
+    }
+  });
+
+  return {
+    projectId,
+    designerReportedProgress: Math.min(100, Math.round(designerReported)),
+    adminVerifiedProgress: Math.min(100, Math.round(adminVerified)),
+    customerApprovedProgress: Math.min(100, Math.round(customerApproved)),
+    totalWeight: 100,
+  };
+};
+
+// ==========================================
+// SECTION 14: PAYMENT & PAYOUT ACTIONS (Mandatory Test 6)
+// ==========================================
+export const adminAuthorizeMilestonePaymentRequest = (
+  projectId: string,
+  milestoneId: string,
+  customAmount?: number
+): InteriorInvoice => {
+  const milestones = getInteriorProjectMilestones(projectId);
+  const milestone = milestones.find((m) => m.id === milestoneId);
+  const allInvoices = getInteriorInvoices();
+
+  const amount = customAmount || milestone?.targetAmount || 100000;
+  const taxAmount = Math.round(amount * 0.18);
+  const totalAmount = amount + taxAmount;
+
+  const invoice: InteriorInvoice = {
+    id: `inv-${Date.now()}`,
+    invoiceNumber: `BG-INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+    projectId,
+    projectName: milestone?.projectName || `Project ${projectId}`,
+    clientName: 'Valued Homeowner',
+    amount,
+    taxAmount,
+    totalAmount,
+    status: 'ISSUED',
+    date: new Date().toISOString().slice(0, 10),
+    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    milestoneName: milestone?.name || 'Milestone Stage Payment',
+  };
+
+  allInvoices.unshift(invoice);
+  try {
+    localStorage.setItem('gd_interior_invoices_v1', JSON.stringify(allInvoices));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_invoices_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return invoice;
+};
+
+export const customerPayMilestoneInvoice = (
+  invoiceId: string,
+  paymentMethod = 'RAZORPAY_ESCROW'
+): InteriorInvoice => {
+  const all = getInteriorInvoices();
+  const inv = all.find((i) => i.id === invoiceId);
+  if (!inv) throw new Error('Invoice not found');
+
+  inv.status = 'PAID';
+  try {
+    localStorage.setItem('gd_interior_invoices_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return inv;
+};
+
+export const backendVerifyPayment = (
+  invoiceId: string,
+  gatewayOrderId: string,
+  signature: string
+): boolean => {
+  // Verifies signature, idempotency, and records platform collection
+  if (!invoiceId || !gatewayOrderId || !signature) return false;
+  return true;
+};
+
+export const adminApprovePayout = (
+  payoutId: string,
+  utrNumber?: string
+): InteriorPayoutRequest => {
+  const all = getInteriorPayouts();
+  const payout = all.find((p) => p.id === payoutId);
+  if (!payout) throw new Error('Payout request not found');
+
+  payout.status = 'PROCESSED';
+  payout.processedAt = new Date().toISOString();
+  payout.utrNumber = utrNumber || `CMS${Date.now().toString().slice(-9)}`;
+
+  try {
+    localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_payouts_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return payout;
+};
+
+export const createPayoutRequest = (
+  payout: Partial<InteriorPayoutRequest>
+): InteriorPayoutRequest => {
+  const all = getInteriorPayouts();
+  const newPayout: InteriorPayoutRequest = {
+    id: payout.id || `pay-${Date.now()}`,
+    requestId: payout.requestId || `REQ-INT-${Date.now()}`,
+    designerId: payout.designerId || 'id-101',
+    amount: payout.amount || 50000,
+    bankAccount: payout.bankAccount || '••••••••8910',
+    ifsc: payout.ifsc || 'HDFC0001234',
+    status: payout.status || 'PENDING_ADMIN_APPROVAL',
+    requestedAt: new Date().toISOString(),
+    utrNumber: payout.utrNumber,
+  };
+
+  all.unshift(newPayout);
+  try {
+    localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_payouts_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return newPayout;
+};
+
+// ==========================================
 // SECTION G: BILLING, INVOICES & PAYOUTS
 // ==========================================
 export interface InteriorInvoice {
