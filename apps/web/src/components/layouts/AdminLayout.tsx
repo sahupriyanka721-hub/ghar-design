@@ -358,6 +358,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/payments': true,
     '/admin/payouts': true,
     '/admin/invoices': true,
+    '/admin/communications': true,
   });
   const { success } = useToast();
 
@@ -391,6 +392,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/invoices')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/invoices': true }));
+    }
+    if (location.pathname.startsWith('/admin/communications')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/communications': true }));
     }
   }, [location.pathname]);
 
@@ -706,7 +710,21 @@ export const AdminLayout: React.FC = () => {
           ],
         },
         { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
-        { label: 'Communication Router (Inbox)', path: '/admin/communications', icon: Megaphone },
+        {
+          label: 'Communication Management',
+          path: '/admin/communications',
+          icon: Megaphone,
+          subItems: [
+            { label: 'Customer Messages', path: '/admin/communications?view=CUSTOMER_MESSAGES', view: 'CUSTOMER_MESSAGES' },
+            { label: 'Architect Messages', path: '/admin/communications?view=ARCHITECT_MESSAGES', view: 'ARCHITECT_MESSAGES' },
+            { label: 'Admin Review Inbox', path: '/admin/communications?view=ADMIN_INBOX', view: 'ADMIN_INBOX' },
+            { label: 'Customer-to-Architect Routed Messages', path: '/admin/communications?view=CUSTOMER_TO_ARCHITECT', view: 'CUSTOMER_TO_ARCHITECT' },
+            { label: 'Architect-to-Customer Routed Messages', path: '/admin/communications?view=ARCHITECT_TO_CUSTOMER', view: 'ARCHITECT_TO_CUSTOMER' },
+            { label: 'Clarification Requests', path: '/admin/communications?view=CLARIFICATION_REQUESTS', view: 'CLARIFICATION_REQUESTS' },
+            { label: 'Internal Admin Notes', path: '/admin/communications?view=INTERNAL_ADMIN_NOTES', view: 'INTERNAL_ADMIN_NOTES' },
+            { label: 'Communication History', path: '/admin/communications?view=COMMUNICATION_HISTORY', view: 'COMMUNICATION_HISTORY' },
+          ],
+        },
         { label: 'Complaint & Dispute Resolution', path: '/admin/support', icon: LifeBuoy },
         { label: 'Reports & Analytics (GMV & SLA)', path: '/admin/reports', icon: BarChart3 },
         { label: 'Notification Broadcast Center', path: '/admin/notifications', icon: Bell },
@@ -949,7 +967,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES')));
 
                               return (
                                 <Link
