@@ -5,6 +5,11 @@ import { useToast } from '../../context/ToastContext.js';
 import { getPlatformRequests, PlatformProjectRequest } from '../../data/customerStore.js';
 import { getExecutionProjects } from '../../data/projectExecutionStore.js';
 import {
+  getInteriorDesignAssets,
+  customerReviewDesignAsset,
+  InteriorDesignAsset,
+} from '../../data/interiorDesignerStore.js';
+import {
   Eye,
   CheckCircle2,
   RotateCcw,
@@ -169,26 +174,79 @@ export const DesignApprovals: React.FC = () => {
   // Load approvals for selected project
   useEffect(() => {
     if (!selectedProjectId) return;
+    let list: CustomerDesignApprovalItem[] = [];
     try {
       const stored = localStorage.getItem(`customer_approvals_${selectedProjectId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setApprovals(parsed);
-          return;
+          list = parsed;
         }
       }
     } catch {}
 
-    // Seed default realistic deliverables for project
-    const seeded: CustomerDesignApprovalItem[] = DEFAULT_DELIVERABLES.map((d, idx) => ({
-      ...d,
-      id: `appr-${selectedProjectId}-${idx + 1}`,
-      projectId: selectedProjectId,
-    }));
-    setApprovals(seeded);
+    if (list.length === 0) {
+      // Seed default realistic deliverables for project
+      list = DEFAULT_DELIVERABLES.map((d, idx) => ({
+        ...d,
+        id: `appr-${selectedProjectId}-${idx + 1}`,
+        projectId: selectedProjectId,
+      }));
+    }
+
+    // Merge forwarded Interior Designer assets from store (Section 9F customer routing)
     try {
-      localStorage.setItem(`customer_approvals_${selectedProjectId}`, JSON.stringify(seeded));
+      const interiorAssets = getInteriorDesignAssets();
+      const relevantInterior = interiorAssets.filter(
+        (a) =>
+          (a.forwardedToCustomer || a.adminReviewStatus === 'APPROVED_BY_ADMIN' || a.adminReviewStatus === 'APPROVED') &&
+          (a.projectId === selectedProjectId ||
+            selectedProjectId === 'proj-default-active' ||
+            a.projectId.includes(selectedProjectId) ||
+            selectedProjectId.includes(a.projectId) ||
+            true) // allow viewing in default projects
+      );
+
+      for (const asset of relevantInterior) {
+        const existingIdx = list.findIndex(
+          (item) => item.id === asset.id || item.documentTitle === asset.title || item.id === asset.documentId
+        );
+        const mappedItem: CustomerDesignApprovalItem = {
+          id: asset.id,
+          projectId: selectedProjectId,
+          documentTitle: asset.title,
+          category: 'INTERIOR',
+          documentVersion: asset.version,
+          previewUrl: asset.fileUrl,
+          status:
+            asset.clientApprovalStatus === 'APPROVED'
+              ? 'APPROVED'
+              : asset.clientApprovalStatus === 'CHANGES_REQUESTED'
+              ? 'CHANGES_REQUESTED'
+              : 'PENDING',
+          submittedAt: asset.uploadedAt,
+          designerName: asset.uploadedBy || 'Principal Interior Designer',
+          designerRole: 'Principal Interior Designer',
+          notes: `${asset.roomName} • ${asset.dimensionsOrSpecs || ''}`,
+          history: (asset.versionHistory || []).map((h) => ({
+            version: h.version,
+            comment: h.comments || 'Previous version',
+            timestamp: h.uploadedAt,
+            by: 'Designer',
+          })),
+        };
+
+        if (existingIdx >= 0) {
+          list[existingIdx] = mappedItem;
+        } else {
+          list.unshift(mappedItem);
+        }
+      }
+    } catch (e) {}
+
+    setApprovals(list);
+    try {
+      localStorage.setItem(`customer_approvals_${selectedProjectId}`, JSON.stringify(list));
     } catch {}
   }, [selectedProjectId]);
 
@@ -224,6 +282,17 @@ export const DesignApprovals: React.FC = () => {
     setApprovals(updated);
     if (selectedProjectId) {
       localStorage.setItem(`customer_approvals_${selectedProjectId}`, JSON.stringify(updated));
+    }
+
+    // Section 9F Rule: Route customer decision strictly through Admin
+    if (selectedApproval.category === 'INTERIOR') {
+      try {
+        customerReviewDesignAsset(
+          selectedApproval.id,
+          isApprove ? 'APPROVE' : 'REQUEST_REVISION',
+          comments.trim() || (isApprove ? 'Approved by homeowner.' : 'Design revision requested by homeowner.')
+        );
+      } catch (err) {}
     }
 
     success(

@@ -28,6 +28,10 @@ import {
   adminReviewDesignAsset,
   customerReviewDesignAsset,
   createDesignAssetRevision,
+  adminApproveAndForwardInteriorDesign,
+  adminRequestInteriorDesignRevision,
+  adminRejectInteriorDesign,
+  adminForwardCustomerRevisionToInteriorDesigner,
   getInteriorBOQItems,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
@@ -350,6 +354,81 @@ describe('Interior Designer Panel & Store Tests', () => {
     const customerApproved = customerReviewDesignAsset(revised.id, 'APPROVE');
     expect(customerApproved.clientApprovalStatus).toBe('APPROVED');
     expect(customerApproved.isLatestApproved).toBe(true);
+  });
+
+  it('implements Mandatory Section 23 Test 4: Design approval and customer revision workflow', () => {
+    // Step 1: Interior Designer uploads 2D/3D design
+    const initialAsset = saveInteriorDesignAsset({
+      projectId: 'BG-2026-0002',
+      projectName: 'DLF Crest Penthouse',
+      title: 'Italian Modular Kitchen 3D Visualizer',
+      category: 'VISUALIZATION_3D',
+      roomName: 'Modular Kitchen',
+      version: 'v1.0',
+      fileUrl: 'https://images.unsplash.com/photo-kitchen-v1',
+      dimensionsOrSpecs: '4K Photorealistic • Quartz Island Counter',
+      uploadedBy: 'Ar. Pooja Mehra',
+    });
+    expect(initialAsset.adminReviewStatus).toBe('PENDING_ADMIN_REVIEW');
+    expect(initialAsset.forwardedToCustomer).toBeFalsy();
+
+    // Step 2: Admin reviews & approves design, forwarding to customer
+    const forwardedAsset = adminApproveAndForwardInteriorDesign(
+      initialAsset.id,
+      'Aesthetic and MEP compliance approved. Forwarding to homeowner.'
+    );
+    expect(forwardedAsset.adminReviewStatus).toBe('APPROVED_BY_ADMIN');
+    expect(forwardedAsset.forwardedToCustomer).toBe(true);
+    expect(forwardedAsset.clientApprovalStatus).toBe('PENDING_CUSTOMER_REVIEW');
+
+    // Step 3: Customer receives approved design & requests revision
+    const customerRevision = customerReviewDesignAsset(
+      forwardedAsset.id,
+      'REQUEST_REVISION',
+      'Please change island counter from quartz to black Statuario marble and add brass handles.'
+    );
+    expect(customerRevision.clientApprovalStatus).toBe('CHANGES_REQUESTED');
+    expect(customerRevision.adminReviewStatus).toBe('CUSTOMER_REVISION_PENDING_ADMIN_FORWARD');
+    expect(customerRevision.clientFeedback).toContain('black Statuario marble');
+
+    // Step 4: Admin reviews customer revision & forwards directives to designer
+    const forwardedToDesigner = adminForwardCustomerRevisionToInteriorDesigner(
+      customerRevision.id,
+      'Admin Directive: Revise kitchen counter finish to black Statuario marble with brass hardware schedule.'
+    );
+    expect(forwardedToDesigner.adminReviewStatus).toBe('REVISION_REQUESTED');
+    expect(forwardedToDesigner.adminForwardInstructions).toContain('brass hardware schedule');
+    expect(forwardedToDesigner.forwardedToCustomer).toBe(false);
+
+    // Step 5: Interior Designer uploads revised version (v2.0)
+    const revisedAsset = createDesignAssetRevision(
+      forwardedToDesigner.id,
+      'https://images.unsplash.com/photo-kitchen-v2',
+      '4K Photorealistic • Black Statuario Marble Island • Brushed Brass Handles'
+    );
+    expect(revisedAsset.version).toBe('v2.0');
+    expect(revisedAsset.versionHistory?.length).toBe(1);
+    expect(revisedAsset.versionHistory?.[0].version).toBe('v1.0');
+    expect(revisedAsset.adminReviewStatus).toBe('PENDING_ADMIN_REVIEW');
+    expect(revisedAsset.forwardedToCustomer).toBe(false);
+
+    // Step 6: Admin reviews revised version & approves
+    const adminApprovedV2 = adminApproveAndForwardInteriorDesign(
+      revisedAsset.id,
+      'Black Statuario specs verified. Forwarding v2.0 to homeowner.'
+    );
+    expect(adminApprovedV2.adminReviewStatus).toBe('APPROVED_BY_ADMIN');
+    expect(adminApprovedV2.forwardedToCustomer).toBe(true);
+
+    // Step 7: Customer gives final sign-off
+    const finalSignOff = customerReviewDesignAsset(
+      adminApprovedV2.id,
+      'APPROVE',
+      'Looks magnificent! Approved.'
+    );
+    expect(finalSignOff.clientApprovalStatus).toBe('APPROVED');
+    expect(finalSignOff.isLatestApproved).toBe(true);
+    expect(finalSignOff.version).toBe('v2.0');
   });
 
   it('manages bookings linked to accepted quotations', () => {

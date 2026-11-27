@@ -442,7 +442,7 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                     <Download className="w-3.5 h-3.5" />
                   </a>
 
-                  {asset.adminReviewStatus === 'REVISION_REQUESTED' && (
+                  {(asset.adminReviewStatus === 'REVISION_REQUESTED' || asset.clientApprovalStatus === 'CHANGES_REQUESTED') && (
                     <button
                       onClick={() => setRevisionModal({ open: true, asset, newUrl: '', notes: '' })}
                       className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] transition flex items-center gap-1 shadow-2xs"
@@ -703,12 +703,59 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
               )}
 
               {/* Revision remarks if present */}
+              {previewAsset.clientFeedback && (
+                <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs flex items-start gap-2">
+                  <RotateCcw className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-purple-950 block">Homeowner Change Request (via Admin):</span>
+                    <p className="text-purple-900 mt-0.5 leading-relaxed font-medium">"{previewAsset.clientFeedback}"</p>
+                  </div>
+                </div>
+              )}
+
+              {previewAsset.adminForwardInstructions && (
+                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-blue-950 block">Admin Directive for Revision:</span>
+                    <p className="text-blue-900 mt-0.5 leading-relaxed font-medium">{previewAsset.adminForwardInstructions}</p>
+                  </div>
+                </div>
+              )}
+
               {previewAsset.adminFeedback && (
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-amber-950 block">Admin Feedback Remarks:</span>
                     <p className="text-amber-900 mt-0.5 leading-relaxed">{previewAsset.adminFeedback}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Version History List */}
+              {((previewAsset.versionHistory?.length || 0) > 0) && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+                  <span className="font-bold text-slate-700 block">Version History &amp; Prior Iterations</span>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {previewAsset.versionHistory?.map((hist, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                        <div>
+                          <span className="font-mono font-bold text-slate-800">{hist.version}</span>
+                          <span className="text-[10px] text-slate-500 block truncate max-w-[280px]">
+                            {hist.comments || 'Previous version snapshot'}
+                          </span>
+                        </div>
+                        <a
+                          href={hist.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 rounded bg-slate-100 text-slate-600 hover:text-slate-900"
+                        >
+                          <Download className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -724,7 +771,8 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                   <span>Download High-Res</span>
                 </a>
 
-                {previewAsset.adminReviewStatus === 'REVISION_REQUESTED' && (
+                {(previewAsset.adminReviewStatus === 'REVISION_REQUESTED' ||
+                  previewAsset.clientApprovalStatus === 'CHANGES_REQUESTED') && (
                   <button
                     onClick={() => {
                       setRevisionModal({ open: true, asset: previewAsset, newUrl: '', notes: '' });

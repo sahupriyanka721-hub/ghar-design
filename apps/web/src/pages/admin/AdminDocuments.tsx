@@ -53,6 +53,15 @@ import {
   DesignStatus,
   DesignVersionItem,
 } from '../../data/architectPanelStore.js';
+import {
+  getInteriorDesignAssets,
+  adminApproveAndForwardInteriorDesign,
+  adminRequestInteriorDesignRevision,
+  adminRejectInteriorDesign,
+  adminForwardCustomerRevisionToInteriorDesigner,
+  InteriorDesignAsset,
+  InteriorDesignCategory,
+} from '../../data/interiorDesignerStore.js';
 import { getExecutionProjects, ExecutionProject } from '../../data/projectExecutionStore.js';
 import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 import { pushToCloud } from '../../data/cloudSync.js';
@@ -311,6 +320,128 @@ export const AdminDocuments: React.FC = () => {
     setRefreshKey((k) => k + 1);
   };
 
+  // Section 9F Interior Designer Discipline State
+  const [discipline, setDiscipline] = useState<'ARCHITECTURAL' | 'INTERIOR'>('ARCHITECTURAL');
+  const [selectedInteriorAsset, setSelectedInteriorAsset] = useState<InteriorDesignAsset | null>(null);
+  const [interiorActionModal, setInteriorActionModal] = useState<{
+    type: 'APPROVE' | 'REVISE' | 'REJECT' | 'FORWARD_CUSTOMER_REVISION' | null;
+    asset: InteriorDesignAsset | null;
+    notes: string;
+  }>({ type: null, asset: null, notes: '' });
+
+  const interiorAssets = useMemo(() => getInteriorDesignAssets(), [refreshKey]);
+
+  const interiorCounts = useMemo(() => {
+    return {
+      all: interiorAssets.length,
+      pending: interiorAssets.filter((a) => a.adminReviewStatus === 'PENDING_ADMIN_REVIEW').length,
+      forwarded: interiorAssets.filter((a) => a.forwardedToCustomer && a.clientApprovalStatus !== 'APPROVED').length,
+      customerRevision: interiorAssets.filter(
+        (a) => a.adminReviewStatus === 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD' || a.clientApprovalStatus === 'CHANGES_REQUESTED'
+      ).length,
+      approved: interiorAssets.filter((a) => a.clientApprovalStatus === 'APPROVED' || a.isLatestApproved).length,
+      revision: interiorAssets.filter((a) => a.adminReviewStatus === 'REVISION_REQUESTED').length,
+      rejected: interiorAssets.filter((a) => a.adminReviewStatus === 'REJECTED').length,
+    };
+  }, [interiorAssets]);
+
+  const filteredInteriorAssets = useMemo(() => {
+    return interiorAssets.filter((a) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        a.title.toLowerCase().includes(q) ||
+        a.documentId.toLowerCase().includes(q) ||
+        a.projectId.toLowerCase().includes(q) ||
+        a.roomName.toLowerCase().includes(q) ||
+        (a.uploadedBy && a.uploadedBy.toLowerCase().includes(q)) ||
+        (a.projectName && a.projectName.toLowerCase().includes(q));
+
+      if (!matchSearch) return false;
+
+      if (activeStatusTab === 'PENDING_REVIEW' && a.adminReviewStatus !== 'PENDING_ADMIN_REVIEW') return false;
+      if (activeStatusTab === 'FORWARDED' && (!a.forwardedToCustomer || a.clientApprovalStatus === 'APPROVED')) return false;
+      if (activeStatusTab === 'APPROVED' && a.clientApprovalStatus !== 'APPROVED' && !a.isLatestApproved) return false;
+      if (
+        activeStatusTab === 'REVISION' &&
+        a.adminReviewStatus !== 'REVISION_REQUESTED' &&
+        a.adminReviewStatus !== 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD'
+      )
+        return false;
+      if (activeStatusTab === 'REJECTED' && a.adminReviewStatus !== 'REJECTED') return false;
+
+      if (activeCategoryFilter !== 'ALL' && a.category !== activeCategoryFilter) return false;
+
+      return true;
+    });
+  }, [interiorAssets, search, activeStatusTab, activeCategoryFilter]);
+
+  const handleApproveInteriorAsset = (asset: InteriorDesignAsset, notes?: string) => {
+    const updated = adminApproveAndForwardInteriorDesign(
+      asset.id,
+      notes || 'Technical and aesthetic compliance audit verified by Admin Desk.'
+    );
+    logAdminAuditAction({
+      action: 'APPROVE_AND_FORWARD_DESIGN',
+      module: 'DOCUMENT_MANAGEMENT',
+      entity: `${updated.title} (${updated.version})`,
+      details: `Admin approved interior design ${updated.documentId} and forwarded to homeowner for project ${updated.projectId}.`,
+    });
+    pushToCloud().catch(() => {});
+    success(`Interior design ${updated.documentId} (${updated.version}) approved & forwarded to homeowner!`);
+    setSelectedInteriorAsset(updated);
+    setInteriorActionModal({ type: null, asset: null, notes: '' });
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleRequestInteriorRevision = (asset: InteriorDesignAsset, notes: string) => {
+    if (!notes.trim()) {
+      error('Please specify redline comments for the interior designer.');
+      return;
+    }
+    const updated = adminRequestInteriorDesignRevision(asset.id, notes.trim());
+    logAdminAuditAction({
+      action: 'REQUEST_DESIGN_REVISION',
+      module: 'DOCUMENT_MANAGEMENT',
+      entity: `${updated.title} (${updated.version})`,
+      details: `Admin requested revision on interior design ${updated.documentId}. Notes: ${notes.trim()}`,
+    });
+    pushToCloud().catch(() => {});
+    success(`Revision requested from interior designer for ${updated.documentId}. Designer studio notified.`);
+    setSelectedInteriorAsset(updated);
+    setInteriorActionModal({ type: null, asset: null, notes: '' });
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleForwardCustomerRevisionToInteriorDesigner = (asset: InteriorDesignAsset, instructions: string) => {
+    const updated = adminForwardCustomerRevisionToInteriorDesigner(asset.id, instructions.trim());
+    logAdminAuditAction({
+      action: 'FORWARD_CUSTOMER_REVISION_TO_ARCHITECT',
+      module: 'DOCUMENT_MANAGEMENT',
+      entity: `${updated.title} (${updated.version})`,
+      details: `Admin forwarded homeowner changes to Interior Designer for ${updated.documentId}. Admin directives: ${instructions.trim()}`,
+    });
+    pushToCloud().catch(() => {});
+    success(`Homeowner revision feedback and Admin instructions forwarded to interior designer.`);
+    setSelectedInteriorAsset(updated);
+    setInteriorActionModal({ type: null, asset: null, notes: '' });
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleRejectInteriorAsset = (asset: InteriorDesignAsset, reason: string) => {
+    const updated = adminRejectInteriorDesign(asset.id, reason.trim());
+    logAdminAuditAction({
+      action: 'REJECT_DESIGN',
+      module: 'DOCUMENT_MANAGEMENT',
+      entity: `${updated.title} (${updated.version})`,
+      details: `Admin rejected interior design ${updated.documentId}. Reason: ${reason.trim()}`,
+    });
+    pushToCloud().catch(() => {});
+    success(`Interior design submission rejected.`);
+    setSelectedInteriorAsset(updated);
+    setInteriorActionModal({ type: null, asset: null, notes: '' });
+    setRefreshKey((k) => k + 1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -321,11 +452,13 @@ export const AdminDocuments: React.FC = () => {
               <FileCheck2 className="w-5 h-5" />
             </span>
             <h1 className="text-xl sm:text-2xl font-black font-display text-navy-950">
-              Architectural Design &amp; Technical Document Review Desk
+              {discipline === 'INTERIOR' ? 'Interior Design 2D/3D & Finishes Review Desk' : 'Architectural Design & Technical Document Review Desk'}
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Section 10 Master Review Console: Floor Plans, 3D Facades, Structural CAD (IS 456), Working MEP, BOQ &amp; Multi-Version Customer Handover.
+            {discipline === 'INTERIOR'
+              ? 'Section 9F Multi-Stage Approval Console: Space Planning, 2D Working CAD, 3D Photorealistic Renders, Material Palettes & Client Revisions.'
+              : 'Section 10 Master Review Console: Floor Plans, 3D Facades, Structural CAD (IS 456), Working MEP, BOQ & Multi-Version Customer Handover.'}
           </p>
         </div>
 
@@ -345,6 +478,63 @@ export const AdminDocuments: React.FC = () => {
         </div>
       </div>
 
+      {/* Discipline Switcher Pill Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100 rounded-2xl border border-slate-200">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setDiscipline('ARCHITECTURAL');
+              setActiveStatusTab('ALL');
+              setActiveCategoryFilter('ALL');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              discipline === 'ARCHITECTURAL'
+                ? 'bg-white text-navy-950 shadow-xs'
+                : 'text-slate-600 hover:text-navy-950'
+            }`}
+          >
+            <Building className="w-4 h-4 text-blue-600" />
+            <span>Architectural &amp; Structural CAD</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-50 text-blue-700 font-mono">
+              {counts.all}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setDiscipline('INTERIOR');
+              setActiveStatusTab('ALL');
+              setActiveCategoryFilter('ALL');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              discipline === 'INTERIOR'
+                ? 'bg-white text-navy-950 shadow-xs'
+                : 'text-slate-600 hover:text-navy-950'
+            }`}
+          >
+            <Palette className="w-4 h-4 text-amber-600" />
+            <span>Interior Design Desk (Section 9F)</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-50 text-amber-700 font-mono">
+              {interiorCounts.all}
+            </span>
+            {interiorCounts.pending > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-mono animate-pulse">
+                {interiorCounts.pending} New
+              </span>
+            )}
+            {interiorCounts.customerRevision > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500 text-white font-mono">
+                {interiorCounts.customerRevision} Client Rev
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="text-[11px] font-mono text-slate-500 hidden sm:block pr-2">
+          Review Mode: <strong className="text-navy-950">{discipline === 'INTERIOR' ? 'Interior Designer Deliverables' : 'Architectural Deliverables'}</strong>
+        </div>
+      </div>
+
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
@@ -352,8 +542,12 @@ export const AdminDocuments: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-wider">Total Submissions</span>
             <Layers className="w-4 h-4 text-slate-500" />
           </div>
-          <p className="text-2xl font-black font-display text-navy-950 mt-1">{counts.all}</p>
-          <span className="text-[10px] text-slate-400 font-medium">All Project Drawings</span>
+          <p className="text-2xl font-black font-display text-navy-950 mt-1">
+            {discipline === 'INTERIOR' ? interiorCounts.all : counts.all}
+          </p>
+          <span className="text-[10px] text-slate-400 font-medium">
+            {discipline === 'INTERIOR' ? 'All Interior 2D/3D Assets' : 'All Project Drawings'}
+          </span>
         </div>
 
         <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200 shadow-2xs">
@@ -361,8 +555,10 @@ export const AdminDocuments: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-wider">Pending Admin Review</span>
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
-          <p className="text-2xl font-black font-display text-amber-950 mt-1">{counts.pending}</p>
-          <span className="text-[10px] text-amber-700 font-bold">Needs Technical Audit</span>
+          <p className="text-2xl font-black font-display text-amber-950 mt-1">
+            {discipline === 'INTERIOR' ? interiorCounts.pending : counts.pending}
+          </p>
+          <span className="text-[10px] text-amber-700 font-bold">Needs Compliance Audit</span>
         </div>
 
         <div className="bg-sky-50/60 p-4 rounded-2xl border border-sky-200 shadow-2xs">
@@ -370,8 +566,10 @@ export const AdminDocuments: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-wider">Forwarded to Client</span>
             <Send className="w-4 h-4 text-sky-600" />
           </div>
-          <p className="text-2xl font-black font-display text-sky-950 mt-1">{counts.forwarded}</p>
-          <span className="text-[10px] text-sky-700 font-medium">Awaiting Client Decision</span>
+          <p className="text-2xl font-black font-display text-sky-950 mt-1">
+            {discipline === 'INTERIOR' ? interiorCounts.forwarded : counts.forwarded}
+          </p>
+          <span className="text-[10px] text-sky-700 font-medium">Awaiting Homeowner Decision</span>
         </div>
 
         <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 shadow-2xs">
@@ -379,17 +577,25 @@ export const AdminDocuments: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-wider">Client Approved</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-2xl font-black font-display text-emerald-950 mt-1">{counts.approved}</p>
+          <p className="text-2xl font-black font-display text-emerald-950 mt-1">
+            {discipline === 'INTERIOR' ? interiorCounts.approved : counts.approved}
+          </p>
           <span className="text-[10px] text-emerald-700 font-medium">Locked for Execution</span>
         </div>
 
         <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200 shadow-2xs col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between text-purple-600">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Active Revisions</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+              {discipline === 'INTERIOR' && interiorCounts.customerRevision > 0 ? 'Client Change Request' : 'Active Revisions'}
+            </span>
             <RotateCcw className="w-4 h-4 text-purple-600" />
           </div>
-          <p className="text-2xl font-black font-display text-purple-950 mt-1">{counts.revision}</p>
-          <span className="text-[10px] text-purple-700 font-medium">Redlines in Progress</span>
+          <p className="text-2xl font-black font-display text-purple-950 mt-1">
+            {discipline === 'INTERIOR' ? interiorCounts.customerRevision || interiorCounts.revision : counts.revision}
+          </p>
+          <span className="text-[10px] text-purple-700 font-medium">
+            {discipline === 'INTERIOR' && interiorCounts.customerRevision > 0 ? 'Requires Admin Routing' : 'Redlines in Progress'}
+          </span>
         </div>
       </div>
 
@@ -399,12 +605,12 @@ export const AdminDocuments: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {[
-              { label: 'All Submissions', value: 'ALL', count: counts.all },
-              { label: 'Pending Review', value: 'PENDING_REVIEW', count: counts.pending },
-              { label: 'Forwarded to Client', value: 'FORWARDED', count: counts.forwarded },
-              { label: 'Client Approved', value: 'APPROVED', count: counts.approved },
-              { label: 'Revisions Active', value: 'REVISION', count: counts.revision },
-              { label: 'Rejected', value: 'REJECTED', count: counts.rejected },
+              { label: 'All Submissions', value: 'ALL', count: discipline === 'INTERIOR' ? interiorCounts.all : counts.all },
+              { label: 'Pending Review', value: 'PENDING_REVIEW', count: discipline === 'INTERIOR' ? interiorCounts.pending : counts.pending },
+              { label: 'Forwarded to Client', value: 'FORWARDED', count: discipline === 'INTERIOR' ? interiorCounts.forwarded : counts.forwarded },
+              { label: 'Client Approved', value: 'APPROVED', count: discipline === 'INTERIOR' ? interiorCounts.approved : counts.approved },
+              { label: 'Revisions Active', value: 'REVISION', count: discipline === 'INTERIOR' ? interiorCounts.customerRevision + interiorCounts.revision : counts.revision },
+              { label: 'Rejected', value: 'REJECTED', count: discipline === 'INTERIOR' ? interiorCounts.rejected : counts.rejected },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -433,7 +639,7 @@ export const AdminDocuments: React.FC = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search drawing, project ID, architect..."
+              placeholder={discipline === 'INTERIOR' ? 'Search title, room, doc ID, designer...' : 'Search drawing, project ID, architect...'}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-sans"
             />
           </div>
@@ -442,18 +648,27 @@ export const AdminDocuments: React.FC = () => {
         {/* Category Pills Strip */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-100 text-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-            Document Category:
+            {discipline === 'INTERIOR' ? 'Interior Category:' : 'Document Category:'}
           </span>
-          {[
-            { label: 'All Categories', value: 'ALL' },
-            { label: '📐 Floor Plans & House Maps', value: 'FLOOR_PLAN' },
-            { label: '🎨 3D Facades & Elevations', value: 'ELEVATION_3D' },
-            { label: '📏 2D & Sectional Blueprints', value: 'DRAWING_2D' },
-            { label: '🏗️ Structural & Column Grids', value: 'STRUCTURAL' },
-            { label: '⚙️ Working Drawings & MEP', value: 'WORKING_DRAWINGS' },
-            { label: '📊 BOQ & Cost Estimates', value: 'BOQ_SPEC' },
-            { label: '🏛️ Municipal Sanctions', value: 'MUNICIPAL_SANCTION' },
-          ].map((cat) => (
+          {(discipline === 'INTERIOR'
+            ? [
+                { label: 'All Interior Deliverables', value: 'ALL' },
+                { label: '🛋️ 9B. Space Planning (Layouts)', value: 'SPACE_PLANNING' },
+                { label: '📐 9C. 2D Working CAD Plans', value: 'LAYOUT_2D' },
+                { label: '🎨 9D. 3D Photorealistic Renders', value: 'VISUALIZATION_3D' },
+                { label: '🧱 9E. Material & Finish Palettes', value: 'MATERIAL_FINISHES' },
+              ]
+            : [
+                { label: 'All Categories', value: 'ALL' },
+                { label: '📐 Floor Plans & House Maps', value: 'FLOOR_PLAN' },
+                { label: '🎨 3D Facades & Elevations', value: 'ELEVATION_3D' },
+                { label: '📏 2D & Sectional Blueprints', value: 'DRAWING_2D' },
+                { label: '🏗️ Structural & Column Grids', value: 'STRUCTURAL' },
+                { label: '⚙️ Working Drawings & MEP', value: 'WORKING_DRAWINGS' },
+                { label: '📊 BOQ & Cost Estimates', value: 'BOQ_SPEC' },
+                { label: '🏛️ Municipal Sanctions', value: 'MUNICIPAL_SANCTION' },
+              ]
+          ).map((cat) => (
             <button
               key={cat.value}
               onClick={() => setActiveCategoryFilter(cat.value)}
@@ -470,182 +685,370 @@ export const AdminDocuments: React.FC = () => {
 
         {/* Data Table */}
         <div className="overflow-x-auto rounded-xl border border-slate-200 mt-2">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Document Details</th>
-                <th className="py-3 px-3">Shared Project ID</th>
-                <th className="py-3 px-3">Architect Partner</th>
-                <th className="py-3 px-3">Homeowner Client</th>
-                <th className="py-3 px-3 text-center">Version Control</th>
-                <th className="py-3 px-3 text-center">Review Status</th>
-                <th className="py-3 px-4 text-right">Moderation Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredDesigns.length === 0 ? (
+          {discipline === 'INTERIOR' ? (
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-600">No architectural documents match this filter.</p>
-                  </td>
+                  <th className="py-3 px-4">Interior Deliverable</th>
+                  <th className="py-3 px-3">Shared Project ID</th>
+                  <th className="py-3 px-3">Interior Designer</th>
+                  <th className="py-3 px-3">Room / Space</th>
+                  <th className="py-3 px-3 text-center">Version &amp; Audit</th>
+                  <th className="py-3 px-3 text-center">Section 9F Status</th>
+                  <th className="py-3 px-4 text-right">Admin Moderation</th>
                 </tr>
-              ) : (
-                filteredDesigns.map((d) => {
-                  const isPending = d.status === 'SUBMITTED_TO_ADMIN';
-                  const isCustomerRevision = d.status === 'CUSTOMER_REVISION_REQUESTED';
-                  const isApproved = d.status === 'APPROVED' || d.status === 'CUSTOMER_APPROVED' || d.status === 'ADMIN_APPROVED';
-                  const isForwarded = d.status === 'FORWARDED_TO_CUSTOMER' || d.status === 'PENDING_CUSTOMER_APPROVAL';
-                  const isRevision = d.status === 'REVISION_REQUESTED';
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredInteriorAssets.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <Palette className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-600">No interior design submissions match this filter.</p>
+                      <span className="text-[11px] text-slate-400 mt-1 block">
+                        Submissions from Interior Designers route here for technical &amp; aesthetic compliance audit.
+                      </span>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInteriorAssets.map((asset) => {
+                    const isPendingAdmin = asset.adminReviewStatus === 'PENDING_ADMIN_REVIEW';
+                    const isClientRevision =
+                      asset.adminReviewStatus === 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD' ||
+                      asset.clientApprovalStatus === 'CHANGES_REQUESTED';
+                    const isApproved = asset.clientApprovalStatus === 'APPROVED' || asset.isLatestApproved;
+                    const isForwarded = asset.forwardedToCustomer && asset.clientApprovalStatus !== 'APPROVED';
+                    const isRevisionUnderway = asset.adminReviewStatus === 'REVISION_REQUESTED';
 
-                  return (
-                    <tr key={d.id} className="hover:bg-slate-50/80 transition">
-                      {/* 1. Document Details */}
-                      <td className="py-3 px-4">
-                        <div
-                          onClick={() => {
-                            setSelectedDesign(d);
-                            setInspectedVersion(d.versions?.[0] || null);
-                          }}
-                          className="cursor-pointer group"
-                          title="Click to inspect drawing & technical audit"
-                        >
-                          <strong className="text-slate-900 group-hover:text-blue-600 transition-colors block text-xs">
-                            {d.title}
-                          </strong>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
-                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-bold">
-                              {d.fileType}
-                            </span>
-                            <span>{d.fileSize}</span>
-                            <span>•</span>
-                            <span className="text-slate-500 font-sans">{d.category.replace(/_/g, ' ')}</span>
+                    return (
+                      <tr key={asset.id} className="hover:bg-amber-50/20 transition">
+                        {/* 1. Interior Deliverable */}
+                        <td className="py-3 px-4">
+                          <div
+                            onClick={() => setSelectedInteriorAsset(asset)}
+                            className="cursor-pointer group"
+                            title="Click to inspect drawing & audit"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                                {asset.documentId}
+                              </span>
+                              <strong className="text-slate-900 group-hover:text-blue-600 transition-colors block text-xs">
+                                {asset.title}
+                              </strong>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
+                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-bold font-sans">
+                                {asset.category.replace(/_/g, ' ')}
+                              </span>
+                              <span>{asset.fileSize}</span>
+                              {asset.isLatestApproved && (
+                                <span className="px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold text-[9px]">
+                                  LATEST APPROVED
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* 2. Shared Project ID */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700">
-                            {d.projectId}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
-                            {d.projectTitle}
-                          </span>
-                        </div>
-                      </td>
+                        {/* 2. Shared Project ID */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700">
+                              {asset.projectId}
+                            </span>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
+                              {asset.projectName}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* 3. Architect Partner */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-900 block">{d.architectName || 'Lead Architect'}</span>
-                          <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
-                            {d.architectFirm || 'Studio Partner'}
-                          </span>
-                        </div>
-                      </td>
+                        {/* 3. Interior Designer */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-900 block">{asset.uploadedBy}</span>
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              {new Date(asset.uploadedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* 4. Homeowner Client */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-900 block">{d.customerName}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{d.customerPhone || 'Client Contact'}</span>
-                        </div>
-                      </td>
+                        {/* 4. Room / Space */}
+                        <td className="py-3 px-3">
+                          <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg text-xs">
+                            {asset.roomName}
+                          </span>
+                        </td>
 
-                      {/* 5. Version Control */}
-                      <td className="py-3 px-3 text-center">
-                        <div className="inline-flex flex-col items-center">
-                          <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800">
-                            {d.currentVersion}
-                          </span>
-                          <span className="text-[9px] text-slate-400 mt-0.5">
-                            {d.versions?.length || 1} {(d.versions?.length || 1) === 1 ? 'version' : 'versions'}
-                          </span>
-                        </div>
-                      </td>
+                        {/* 5. Version Control */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800">
+                              {asset.version}
+                            </span>
+                            <span className="text-[9px] text-slate-400 mt-0.5">
+                              {(asset.versionHistory?.length || 0) + 1} {(asset.versionHistory?.length || 0) + 1 === 1 ? 'version' : 'versions'}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* 6. Status Badge */}
-                      <td className="py-3 px-3 text-center">
-                        {isPending ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center gap-1">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            <span>Pending Review</span>
-                          </span>
-                        ) : isForwarded ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 flex items-center justify-center gap-1">
-                            <Send className="w-3 h-3 text-sky-600" />
-                            <span>Forwarded to Client</span>
-                          </span>
-                        ) : isApproved ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Client Approved</span>
-                          </span>
-                        ) : isCustomerRevision ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 flex items-center justify-center gap-1">
-                            <RotateCcw className="w-3 h-3 text-purple-600" />
-                            <span>Client Requested Changes</span>
-                          </span>
-                        ) : isRevision ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                            Revision Underway
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
-                            {d.status}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 7. Moderation Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isPending && (
-                            <button
-                              onClick={() => handleApproveAndForward(d)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="Approve & Forward to Homeowner"
-                            >
-                              <Send className="w-3 h-3" />
-                              <span>Forward</span>
-                            </button>
+                        {/* 6. Section 9F Status */}
+                        <td className="py-3 px-3 text-center">
+                          {isClientRevision ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 flex items-center justify-center gap-1 animate-pulse">
+                              <RotateCcw className="w-3 h-3 text-purple-600" />
+                              <span>Client Requested Changes</span>
+                            </span>
+                          ) : isPendingAdmin ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Pending Admin Review</span>
+                            </span>
+                          ) : isApproved ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Homeowner Approved</span>
+                            </span>
+                          ) : isForwarded ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 flex items-center justify-center gap-1">
+                              <Send className="w-3 h-3 text-sky-600" />
+                              <span>Forwarded to Homeowner</span>
+                            </span>
+                          ) : isRevisionUnderway ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                              Revision Underway
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              {asset.adminReviewStatus}
+                            </span>
                           )}
+                        </td>
 
-                          {isCustomerRevision && (
+                        {/* 7. Admin Moderation Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isPendingAdmin && (
+                              <button
+                                onClick={() => handleApproveInteriorAsset(asset)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Approve & Forward to Homeowner"
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>Forward</span>
+                              </button>
+                            )}
+
+                            {isClientRevision && (
+                              <button
+                                onClick={() =>
+                                  setInteriorActionModal({
+                                    type: 'FORWARD_CUSTOMER_REVISION',
+                                    asset,
+                                    notes: asset.clientFeedback || '',
+                                  })
+                                }
+                                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Forward Client Feedback to Designer"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Route to Designer</span>
+                              </button>
+                            )}
+
                             <button
-                              onClick={() => {
-                                setForwardCustomerRevisionDesign(d);
-                                setAdminForwardInstructions(d.customerComments || '');
-                              }}
-                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="Route Customer Feedback to Architect"
+                              onClick={() => setSelectedInteriorAsset(asset)}
+                              className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Inspect Drawing & Technical Audit"
                             >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Route to Arch</span>
+                              <Eye className="w-3.5 h-3.5 text-sky-600" />
+                              <span>Audit</span>
                             </button>
-                          )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Document Details</th>
+                  <th className="py-3 px-3">Shared Project ID</th>
+                  <th className="py-3 px-3">Architect Partner</th>
+                  <th className="py-3 px-3">Homeowner Client</th>
+                  <th className="py-3 px-3 text-center">Version Control</th>
+                  <th className="py-3 px-3 text-center">Review Status</th>
+                  <th className="py-3 px-4 text-right">Moderation Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDesigns.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-600">No architectural documents match this filter.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDesigns.map((d) => {
+                    const isPending = d.status === 'SUBMITTED_TO_ADMIN';
+                    const isCustomerRevision = d.status === 'CUSTOMER_REVISION_REQUESTED';
+                    const isApproved = d.status === 'APPROVED' || d.status === 'CUSTOMER_APPROVED' || d.status === 'ADMIN_APPROVED';
+                    const isForwarded = d.status === 'FORWARDED_TO_CUSTOMER' || d.status === 'PENDING_CUSTOMER_APPROVAL';
+                    const isRevision = d.status === 'REVISION_REQUESTED';
 
-                          <button
+                    return (
+                      <tr key={d.id} className="hover:bg-slate-50/80 transition">
+                        {/* 1. Document Details */}
+                        <td className="py-3 px-4">
+                          <div
                             onClick={() => {
                               setSelectedDesign(d);
                               setInspectedVersion(d.versions?.[0] || null);
                             }}
-                            className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                            title="Inspect Blueprint & Technical Audit"
+                            className="cursor-pointer group"
+                            title="Click to inspect drawing & technical audit"
                           >
-                            <Eye className="w-3.5 h-3.5 text-sky-600" />
-                            <span>Audit</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            <strong className="text-slate-900 group-hover:text-blue-600 transition-colors block text-xs">
+                              {d.title}
+                            </strong>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
+                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-bold">
+                                {d.fileType}
+                              </span>
+                              <span>{d.fileSize}</span>
+                              <span>•</span>
+                              <span className="text-slate-500 font-sans">{d.category.replace(/_/g, ' ')}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Shared Project ID */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700">
+                              {d.projectId}
+                            </span>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
+                              {d.projectTitle}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 3. Architect Partner */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-900 block">{d.architectName || 'Lead Architect'}</span>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[150px]">
+                              {d.architectFirm || 'Studio Partner'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 4. Homeowner Client */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-900 block">{d.customerName}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{d.customerPhone || 'Client Contact'}</span>
+                          </div>
+                        </td>
+
+                        {/* 5. Version Control */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800">
+                              {d.currentVersion}
+                            </span>
+                            <span className="text-[9px] text-slate-400 mt-0.5">
+                              {d.versions?.length || 1} {(d.versions?.length || 1) === 1 ? 'version' : 'versions'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 6. Status Badge */}
+                        <td className="py-3 px-3 text-center">
+                          {isPending ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Pending Review</span>
+                            </span>
+                          ) : isForwarded ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 flex items-center justify-center gap-1">
+                              <Send className="w-3 h-3 text-sky-600" />
+                              <span>Forwarded to Client</span>
+                            </span>
+                          ) : isApproved ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Client Approved</span>
+                            </span>
+                          ) : isCustomerRevision ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 flex items-center justify-center gap-1">
+                              <RotateCcw className="w-3 h-3 text-purple-600" />
+                              <span>Client Requested Changes</span>
+                            </span>
+                          ) : isRevision ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                              Revision Underway
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              {d.status}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 7. Moderation Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isPending && (
+                              <button
+                                onClick={() => handleApproveAndForward(d)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Approve & Forward to Homeowner"
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>Forward</span>
+                              </button>
+                            )}
+
+                            {isCustomerRevision && (
+                              <button
+                                onClick={() => {
+                                  setForwardCustomerRevisionDesign(d);
+                                  setAdminForwardInstructions(d.customerComments || '');
+                                }}
+                                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Route Customer Feedback to Architect"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Route to Arch</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setSelectedDesign(d);
+                                setInspectedVersion(d.versions?.[0] || null);
+                              }}
+                              className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Inspect Blueprint & Technical Audit"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-sky-600" />
+                              <span>Audit</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -1295,6 +1698,417 @@ export const AdminDocuments: React.FC = () => {
                 </form>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* FULL-SCREEN MODAL: INTERIOR DESIGN AUDIT & DOCUMENT INSPECTION DRAWER */}
+      <AnimatePresence>
+        {selectedInteriorAsset && (
+          <div className="admin-fullscreen-modal fixed inset-0 z-50 overflow-y-auto bg-[#f8fafc] flex flex-col font-sans animate-in fade-in duration-150">
+            <div className="h-[2px] bg-gradient-to-r from-transparent via-amber-400 via-yellow-400 to-transparent pointer-events-none shrink-0" />
+            <div className="sticky top-0 z-40 bg-navy-950 text-white px-4 sm:px-8 py-3.5 border-b border-navy-900 flex items-center justify-between shadow-xl shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <button
+                  onClick={() => setSelectedInteriorAsset(null)}
+                  className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs flex items-center gap-2 border border-slate-700/80 hover:border-slate-500 transition group cursor-pointer shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                  <span className="hidden sm:inline">Back to Interior Registry</span>
+                  <span className="sm:hidden">Back</span>
+                </button>
+                <div className="h-6 w-px bg-slate-700 hidden sm:block shrink-0" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-base font-display shrink-0">
+                    <Palette className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {selectedInteriorAsset.documentId}
+                      </span>
+                      <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                        {selectedInteriorAsset.title}
+                      </h2>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-sky-500/20 text-sky-300 border-sky-500/40 font-mono">
+                        {selectedInteriorAsset.version}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono truncate">
+                      Project: {selectedInteriorAsset.projectId} ({selectedInteriorAsset.projectName}) • Designer: {selectedInteriorAsset.uploadedBy} • Room: {selectedInteriorAsset.roomName}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <button
+                  onClick={() => setSelectedInteriorAsset(null)}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                  <span className="hidden sm:inline">Close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* LEFT SIDE: VISUAL CANVAS & SPECS (7 COLS) */}
+                <div className="lg:col-span-7 space-y-5">
+                  <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-md space-y-4">
+                    <div className="flex items-center justify-between border-b pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                          <Eye className="w-4 h-4" />
+                        </span>
+                        <h3 className="font-bold text-slate-900 text-sm">
+                          Design Rendering / CAD Drawing Artifact
+                        </h3>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-slate-100 rounded text-slate-700">
+                          {selectedInteriorAsset.version}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setZoomPreview(!zoomPreview)}
+                          className="px-2.5 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          <span>{zoomPreview ? 'Standard' : 'Expand'}</span>
+                        </button>
+
+                        <a
+                          href={selectedInteriorAsset.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 bg-navy-950 text-gold-400 font-bold rounded-lg text-xs flex items-center gap-1 shadow-xs hover:bg-navy-900 transition"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download High-Res</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Canvas Frame */}
+                    <div
+                      className={`relative w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center transition-all ${
+                        zoomPreview ? 'h-[650px]' : 'h-[440px]'
+                      }`}
+                    >
+                      <img
+                        src={selectedInteriorAsset.fileUrl}
+                        alt={selectedInteriorAsset.title}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
+                    {/* Technical Specs Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-2">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Category</span>
+                        <span className="font-bold text-navy-950">{selectedInteriorAsset.category.replace(/_/g, ' ')}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Room / Space</span>
+                        <span className="font-bold text-navy-950">{selectedInteriorAsset.roomName}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Uploaded By</span>
+                        <span className="font-bold text-navy-950">{selectedInteriorAsset.uploadedBy}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">File Specs</span>
+                        <span className="font-bold text-navy-950">{selectedInteriorAsset.fileSize}</span>
+                      </div>
+                    </div>
+
+                    {selectedInteriorAsset.dimensionsOrSpecs && (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Dimensions &amp; Materials Specs</span>
+                        <span className="font-mono text-slate-800">{selectedInteriorAsset.dimensionsOrSpecs}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* RIGHT SIDE: SECTION 9F AUDIT & MODERATION ACTION DESK (5 COLS) */}
+                <div className="lg:col-span-5 space-y-5">
+                  <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-md space-y-4">
+                    <div className="flex items-center justify-between border-b pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                          <ShieldCheck className="w-4 h-4" />
+                        </span>
+                        <h3 className="font-bold text-slate-900 text-sm">
+                          Section 9F Compliance &amp; Customer Routing
+                        </h3>
+                      </div>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-800 rounded">
+                        Admin Desk
+                      </span>
+                    </div>
+
+                    {/* Status Summary Banner */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-bold">Admin Audit Status:</span>
+                        <span className="font-black px-2 py-0.5 rounded-full text-[10px] uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                          {selectedInteriorAsset.adminReviewStatus.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-bold">Homeowner Status:</span>
+                        <span className="font-black px-2 py-0.5 rounded-full text-[10px] uppercase bg-blue-100 text-blue-900 border border-blue-300">
+                          {selectedInteriorAsset.clientApprovalStatus.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-bold">Latest Approved Asset:</span>
+                        <span className="font-mono font-bold text-[10px]">
+                          {selectedInteriorAsset.isLatestApproved ? '✅ YES (Active Handover)' : '⏳ Awaiting Full Sign-off'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Homeowner Change Request Callout */}
+                    {(selectedInteriorAsset.adminReviewStatus === 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD' ||
+                      selectedInteriorAsset.clientApprovalStatus === 'CHANGES_REQUESTED' ||
+                      Boolean(selectedInteriorAsset.clientFeedback)) && (
+                      <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 text-xs space-y-2">
+                        <div className="flex items-center gap-2 text-purple-900 font-bold">
+                          <RotateCcw className="w-4 h-4 text-purple-600 shrink-0" />
+                          <span>Homeowner Change Request (Section 9F):</span>
+                        </div>
+                        <p className="text-purple-950 font-medium pl-6 leading-relaxed">
+                          "{selectedInteriorAsset.clientFeedback || 'Revision requested on drawing/render.'}"
+                        </p>
+                        <div className="pt-2 border-t border-purple-200 flex justify-end">
+                          <button
+                            onClick={() =>
+                              setInteriorActionModal({
+                                type: 'FORWARD_CUSTOMER_REVISION',
+                                asset: selectedInteriorAsset,
+                                notes: selectedInteriorAsset.clientFeedback || '',
+                              })
+                            }
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Forward Revision Directives to Designer</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Admin Actions */}
+                    <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Admin Decision Controls
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          onClick={() =>
+                            setInteriorActionModal({
+                              type: 'APPROVE',
+                              asset: selectedInteriorAsset,
+                              notes: '',
+                            })
+                          }
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Approve &amp; Forward</span>
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            setInteriorActionModal({
+                              type: 'REVISE',
+                              asset: selectedInteriorAsset,
+                              notes: '',
+                            })
+                          }
+                          className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>Request Revision</span>
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          setInteriorActionModal({
+                            type: 'REJECT',
+                            asset: selectedInteriorAsset,
+                            notes: '',
+                          })
+                        }
+                        className="w-full px-4 py-2 border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Reject Submission</span>
+                      </button>
+                    </div>
+
+                    {/* Version Audit History */}
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Version History &amp; Audit Trail ({((selectedInteriorAsset.versionHistory?.length || 0) + 1)} Versions)
+                      </span>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200 text-xs flex items-center justify-between">
+                          <div>
+                            <span className="font-mono font-bold text-blue-950">Active {selectedInteriorAsset.version}</span>
+                            <span className="text-[10px] text-slate-500 block">Uploaded {new Date(selectedInteriorAsset.uploadedAt).toLocaleString()}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                            Current
+                          </span>
+                        </div>
+
+                        {(selectedInteriorAsset.versionHistory || []).map((hist, i) => (
+                          <div key={i} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                            <div>
+                              <span className="font-mono font-bold text-slate-800">{hist.version} (Archived)</span>
+                              <span className="text-[10px] text-slate-500 block">{hist.comments || 'Prior revision snapshot'}</span>
+                              <span className="text-[9px] text-slate-400 font-mono">{new Date(hist.uploadedAt).toLocaleString()}</span>
+                            </div>
+                            <a
+                              href={hist.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
+                              title="Download previous version"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ACTION MODAL: INTERIOR DESIGN MODERATION DIALOG */}
+      <AnimatePresence>
+        {interiorActionModal.type && interiorActionModal.asset && (
+          <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      interiorActionModal.type === 'APPROVE'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : interiorActionModal.type === 'FORWARD_CUSTOMER_REVISION'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {interiorActionModal.type === 'APPROVE' ? (
+                      <CheckCircle2 className="w-5 h-5" />
+                    ) : (
+                      <RotateCcw className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-black text-navy-950 text-base">
+                      {interiorActionModal.type === 'APPROVE' && 'Approve & Forward to Homeowner'}
+                      {interiorActionModal.type === 'REVISE' && 'Request Designer Redline Revision'}
+                      {interiorActionModal.type === 'FORWARD_CUSTOMER_REVISION' && 'Forward Client Changes to Designer'}
+                      {interiorActionModal.type === 'REJECT' && 'Reject Submission'}
+                    </h3>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {interiorActionModal.asset.documentId} ({interiorActionModal.asset.version}) • {interiorActionModal.asset.roomName}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setInteriorActionModal({ type: null, asset: null, notes: '' })}
+                  className="p-1 rounded-full hover:bg-slate-100 text-slate-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="text-xs space-y-3">
+                <p className="text-slate-600 leading-relaxed">
+                  {interiorActionModal.type === 'APPROVE' &&
+                    'This deliverable will be marked approved by Admin and immediately forwarded to the homeowner portal for final sign-off.'}
+                  {interiorActionModal.type === 'REVISE' &&
+                    'Specify technical redlines and aesthetic adjustments needed from the Interior Designer before homeowner handover.'}
+                  {interiorActionModal.type === 'FORWARD_CUSTOMER_REVISION' &&
+                    'Route the homeowner feedback to the Interior Designer with your administrative instructions.'}
+                  {interiorActionModal.type === 'REJECT' &&
+                    'Provide the rejection reason. The Interior Designer will be required to re-upload according to specifications.'}
+                </p>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                    {interiorActionModal.type === 'APPROVE' ? 'Handover Notes / Verification Remarks (Optional)' : 'Directives & Comments (Required)'}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={interiorActionModal.notes}
+                    onChange={(e) => setInteriorActionModal({ ...interiorActionModal, notes: e.target.value })}
+                    placeholder={
+                      interiorActionModal.type === 'APPROVE'
+                        ? 'e.g. Dimensions and material finishes verified against design brief. Approved for client review.'
+                        : 'e.g. Please alter headboard wooden louvers to light Scandinavian oak per client feedback.'
+                    }
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setInteriorActionModal({ type: null, asset: null, notes: '' })}
+                  className="px-4 py-2 border rounded-xl text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!interiorActionModal.asset) return;
+                    if (interiorActionModal.type === 'APPROVE') {
+                      handleApproveInteriorAsset(interiorActionModal.asset, interiorActionModal.notes);
+                    } else if (interiorActionModal.type === 'REVISE') {
+                      handleRequestInteriorRevision(interiorActionModal.asset, interiorActionModal.notes);
+                    } else if (interiorActionModal.type === 'FORWARD_CUSTOMER_REVISION') {
+                      handleForwardCustomerRevisionToInteriorDesigner(interiorActionModal.asset, interiorActionModal.notes);
+                    } else if (interiorActionModal.type === 'REJECT') {
+                      handleRejectInteriorAsset(interiorActionModal.asset, interiorActionModal.notes);
+                    }
+                  }}
+                  className={`px-5 py-2 text-white font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer ${
+                    interiorActionModal.type === 'APPROVE'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : interiorActionModal.type === 'FORWARD_CUSTOMER_REVISION'
+                      ? 'bg-purple-600 hover:bg-purple-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Confirm Decision</span>
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

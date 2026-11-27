@@ -2238,6 +2238,20 @@ export type InteriorDesignCategory =
   | 'MATERIAL_FINISHES' // 9E: Material and Finish Selection
   | 'MOOD_BOARD';
 
+export type InteriorAdminReviewStatus =
+  | 'PENDING_ADMIN_REVIEW'
+  | 'APPROVED_BY_ADMIN'
+  | 'REVISION_REQUESTED'
+  | 'REJECTED'
+  | 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD';
+
+export type InteriorClientApprovalStatus =
+  | 'NOT_FORWARDED'
+  | 'PENDING_CUSTOMER_REVIEW'
+  | 'APPROVED'
+  | 'CHANGES_REQUESTED'
+  | 'REVISION_REQUESTED';
+
 export interface InteriorDesignAsset {
   id: string;
   documentId: string; // BG-DOC-INT-XXXX
@@ -2253,12 +2267,16 @@ export interface InteriorDesignAsset {
   dimensionsOrSpecs?: string;
   uploadedBy: string;
   uploadedAt: string;
-  adminReviewStatus: 'PENDING_ADMIN_REVIEW' | 'APPROVED_BY_ADMIN' | 'REVISION_REQUESTED';
+  adminReviewStatus: InteriorAdminReviewStatus;
   adminFeedback?: string;
-  clientApprovalStatus: 'PENDING_CUSTOMER_REVIEW' | 'APPROVED' | 'REVISION_REQUESTED';
+  forwardedToCustomer?: boolean;
+  forwardedAt?: string;
+  adminForwardInstructions?: string;
+  clientApprovalStatus: InteriorClientApprovalStatus;
   clientFeedback?: string;
   isLatestApproved: boolean;
   versionHistory?: { version: string; fileUrl: string; uploadedAt: string; comments?: string }[];
+  customerName?: string;
 }
 
 export const TEST_INTERIOR_DESIGN_ASSETS: InteriorDesignAsset[] = [
@@ -2465,28 +2483,112 @@ export const submitDesignAssetToAdmin = (assetId: string, notes?: string): Inter
   return saveInteriorDesignAsset(asset);
 };
 
-export const adminReviewDesignAsset = (
+export const adminApproveAndForwardInteriorDesign = (
   assetId: string,
-  action: 'APPROVE' | 'REJECT' | 'REQUEST_REVISION',
-  feedback?: string
+  adminNotes?: string
 ): InteriorDesignAsset => {
   const all = getInteriorDesignAssets();
   const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
   if (!asset) throw new Error('Design asset not found');
 
-  if (action === 'APPROVE') {
-    asset.adminReviewStatus = 'APPROVED_BY_ADMIN';
-    asset.clientApprovalStatus = 'PENDING_CUSTOMER_REVIEW';
-    asset.isLatestApproved = true;
-  } else if (action === 'REQUEST_REVISION') {
-    asset.adminReviewStatus = 'REVISION_REQUESTED';
-    asset.adminFeedback = feedback;
-  } else {
-    asset.adminReviewStatus = 'REVISION_REQUESTED';
-    asset.adminFeedback = feedback || 'Rejected by Admin';
-  }
+  asset.adminReviewStatus = 'APPROVED_BY_ADMIN';
+  asset.forwardedToCustomer = true;
+  asset.forwardedAt = new Date().toISOString();
+  asset.clientApprovalStatus = 'PENDING_CUSTOMER_REVIEW';
+  if (adminNotes) asset.adminFeedback = adminNotes;
+  asset.isLatestApproved = true;
+
+  // Sync to customer deliverables storage so homeowner sees it in DesignApprovals immediately
+  try {
+    const custKey = `customer_approvals_${asset.projectId}`;
+    const storedCust = localStorage.getItem(custKey);
+    let custApprovals: any[] = storedCust ? JSON.parse(storedCust) : [];
+    const existingCustIdx = custApprovals.findIndex((c) => c.id === asset.id || c.documentTitle === asset.title);
+    const custItem = {
+      id: asset.id,
+      projectId: asset.projectId,
+      documentTitle: asset.title,
+      category: 'INTERIOR',
+      documentVersion: asset.version,
+      previewUrl: asset.fileUrl,
+      status: 'PENDING',
+      submittedAt: asset.uploadedAt,
+      designerName: asset.uploadedBy,
+      designerRole: 'Principal Interior Designer',
+      notes: `${asset.roomName} • ${asset.dimensionsOrSpecs || ''}`,
+      history: (asset.versionHistory || []).map((v) => ({
+        version: v.version,
+        comment: v.comments || 'Previous version',
+        timestamp: v.uploadedAt,
+        by: 'Designer',
+      })),
+    };
+    if (existingCustIdx >= 0) {
+      custApprovals[existingCustIdx] = custItem;
+    } else {
+      custApprovals.unshift(custItem);
+    }
+    localStorage.setItem(custKey, JSON.stringify(custApprovals));
+  } catch (e) {}
 
   return saveInteriorDesignAsset(asset);
+};
+
+export const adminRequestInteriorDesignRevision = (
+  assetId: string,
+  revisionNotes: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  asset.adminReviewStatus = 'REVISION_REQUESTED';
+  asset.adminFeedback = revisionNotes;
+  asset.forwardedToCustomer = false;
+  return saveInteriorDesignAsset(asset);
+};
+
+export const adminRejectInteriorDesign = (
+  assetId: string,
+  reason: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  asset.adminReviewStatus = 'REJECTED';
+  asset.adminFeedback = reason;
+  asset.forwardedToCustomer = false;
+  return saveInteriorDesignAsset(asset);
+};
+
+export const adminForwardCustomerRevisionToInteriorDesigner = (
+  assetId: string,
+  adminDirectives?: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  asset.adminReviewStatus = 'REVISION_REQUESTED';
+  if (adminDirectives) asset.adminForwardInstructions = adminDirectives;
+  asset.forwardedToCustomer = false;
+
+  return saveInteriorDesignAsset(asset);
+};
+
+export const adminReviewDesignAsset = (
+  assetId: string,
+  action: 'APPROVE' | 'REJECT' | 'REQUEST_REVISION',
+  feedback?: string
+): InteriorDesignAsset => {
+  if (action === 'APPROVE') {
+    return adminApproveAndForwardInteriorDesign(assetId, feedback);
+  } else if (action === 'REQUEST_REVISION') {
+    return adminRequestInteriorDesignRevision(assetId, feedback || 'Revision required by Admin');
+  } else {
+    return adminRejectInteriorDesign(assetId, feedback || 'Rejected by Admin');
+  }
 };
 
 export const customerReviewDesignAsset = (
@@ -2501,9 +2603,11 @@ export const customerReviewDesignAsset = (
   if (action === 'APPROVE') {
     asset.clientApprovalStatus = 'APPROVED';
     asset.isLatestApproved = true;
+    asset.clientFeedback = feedback || 'Approved by customer';
   } else {
-    asset.clientApprovalStatus = 'REVISION_REQUESTED';
-    asset.clientFeedback = feedback;
+    asset.clientApprovalStatus = 'CHANGES_REQUESTED';
+    asset.adminReviewStatus = 'CUSTOMER_REVISION_PENDING_ADMIN_FORWARD';
+    asset.clientFeedback = feedback || 'Customer requested changes';
   }
 
   return saveInteriorDesignAsset(asset);
@@ -2537,8 +2641,11 @@ export const createDesignAssetRevision = (
   if (specs) asset.dimensionsOrSpecs = specs;
   asset.uploadedAt = new Date().toISOString();
   asset.adminReviewStatus = 'PENDING_ADMIN_REVIEW';
-  asset.clientApprovalStatus = 'PENDING_CUSTOMER_REVIEW';
+  asset.clientApprovalStatus = 'NOT_FORWARDED';
+  asset.forwardedToCustomer = false;
   asset.isLatestApproved = false;
+  asset.adminFeedback = undefined;
+  asset.adminForwardInstructions = undefined;
 
   return saveInteriorDesignAsset(asset);
 };
