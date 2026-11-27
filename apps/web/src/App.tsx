@@ -112,6 +112,7 @@ import { AdminPayouts } from './pages/admin/AdminPayouts.js';
 import { AdminInvoices } from './pages/admin/AdminInvoices.js';
 import { AdminNotifications } from './pages/admin/AdminNotifications.js';
 import { AdminCMSContent } from './pages/admin/AdminCMSContent.js';
+import { AdminServiceConfig } from './pages/admin/AdminServiceConfig.js';
 
 // Architect Partner Portal Pages (Master Development Prompt)
 import { ArchitectLandingPage } from './pages/public/ArchitectLandingPage.js';
@@ -435,7 +436,10 @@ export const App: React.FC = () => {
           <Route path="materials" element={<AdminMaterialOrders />} />
           <Route path="calculator" element={<AdminCostCalculator />} />
           <Route path="cost-calculator" element={<AdminCostCalculator />} />
-          <Route path="categories" element={<AdminCategories />} />
+          <Route path="categories" element={<AdminServiceConfig />} />
+          <Route path="services-config" element={<AdminServiceConfig />} />
+          <Route path="service-config" element={<AdminServiceConfig />} />
+          <Route path="services" element={<AdminServiceConfig />} />
           <Route path="requests" element={<AdminRequests />} />
           <Route path="requests/:id" element={<AdminRequestDetail />} />
           <Route path="quotations" element={<AdminQuotationsReview />} />

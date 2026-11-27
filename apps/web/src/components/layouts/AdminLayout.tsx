@@ -364,6 +364,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/reports': true,
     '/admin/notifications': true,
     '/admin/cms': true,
+    '/admin/services-config': true,
   });
   const { success } = useToast();
 
@@ -412,6 +413,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/cms')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/cms': true }));
+    }
+    if (location.pathname.startsWith('/admin/services-config') || location.pathname.startsWith('/admin/categories')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/services-config': true }));
     }
   }, [location.pathname]);
 
@@ -614,7 +618,7 @@ export const AdminLayout: React.FC = () => {
           ],
         },
         { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
-        { label: 'Service & Category Pricing', path: '/admin/categories', icon: Layers },
+        { label: 'Service & Category Pricing', path: '/admin/services-config?view=PRICING_CONFIGURATION', icon: Layers },
       ],
     },
     {
@@ -801,6 +805,22 @@ export const AdminLayout: React.FC = () => {
             { label: 'Privacy Policy', path: '/admin/cms?view=PRIVACY_POLICY', view: 'PRIVACY_POLICY' },
             { label: 'Cancellation Policy', path: '/admin/cms?view=CANCELLATION_POLICY', view: 'CANCELLATION_POLICY' },
             { label: 'Refund Policy', path: '/admin/cms?view=REFUND_POLICY', view: 'REFUND_POLICY' },
+          ],
+        },
+        {
+          label: 'Service & Configuration Management',
+          path: '/admin/services-config',
+          icon: Layers,
+          subItems: [
+            { label: 'Service Categories', path: '/admin/services-config?view=SERVICE_CATEGORIES', view: 'SERVICE_CATEGORIES' },
+            { label: 'Subcategories', path: '/admin/services-config?view=SUBCATEGORIES', view: 'SUBCATEGORIES' },
+            { label: 'Service Types', path: '/admin/services-config?view=SERVICE_TYPES', view: 'SERVICE_TYPES' },
+            { label: 'Project Types', path: '/admin/services-config?view=PROJECT_TYPES', view: 'PROJECT_TYPES' },
+            { label: 'Pricing Configuration', path: '/admin/services-config?view=PRICING_CONFIGURATION', view: 'PRICING_CONFIGURATION' },
+            { label: 'Quotation Request Fee', path: '/admin/services-config?view=QUOTATION_FEE', view: 'QUOTATION_FEE' },
+            { label: 'Platform Commission Settings', path: '/admin/services-config?view=COMMISSION_SETTINGS', view: 'COMMISSION_SETTINGS' },
+            { label: 'Milestone Templates', path: '/admin/services-config?view=MILESTONE_TEMPLATES', view: 'MILESTONE_TEMPLATES' },
+            { label: 'Project Status Settings', path: '/admin/services-config?view=PROJECT_STATUS_SETTINGS', view: 'PROJECT_STATUS_SETTINGS' },
           ],
         },
       ],
@@ -1040,7 +1060,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES')));
 
                               return (
                                 <Link
