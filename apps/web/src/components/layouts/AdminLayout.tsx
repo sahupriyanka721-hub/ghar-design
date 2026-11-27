@@ -360,6 +360,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/invoices': true,
     '/admin/communications': true,
     '/admin/support': true,
+    '/admin/reports': true,
   });
   const { success } = useToast();
 
@@ -399,6 +400,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/support')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/support': true }));
+    }
+    if (location.pathname.startsWith('/admin/reports')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/reports': true }));
     }
   }, [location.pathname]);
 
@@ -743,7 +747,23 @@ export const AdminLayout: React.FC = () => {
             { label: 'Escalation Management', path: '/admin/support?view=ESCALATION_MANAGEMENT', view: 'ESCALATION_MANAGEMENT' },
           ],
         },
-        { label: 'Reports & Analytics (GMV & SLA)', path: '/admin/reports', icon: BarChart3 },
+        {
+          label: 'Reports & Analytics',
+          path: '/admin/reports',
+          icon: BarChart3,
+          subItems: [
+            { label: 'Customer Reports', path: '/admin/reports?view=CUSTOMER_REPORTS', view: 'CUSTOMER_REPORTS' },
+            { label: 'Architect Reports', path: '/admin/reports?view=ARCHITECT_REPORTS', view: 'ARCHITECT_REPORTS' },
+            { label: 'Quotation Reports', path: '/admin/reports?view=QUOTATION_REPORTS', view: 'QUOTATION_REPORTS' },
+            { label: 'Project Reports', path: '/admin/reports?view=PROJECT_REPORTS', view: 'PROJECT_REPORTS' },
+            { label: 'Milestone Reports', path: '/admin/reports?view=MILESTONE_REPORTS', view: 'MILESTONE_REPORTS' },
+            { label: 'Payment Reports', path: '/admin/reports?view=PAYMENT_REPORTS', view: 'PAYMENT_REPORTS' },
+            { label: 'Payout Reports', path: '/admin/reports?view=PAYOUT_REPORTS', view: 'PAYOUT_REPORTS' },
+            { label: 'Revenue Reports', path: '/admin/reports?view=REVENUE_REPORTS', view: 'REVENUE_REPORTS' },
+            { label: 'Commission Reports', path: '/admin/reports?view=COMMISSION_REPORTS', view: 'COMMISSION_REPORTS' },
+            { label: 'Performance Reports', path: '/admin/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
+          ],
+        },
         { label: 'Notification Broadcast Center', path: '/admin/notifications', icon: Bell },
         { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
         { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
@@ -984,7 +1004,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS')));
 
                               return (
                                 <Link
