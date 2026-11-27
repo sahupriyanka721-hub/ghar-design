@@ -366,6 +366,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/cms': true,
     '/admin/services-config': true,
     '/admin/staff': true,
+    '/admin/settings': true,
   });
   const { success } = useToast();
 
@@ -420,6 +421,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/staff')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/staff': true }));
+    }
+    if (location.pathname.startsWith('/admin/settings')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/settings': true }));
     }
   }, [location.pathname]);
 
@@ -554,7 +558,21 @@ export const AdminLayout: React.FC = () => {
           ],
         },
         { label: 'Security Audit Trail', path: '/admin/audit-logs', icon: ShieldCheck },
-        { label: 'Platform Global Settings', path: '/admin/settings', icon: Sliders },
+        {
+          label: 'Platform Settings',
+          path: '/admin/settings',
+          icon: Sliders,
+          subItems: [
+            { label: 'General Settings', path: '/admin/settings?view=GENERAL_SETTINGS', view: 'GENERAL_SETTINGS' },
+            { label: 'Payment Gateway Settings', path: '/admin/settings?view=PAYMENT_GATEWAY', view: 'PAYMENT_GATEWAY' },
+            { label: 'Payout Settings', path: '/admin/settings?view=PAYOUT_SETTINGS', view: 'PAYOUT_SETTINGS' },
+            { label: 'OTP Settings', path: '/admin/settings?view=OTP_SETTINGS', view: 'OTP_SETTINGS' },
+            { label: 'Email/SMS Settings', path: '/admin/settings?view=EMAIL_SMS_SETTINGS', view: 'EMAIL_SMS_SETTINGS' },
+            { label: 'Tax Settings', path: '/admin/settings?view=TAX_SETTINGS', view: 'TAX_SETTINGS' },
+            { label: 'Document Settings', path: '/admin/settings?view=DOCUMENT_SETTINGS', view: 'DOCUMENT_SETTINGS' },
+            { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
+          ],
+        },
       ],
     },
     {
@@ -848,6 +866,21 @@ export const AdminLayout: React.FC = () => {
             { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
           ],
         },
+        {
+          label: 'Platform Settings',
+          path: '/admin/settings',
+          icon: Sliders,
+          subItems: [
+            { label: 'General Settings', path: '/admin/settings?view=GENERAL_SETTINGS', view: 'GENERAL_SETTINGS' },
+            { label: 'Payment Gateway Settings', path: '/admin/settings?view=PAYMENT_GATEWAY', view: 'PAYMENT_GATEWAY' },
+            { label: 'Payout Settings', path: '/admin/settings?view=PAYOUT_SETTINGS', view: 'PAYOUT_SETTINGS' },
+            { label: 'OTP Settings', path: '/admin/settings?view=OTP_SETTINGS', view: 'OTP_SETTINGS' },
+            { label: 'Email/SMS Settings', path: '/admin/settings?view=EMAIL_SMS_SETTINGS', view: 'EMAIL_SMS_SETTINGS' },
+            { label: 'Tax Settings', path: '/admin/settings?view=TAX_SETTINGS', view: 'TAX_SETTINGS' },
+            { label: 'Document Settings', path: '/admin/settings?view=DOCUMENT_SETTINGS', view: 'DOCUMENT_SETTINGS' },
+            { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
+          ],
+        },
       ],
     },
   ];
@@ -1085,7 +1118,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS')));
 
                               return (
                                 <Link

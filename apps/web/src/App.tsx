@@ -467,6 +467,8 @@ export const App: React.FC = () => {
           <Route path="roles" element={<AdminStaff />} />
           <Route path="rbac" element={<AdminStaff />} />
           <Route path="settings" element={<AdminPlatformSettings />} />
+          <Route path="platform-settings" element={<AdminPlatformSettings />} />
+          <Route path="global-settings" element={<AdminPlatformSettings />} />
           <Route path="cms" element={<AdminCMSContent />} />
           <Route path="content" element={<AdminCMSContent />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
