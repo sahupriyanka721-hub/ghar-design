@@ -61,8 +61,14 @@ import {
   customerPayMilestoneInvoice,
   backendVerifyPayment,
   adminApprovePayout,
+  adminRejectPayout,
+  adminHoldPayout,
   createPayoutRequest,
   getInteriorPayouts,
+  getInteriorLedger,
+  recordLedgerEntry,
+  createLedgerReversalEntry,
+  processPaymentWebhook,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
 
@@ -806,5 +812,115 @@ describe('Interior Designer Panel & Store Tests', () => {
     );
     expect(corrected.status).toBe('CORRECTION_REQUESTED');
     expect(corrected.adminReview?.feedback).toContain('updated island dimensions');
+  });
+
+  it('calculates Section 14 Step 6 Payout Deductions (10% Commission + 1% TDS)', () => {
+    const grossAmount = 400000;
+    const payout = createPayoutRequest({
+      grossAmount,
+      projectId: 'BG-PRJ-CALC',
+      milestoneName: 'Stage 3: 3D Visualization',
+    });
+
+    // Example in Section 14 Step 6: 10% commission, 1% TDS, Net payable = 89%
+    expect(payout.grossAmount).toBe(400000);
+    expect(payout.platformCommission).toBe(40000); // 10% of 4,00,000
+    expect(payout.tdsDeduction).toBe(4000); // 1% of 4,00,000
+    expect(payout.netPayable).toBe(356000); // 400000 - 40000 - 4000
+  });
+
+  it('implements Mandatory Section 23 Test 9: Financial safety workflow', () => {
+    const projectId = 'BG-FIN-SAFETY-TEST';
+    const milestoneId = 'MS-TEST-9';
+
+    // 1. Failed payment handling
+    const failedAttempt = processPaymentWebhook({
+      event: 'payment.failed',
+      orderId: 'order_failed_101',
+      paymentId: 'pay_failed_101',
+      amount: 150000,
+      signature: 'sig_valid_dummy',
+      idempotencyKey: 'idemp_key_failed_1',
+      projectId,
+      milestoneId,
+    });
+    expect(failedAttempt.success).toBe(false);
+    expect(failedAttempt.message).toContain('failed');
+
+    // 2. Successful payment webhook
+    const validAttempt = processPaymentWebhook({
+      event: 'payment.captured',
+      orderId: 'order_success_102',
+      paymentId: 'pay_success_102',
+      amount: 150000,
+      signature: 'sig_valid_102',
+      idempotencyKey: 'idemp_key_success_102',
+      projectId,
+      milestoneId,
+    });
+    expect(validAttempt.success).toBe(true);
+    expect(validAttempt.duplicate).toBe(false);
+
+    // 3. Duplicate webhook detection (Idempotency test)
+    const duplicateAttempt = processPaymentWebhook({
+      event: 'payment.captured',
+      orderId: 'order_success_102',
+      paymentId: 'pay_success_102',
+      amount: 150000,
+      signature: 'sig_valid_102',
+      idempotencyKey: 'idemp_key_success_102', // SAME KEY
+      projectId,
+      milestoneId,
+    });
+    expect(duplicateAttempt.success).toBe(true);
+    expect(duplicateAttempt.duplicate).toBe(true);
+    expect(duplicateAttempt.message).toContain('Duplicate webhook detected');
+
+    // 4. Duplicate payout attempt prevention
+    const payout = createPayoutRequest({
+      projectId,
+      milestoneName: 'Safety Milestone',
+      grossAmount: 150000,
+    });
+    expect(payout.status).toBe('PENDING_ADMIN_APPROVAL');
+
+    const processedPayout = adminApprovePayout(payout.id, 'CMS202611SAFETY1');
+    expect(processedPayout.status).toBe('PROCESSED');
+
+    // Second approve attempt MUST throw error
+    expect(() => {
+      adminApprovePayout(payout.id, 'CMS202611SAFETY2');
+    }).toThrow(/already processed/i);
+
+    // 5. Immutable ledger reversal
+    const ledger = getInteriorLedger(projectId);
+    expect(ledger.length).toBeGreaterThan(0);
+    const entryToReverse = ledger[0];
+
+    const reversal = createLedgerReversalEntry(entryToReverse.id, 'Billing dispute correction');
+    expect(reversal.type).toBe('REVERSAL');
+    expect(reversal.description).toContain('Reversal of');
+    const updatedOriginal = getInteriorLedger(projectId).find((l) => l.id === entryToReverse.id);
+    expect(updatedOriginal?.status).toBe('REVERSED');
+  });
+
+  it('manages Admin Hold and Reject actions for Interior Payouts', () => {
+    // 1. Hold action
+    const payout1 = createPayoutRequest({
+      projectId: 'BG-HOLD-TEST',
+      grossAmount: 180000,
+    });
+    const held = adminHoldPayout(payout1.id, 'Snag inspection pending in dining room');
+    expect(held.status).toBe('ON_HOLD');
+    expect(held.holdReason).toContain('Snag inspection');
+
+    // 2. Reject action
+    const payout2 = createPayoutRequest({
+      projectId: 'BG-REJECT-TEST',
+      grossAmount: 120000,
+    });
+    const rejected = adminRejectPayout(payout2.id, 'Duplicate invoice submitted by designer');
+    expect(rejected.status).toBe('REJECTED');
+    expect(rejected.rejectionReason).toContain('Duplicate invoice');
   });
 });

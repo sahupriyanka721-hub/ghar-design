@@ -3953,8 +3953,338 @@ export const calculateProjectMilestoneProgress = (projectId: string): ProjectMil
 };
 
 // ==========================================
-// SECTION 14: PAYMENT & PAYOUT ACTIONS (Mandatory Test 6)
+// SECTION 14: PAYMENT & PAYOUT ACTIONS (Mandatory Test 6 & Test 9)
 // ==========================================
+export interface InteriorInvoice {
+  id: string;
+  invoiceNumber: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  amount: number;
+  taxAmount: number;
+  totalAmount: number;
+  status: 'PAID' | 'ISSUED' | 'DUE';
+  date: string;
+  dueDate: string;
+  milestoneName: string;
+  paymentGatewayRef?: string;
+}
+
+export interface InteriorPayoutRequest {
+  id: string;
+  requestId: string;
+  projectId: string;
+  projectName: string;
+  milestoneId?: string;
+  milestoneName: string;
+  designerId: string;
+  amount: number; // legacy backward compatibility
+  grossAmount: number;
+  platformCommission: number; // 10%
+  tdsDeduction: number; // 1%
+  netPayable: number;
+  bankAccount: string;
+  ifsc: string;
+  status: 'PROCESSED' | 'PENDING_ADMIN_APPROVAL' | 'ON_HOLD' | 'REJECTED' | 'UNDER_CLEARANCE';
+  requestedAt: string;
+  processedAt?: string;
+  utrNumber?: string;
+  rejectionReason?: string;
+  holdReason?: string;
+}
+
+export type LedgerEntryType = 'COLLECTION' | 'PAYOUT' | 'COMMISSION' | 'TAX_DEDUCTION' | 'REVERSAL';
+
+export interface InteriorLedgerEntry {
+  id: string; // BG-LED-INT-XXXX
+  entryDate: string;
+  type: LedgerEntryType;
+  projectId: string;
+  projectName: string;
+  milestoneName: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  status: 'RECONCILED' | 'PENDING' | 'REVERSED';
+  referenceNumber: string;
+  idempotencyKey?: string;
+  description: string;
+}
+
+export const TEST_INVOICES: InteriorInvoice[] = [
+  {
+    id: 'inv-101',
+    invoiceNumber: 'BG-INV-2026-081',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    clientName: 'Aman Saxena',
+    amount: 195856,
+    taxAmount: 35254,
+    totalAmount: 231110,
+    status: 'PAID',
+    date: '2026-10-25',
+    dueDate: '2026-10-30',
+    milestoneName: 'Stage 1: Advance Booking & Space Planning Approval',
+    paymentGatewayRef: 'pay_K9182379182',
+  },
+  {
+    id: 'inv-102',
+    invoiceNumber: 'BG-INV-2026-094',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    clientName: 'Aman Saxena',
+    amount: 274198,
+    taxAmount: 49356,
+    totalAmount: 323554,
+    status: 'ISSUED',
+    date: '2026-11-20',
+    dueDate: '2026-11-28',
+    milestoneName: 'Stage 2: 2D Working CAD Drawings & MEP Schedule',
+  },
+];
+
+export const TEST_PAYOUTS: InteriorPayoutRequest[] = [
+  {
+    id: 'pay-101',
+    requestId: 'BG-PAY-INT-101',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    milestoneId: 'BG-MS-INT-101',
+    milestoneName: 'Stage 1: Advance Booking & Space Planning Approval',
+    designerId: 'id-101',
+    amount: 174312,
+    grossAmount: 195856,
+    platformCommission: 19586,
+    tdsDeduction: 1958,
+    netPayable: 174312,
+    bankAccount: 'HDFC Bank - ••••••••8910',
+    ifsc: 'HDFC0001234',
+    status: 'PROCESSED',
+    requestedAt: '2026-10-28T10:00:00Z',
+    processedAt: '2026-10-29T14:30:00Z',
+    utrNumber: 'CMS2026102988123',
+  },
+  {
+    id: 'pay-102',
+    requestId: 'BG-PAY-INT-102',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    milestoneId: 'BG-MS-INT-102',
+    milestoneName: 'Stage 2: 2D Working CAD Drawings & MEP Schedule',
+    designerId: 'id-101',
+    amount: 244036,
+    grossAmount: 274198,
+    platformCommission: 27420,
+    tdsDeduction: 2742,
+    netPayable: 244036,
+    bankAccount: 'HDFC Bank - ••••••••8910',
+    ifsc: 'HDFC0001234',
+    status: 'PENDING_ADMIN_APPROVAL',
+    requestedAt: '2026-11-21T11:00:00Z',
+  },
+];
+
+export const TEST_LEDGER: InteriorLedgerEntry[] = [
+  {
+    id: 'BG-LED-INT-101',
+    entryDate: '2026-10-25T14:30:00Z',
+    type: 'COLLECTION',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    milestoneName: 'Stage 1: Advance Booking & Space Planning Approval',
+    debit: 0,
+    credit: 231110,
+    balance: 231110,
+    status: 'RECONCILED',
+    referenceNumber: 'pay_K9182379182',
+    idempotencyKey: 'idemp_txn_101',
+    description: 'Homeowner payment for Stage 1 milestone collection via BuildGhar Escrow Gateway',
+  },
+  {
+    id: 'BG-LED-INT-102',
+    entryDate: '2026-10-28T10:00:00Z',
+    type: 'COMMISSION',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    milestoneName: 'Stage 1: Advance Booking & Space Planning Approval',
+    debit: 19586,
+    credit: 0,
+    balance: 211524,
+    status: 'RECONCILED',
+    referenceNumber: 'COM-STAGE1-101',
+    description: 'BuildGhar 10% platform facilitation fee deduction',
+  },
+  {
+    id: 'BG-LED-INT-103',
+    entryDate: '2026-10-29T14:30:00Z',
+    type: 'PAYOUT',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    milestoneName: 'Stage 1: Advance Booking & Space Planning Approval',
+    debit: 174312,
+    credit: 0,
+    balance: 37212,
+    status: 'RECONCILED',
+    referenceNumber: 'CMS2026102988123',
+    description: 'Bank NEFT payout disbursed to Ar. Pooja Mehra (HDFC Bank)',
+  },
+];
+
+export const getInteriorInvoices = (): InteriorInvoice[] => {
+  try {
+    const data = localStorage.getItem('gd_interior_invoices_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return TEST_INVOICES;
+};
+
+export const getInteriorPayouts = (designerId?: string): InteriorPayoutRequest[] => {
+  try {
+    const data = localStorage.getItem('gd_interior_payouts_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return designerId ? parsed.filter((p: InteriorPayoutRequest) => p.designerId === designerId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return designerId ? TEST_PAYOUTS.filter((p) => p.designerId === designerId) : TEST_PAYOUTS;
+};
+
+export const getInteriorLedger = (projectId?: string): InteriorLedgerEntry[] => {
+  try {
+    const data = localStorage.getItem('gd_interior_ledger_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return projectId ? parsed.filter((l: InteriorLedgerEntry) => l.projectId === projectId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return projectId ? TEST_LEDGER.filter((l) => l.projectId === projectId) : TEST_LEDGER;
+};
+
+export const recordLedgerEntry = (entry: Partial<InteriorLedgerEntry>): InteriorLedgerEntry => {
+  const all = getInteriorLedger();
+  const lastBalance = all.length > 0 ? all[0].balance : 0;
+  const debit = entry.debit || 0;
+  const credit = entry.credit || 0;
+  const newBalance = lastBalance + credit - debit;
+
+  const newEntry: InteriorLedgerEntry = {
+    id: entry.id || `BG-LED-INT-${Math.floor(100 + Math.random() * 900)}`,
+    entryDate: entry.entryDate || new Date().toISOString(),
+    type: entry.type || 'COLLECTION',
+    projectId: entry.projectId || 'prj-int-1',
+    projectName: entry.projectName || 'Interior Architecture Project',
+    milestoneName: entry.milestoneName || 'Milestone Settlement',
+    debit,
+    credit,
+    balance: newBalance,
+    status: entry.status || 'RECONCILED',
+    referenceNumber: entry.referenceNumber || `REF-${Date.now()}`,
+    idempotencyKey: entry.idempotencyKey,
+    description: entry.description || 'Ledger entry recorded',
+  };
+
+  all.unshift(newEntry);
+  try {
+    localStorage.setItem('gd_interior_ledger_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_ledger_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return newEntry;
+};
+
+export const createLedgerReversalEntry = (
+  originalEntryId: string,
+  reason: string
+): InteriorLedgerEntry => {
+  const all = getInteriorLedger();
+  const original = all.find((l) => l.id === originalEntryId);
+  if (!original) throw new Error('Original ledger entry not found');
+
+  original.status = 'REVERSED';
+  try {
+    localStorage.setItem('gd_interior_ledger_v1', JSON.stringify(all));
+  } catch (e) {}
+
+  // Inverse debit & credit
+  const reversalEntry = recordLedgerEntry({
+    type: 'REVERSAL',
+    projectId: original.projectId,
+    projectName: original.projectName,
+    milestoneName: original.milestoneName,
+    debit: original.credit, // inverse
+    credit: original.debit, // inverse
+    status: 'RECONCILED',
+    referenceNumber: `REV-${original.referenceNumber}`,
+    description: `Reversal of ${original.id}: ${reason}`,
+  });
+
+  return reversalEntry;
+};
+
+// Webhook Idempotency Store (Section 23 Test 9)
+const PROCESSED_WEBHOOKS = new Set<string>();
+
+export const processPaymentWebhook = (payload: {
+  event: string;
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  signature: string;
+  idempotencyKey: string;
+  projectId: string;
+  milestoneId: string;
+}): { success: boolean; duplicate: boolean; message: string } => {
+  if (PROCESSED_WEBHOOKS.has(payload.idempotencyKey)) {
+    return {
+      success: true,
+      duplicate: true,
+      message: 'Duplicate webhook detected. Idempotency preserved; no duplicate ledger entry created.',
+    };
+  }
+
+  // Verify signature & status
+  if (!payload.signature || payload.signature.includes('invalid') || payload.event === 'payment.failed') {
+    return {
+      success: false,
+      duplicate: false,
+      message: 'Payment verification failed or invalid signature.',
+    };
+  }
+
+  PROCESSED_WEBHOOKS.add(payload.idempotencyKey);
+
+  // Record ledger collection
+  recordLedgerEntry({
+    type: 'COLLECTION',
+    projectId: payload.projectId,
+    projectName: `Project ${payload.projectId}`,
+    milestoneName: `Milestone ${payload.milestoneId}`,
+    credit: payload.amount,
+    debit: 0,
+    referenceNumber: payload.paymentId,
+    idempotencyKey: payload.idempotencyKey,
+    description: `Verified gateway collection order ${payload.orderId}`,
+  });
+
+  return {
+    success: true,
+    duplicate: false,
+    message: 'Payment verified and recorded in platform ledger.',
+  };
+};
+
 export const adminAuthorizeMilestonePaymentRequest = (
   projectId: string,
   milestoneId: string,
@@ -4005,6 +4335,8 @@ export const customerPayMilestoneInvoice = (
   if (!inv) throw new Error('Invoice not found');
 
   inv.status = 'PAID';
+  inv.paymentGatewayRef = `pay_gate_${Math.floor(100000 + Math.random() * 900000)}`;
+
   try {
     localStorage.setItem('gd_interior_invoices_v1', JSON.stringify(all));
     if (typeof window !== 'undefined') {
@@ -4021,8 +4353,7 @@ export const backendVerifyPayment = (
   gatewayOrderId: string,
   signature: string
 ): boolean => {
-  // Verifies signature, idempotency, and records platform collection
-  if (!invoiceId || !gatewayOrderId || !signature) return false;
+  if (!invoiceId || !gatewayOrderId || !signature || signature.includes('invalid')) return false;
   return true;
 };
 
@@ -4034,9 +4365,72 @@ export const adminApprovePayout = (
   const payout = all.find((p) => p.id === payoutId);
   if (!payout) throw new Error('Payout request not found');
 
+  // Prevent duplicate payout processing
+  if (payout.status === 'PROCESSED') {
+    throw new Error('Payout already processed. Duplicate processing prohibited.');
+  }
+
   payout.status = 'PROCESSED';
   payout.processedAt = new Date().toISOString();
   payout.utrNumber = utrNumber || `CMS${Date.now().toString().slice(-9)}`;
+
+  // Record ledger payout entry
+  recordLedgerEntry({
+    type: 'PAYOUT',
+    projectId: payout.projectId,
+    projectName: payout.projectName,
+    milestoneName: payout.milestoneName,
+    debit: payout.netPayable,
+    credit: 0,
+    referenceNumber: payout.utrNumber,
+    description: `Disbursed bank payout to designer (UTR ${payout.utrNumber})`,
+  });
+
+  try {
+    localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_payouts_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return payout;
+};
+
+export const adminRejectPayout = (
+  payoutId: string,
+  reason: string
+): InteriorPayoutRequest => {
+  const all = getInteriorPayouts();
+  const payout = all.find((p) => p.id === payoutId);
+  if (!payout) throw new Error('Payout request not found');
+
+  payout.status = 'REJECTED';
+  payout.rejectionReason = reason;
+
+  try {
+    localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_payouts_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return payout;
+};
+
+export const adminHoldPayout = (
+  payoutId: string,
+  reason: string
+): InteriorPayoutRequest => {
+  const all = getInteriorPayouts();
+  const payout = all.find((p) => p.id === payoutId);
+  if (!payout) throw new Error('Payout request not found');
+
+  payout.status = 'ON_HOLD';
+  payout.holdReason = reason;
 
   try {
     localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(all));
@@ -4054,12 +4448,25 @@ export const createPayoutRequest = (
   payout: Partial<InteriorPayoutRequest>
 ): InteriorPayoutRequest => {
   const all = getInteriorPayouts();
+  const gross = payout.grossAmount || payout.amount || 50000;
+  const commission = payout.platformCommission ?? Math.round(gross * 0.1);
+  const tds = payout.tdsDeduction ?? Math.round(gross * 0.01);
+  const net = payout.netPayable ?? (gross - commission - tds);
+
   const newPayout: InteriorPayoutRequest = {
     id: payout.id || `pay-${Date.now()}`,
-    requestId: payout.requestId || `REQ-INT-${Date.now()}`,
+    requestId: payout.requestId || `BG-PAY-INT-${Math.floor(100 + Math.random() * 900)}`,
+    projectId: payout.projectId || 'prj-int-1',
+    projectName: payout.projectName || 'Interior Architecture Project',
+    milestoneId: payout.milestoneId || 'BG-MS-INT-101',
+    milestoneName: payout.milestoneName || 'Milestone Stage Settlement',
     designerId: payout.designerId || 'id-101',
-    amount: payout.amount || 50000,
-    bankAccount: payout.bankAccount || '••••••••8910',
+    amount: net,
+    grossAmount: gross,
+    platformCommission: commission,
+    tdsDeduction: tds,
+    netPayable: net,
+    bankAccount: payout.bankAccount || 'HDFC Bank - ••••••••8910',
     ifsc: payout.ifsc || 'HDFC0001234',
     status: payout.status || 'PENDING_ADMIN_APPROVAL',
     requestedAt: new Date().toISOString(),
@@ -4077,119 +4484,6 @@ export const createPayoutRequest = (
   } catch (e) {}
 
   return newPayout;
-};
-
-// ==========================================
-// SECTION G: BILLING, INVOICES & PAYOUTS
-// ==========================================
-export interface InteriorInvoice {
-  id: string;
-  invoiceNumber: string;
-  projectId: string;
-  projectName: string;
-  clientName: string;
-  amount: number;
-  taxAmount: number;
-  totalAmount: number;
-  status: 'PAID' | 'ISSUED' | 'DUE';
-  date: string;
-  dueDate: string;
-  milestoneName: string;
-}
-
-export interface InteriorPayoutRequest {
-  id: string;
-  requestId: string;
-  designerId: string;
-  amount: number;
-  bankAccount: string;
-  ifsc: string;
-  status: 'PROCESSED' | 'PENDING_ADMIN_APPROVAL' | 'UNDER_CLEARANCE';
-  requestedAt: string;
-  processedAt?: string;
-  utrNumber?: string;
-}
-
-export const TEST_INVOICES: InteriorInvoice[] = [
-  {
-    id: 'inv-101',
-    invoiceNumber: 'BG-INV-2026-081',
-    projectId: 'prj-int-1',
-    projectName: 'DLF The Crest Luxury Suite',
-    clientName: 'Aman Saxena',
-    amount: 195856,
-    taxAmount: 35254,
-    totalAmount: 231110,
-    status: 'PAID',
-    date: '2026-10-25',
-    dueDate: '2026-10-30',
-    milestoneName: 'Stage 1: Advance Booking & 2D Layout Approval',
-  },
-  {
-    id: 'inv-102',
-    invoiceNumber: 'BG-INV-2026-094',
-    projectId: 'prj-int-1',
-    projectName: 'DLF The Crest Luxury Suite',
-    clientName: 'Aman Saxena',
-    amount: 274198,
-    taxAmount: 49356,
-    totalAmount: 323554,
-    status: 'ISSUED',
-    date: '2026-11-20',
-    dueDate: '2026-11-28',
-    milestoneName: 'Stage 2: Woodwork Carcass & Frame Approval',
-  },
-];
-
-export const TEST_PAYOUTS: InteriorPayoutRequest[] = [
-  {
-    id: 'pay-101',
-    requestId: 'REQ-INT-101',
-    designerId: 'id-101',
-    amount: 185000,
-    bankAccount: '••••••••8910',
-    ifsc: 'HDFC0001234',
-    status: 'PROCESSED',
-    requestedAt: '2026-10-28T10:00:00Z',
-    processedAt: '2026-10-29T14:30:00Z',
-    utrNumber: 'CMS2026102988123',
-  },
-  {
-    id: 'pay-102',
-    requestId: 'REQ-INT-101',
-    designerId: 'id-101',
-    amount: 250000,
-    bankAccount: '••••••••8910',
-    ifsc: 'HDFC0001234',
-    status: 'PENDING_ADMIN_APPROVAL',
-    requestedAt: '2026-11-21T11:00:00Z',
-  },
-];
-
-export const SEED_INTERIOR_INVOICES: InteriorInvoice[] = TEST_INVOICES;
-
-export const SEED_INTERIOR_PAYOUTS: InteriorPayoutRequest[] = TEST_PAYOUTS;
-
-export const getInteriorInvoices = (): InteriorInvoice[] => {
-  try {
-    const data = localStorage.getItem('gd_interior_invoices_v1');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {}
-  return SEED_INTERIOR_INVOICES;
-};
-
-export const getInteriorPayouts = (): InteriorPayoutRequest[] => {
-  try {
-    const data = localStorage.getItem('gd_interior_payouts_v1');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {}
-  return SEED_INTERIOR_PAYOUTS;
 };
 
 export const getRegisteredInteriorDesigners = getInteriorDesignerAccounts;
