@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Megaphone,
@@ -17,8 +17,28 @@ import {
   Plus,
   X,
   Radio,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  FileText,
+  Lock,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Paperclip,
+  Check,
+  AlertTriangle,
+  RotateCcw,
+  CornerDownRight,
+  Compass,
+  User,
+  Building,
+  Layers,
+  ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
+import { Badge } from '../../components/common/Badge.js';
+import { formatINR, formatDate } from '../../lib/utils.js';
 import {
   PlatformBroadcastNotification,
   getPlatformBroadcastNotifications,
@@ -30,397 +50,1189 @@ import { getRegisteredCustomers } from '../../data/customerStore.js';
 import { getArchitectAccounts } from '../../data/architectStore.js';
 import { getInteriorDesignerAccounts } from '../../data/interiorDesignerStore.js';
 import { getRegisteredVendors } from '../../data/vendorStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
+import {
+  getCommunicationThreads,
+  getCommunicationThreadById,
+  saveCommunicationThread,
+  forwardMessageToTarget,
+  requestClarificationOnMessage,
+  holdRejectMessage,
+  addAdminInternalNote,
+  sendAdminRouterMessage,
+  CommunicationThread,
+  CommunicationMessage,
+  CommunicationCategory,
+} from '../../data/communicationDisputeStore.js';
 
 export const AdminCommunications: React.FC = () => {
   const { success, error } = useToast();
+
+  // Primary Workspace Mode: 'ROUTER' (Section 14) vs 'BROADCASTS'
+  const [activeMode, setActiveMode] = useState<'ROUTER' | 'BROADCASTS'>('ROUTER');
+
+  // ==========================================
+  // SECTION 14: CENTRAL ROUTER STATE
+  // ==========================================
+  const [threads, setThreads] = useState<CommunicationThread[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modals for Router
+  const [forwardModalMsg, setForwardModalMsg] = useState<{ threadId: string; msg: CommunicationMessage } | null>(null);
+  const [forwardNotes, setForwardNotes] = useState('Reviewed and forwarded by BuildGhar Admin Desk.');
+
+  const [clarifyModalMsg, setClarifyModalMsg] = useState<{ threadId: string; msg: CommunicationMessage } | null>(null);
+  const [clarifyReason, setClarifyReason] = useState('');
+
+  const [holdModalMsg, setHoldModalMsg] = useState<{ threadId: string; msg: CommunicationMessage } | null>(null);
+  const [holdReason, setHoldReason] = useState('');
+
+  const [newInternalNote, setNewInternalNote] = useState('');
+  const [adminDirectMsg, setAdminDirectMsg] = useState('');
+  const [adminDirectTarget, setAdminDirectTarget] = useState<'CUSTOMER' | 'ARCHITECT'>('CUSTOMER');
+
+  // ==========================================
+  // BROADCAST NOTIFICATION STATE
+  // ==========================================
   const [broadcasts, setBroadcasts] = useState<PlatformBroadcastNotification[]>(() =>
     getPlatformBroadcastNotifications()
   );
-  const [search, setSearch] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string>('ALL');
-  const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
-
-  // Compose State
+  const [broadcastSearch, setBroadcastSearch] = useState('');
+  const [broadcastRoleFilter, setBroadcastRoleFilter] = useState<string>('ALL');
+  const [broadcastChannelFilter, setBroadcastChannelFilter] = useState<string>('ALL');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [targetRole, setTargetRole] = useState<PlatformBroadcastNotification['targetRole']>('ALL');
   const [channel, setChannel] = useState<PlatformBroadcastNotification['channel']>('IN_APP');
   const [isSending, setIsSending] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
-  const refreshData = () => {
-    setBroadcasts(getPlatformBroadcastNotifications());
+  const loadData = () => {
+    try {
+      const thList = getCommunicationThreads();
+      setThreads([...thList]);
+      if (thList.length > 0 && !selectedThreadId) {
+        setSelectedThreadId(thList[0].id);
+      }
+      setBroadcasts(getPlatformBroadcastNotifications());
+    } catch (e) {
+      console.error('Error loading communications:', e);
+    }
   };
 
-  const customersCount = getRegisteredCustomers().length;
-  const architectsCount = getArchitectAccounts().length;
-  const designersCount = getInteriorDesignerAccounts().length;
-  const contractorsCount = getPlatformContractors().length;
-  const vendorsCount = getRegisteredVendors().length;
-  const totalUsers = customersCount + architectsCount + designersCount + contractorsCount + vendorsCount;
+  useEffect(() => {
+    loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('COMMUNICATION_THREADS_UPDATED', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('COMMUNICATION_THREADS_UPDATED', handleUpdate);
+    };
+  }, []);
 
-  const roleCounts: Record<PlatformBroadcastNotification['targetRole'], number> = {
-    ALL: totalUsers,
-    CUSTOMERS: customersCount,
-    ARCHITECTS: architectsCount,
-    INTERIOR_DESIGNERS: designersCount,
-    CONTRACTORS: contractorsCount,
-    VENDORS: vendorsCount,
+  const activeThread = useMemo(() => {
+    if (!selectedThreadId) return threads[0] || null;
+    return threads.find((t) => t.id === selectedThreadId) || threads[0] || null;
+  }, [threads, selectedThreadId]);
+
+  // Filtered Threads
+  const filteredThreads = useMemo(() => {
+    return threads.filter((t) => {
+      if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
+      if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchCode = t.threadCode.toLowerCase().includes(q);
+        const matchSubj = t.subject.toLowerCase().includes(q);
+        const matchCust = t.customerName.toLowerCase().includes(q);
+        const matchArc = t.architectName.toLowerCase().includes(q) || t.architectFirm.toLowerCase().includes(q);
+        const matchProj = t.projectId.toLowerCase().includes(q) || t.projectTitle.toLowerCase().includes(q);
+        return matchCode || matchSubj || matchCust || matchArc || matchProj;
+      }
+      return true;
+    });
+  }, [threads, statusFilter, categoryFilter, searchQuery]);
+
+  // Router Metrics
+  const routerStats = useMemo(() => {
+    let pendingMessages = 0;
+    threads.forEach((t) => {
+      t.messages.forEach((m) => {
+        if (m.routingStatus === 'PENDING_ADMIN_ROUTING') pendingMessages++;
+      });
+    });
+
+    const pendingReviewThreads = threads.filter((t) => t.status === 'PENDING_ADMIN_REVIEW').length;
+    const forwardedThreads = threads.filter((t) => t.status === 'FORWARDED').length;
+    const clarificationThreads = threads.filter((t) => t.status === 'CLARIFICATION_REQUESTED').length;
+    const heldThreads = threads.filter((t) => t.status === 'HELD').length;
+
+    return {
+      pendingMessages,
+      pendingReviewThreads,
+      forwardedThreads,
+      clarificationThreads,
+      heldThreads,
+      totalThreads: threads.length,
+    };
+  }, [threads]);
+
+  // Router Actions
+  const handleConfirmForward = () => {
+    if (!forwardModalMsg) return;
+    try {
+      const updated = forwardMessageToTarget(forwardModalMsg.threadId, forwardModalMsg.msg.id, {
+        forwardedBy: 'Super Admin',
+        forwardingNotes: forwardNotes,
+      });
+
+      if (updated) {
+        logAdminAuditAction({
+          action: 'COMMUNICATION_FORWARDED',
+          targetType: 'THREAD',
+          targetId: updated.threadCode,
+          description: `Admin forwarded message from ${forwardModalMsg.msg.senderName} (${forwardModalMsg.msg.senderRole}) to ${forwardModalMsg.msg.recipientName} (${forwardModalMsg.msg.recipientRole})`,
+          metadata: { threadId: updated.id, messageId: forwardModalMsg.msg.id },
+        });
+
+        success(`Message routed & forwarded to ${forwardModalMsg.msg.recipientName} successfully!`);
+        loadData();
+        setForwardModalMsg(null);
+      }
+    } catch (err: any) {
+      error(err.message || 'Failed to forward message');
+    }
   };
 
-  const templates = [
-    {
-      title: 'Monsoon Site Protection & Waterproofing Protocol',
-      message: 'Notice to all contractors & site engineers: Cover open excavation, cure foundation concrete, and safeguard cement bags from rain moisture.',
-      role: 'CONTRACTORS' as const,
-      channel: 'WHATSAPP' as const,
-    },
-    {
-      title: 'Diwali Festive Discount: Flat 10% Off on Interior Packages',
-      message: 'Celebrate this festive season with BuildGhar! Enjoy exclusive design consultations and 10% milestone savings on turnkey home interiors.',
-      role: 'CUSTOMERS' as const,
-      channel: 'SMS' as const,
-    },
-    {
-      title: 'Mandatory GST & BIS Certification Verification Notice',
-      message: 'Dear Material Vendor Partner, please ensure updated BIS certificates and GST filings are uploaded in your vendor portal before billing cycle.',
-      role: 'VENDORS' as const,
-      channel: 'IN_APP' as const,
-    },
-  ];
-
-  const handleApplyTemplate = (tpl: typeof templates[0]) => {
-    setTitle(tpl.title);
-    setMessage(tpl.message);
-    setTargetRole(tpl.role);
-    setChannel(tpl.channel);
-    success('Template loaded into composer');
-  };
-
-  const handleSendBroadcast = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !message.trim()) {
-      error('Please specify both title and message.');
+  const handleConfirmClarification = () => {
+    if (!clarifyModalMsg) return;
+    if (!clarifyReason.trim()) {
+      error('Please specify the clarification needed');
       return;
     }
 
+    try {
+      const updated = requestClarificationOnMessage(clarifyModalMsg.threadId, clarifyModalMsg.msg.id, {
+        requestedBy: 'Super Admin',
+        reason: clarifyReason.trim(),
+      });
+
+      if (updated) {
+        logAdminAuditAction({
+          action: 'COMMUNICATION_CLARIFICATION_REQUESTED',
+          targetType: 'THREAD',
+          targetId: updated.threadCode,
+          description: `Clarification requested from ${clarifyModalMsg.msg.senderName}: ${clarifyReason.trim()}`,
+        });
+
+        success(`Clarification request sent to ${clarifyModalMsg.msg.senderName}.`);
+        loadData();
+        setClarifyModalMsg(null);
+      }
+    } catch (err: any) {
+      error(err.message || 'Failed to request clarification');
+    }
+  };
+
+  const handleConfirmHold = () => {
+    if (!holdModalMsg) return;
+    if (!holdReason.trim()) {
+      error('Please specify why this message is being held or rejected');
+      return;
+    }
+
+    try {
+      const updated = holdRejectMessage(holdModalMsg.threadId, holdModalMsg.msg.id, {
+        heldBy: 'Super Admin',
+        reason: holdReason.trim(),
+        action: 'HELD',
+      });
+
+      if (updated) {
+        logAdminAuditAction({
+          action: 'COMMUNICATION_HELD',
+          targetType: 'THREAD',
+          targetId: updated.threadCode,
+          description: `Blocked/Held communication message: ${holdReason.trim()}`,
+        });
+
+        success(`Message flagged and held. Recipient will not receive this content.`);
+        loadData();
+        setHoldModalMsg(null);
+      }
+    } catch (err: any) {
+      error(err.message || 'Failed to hold message');
+    }
+  };
+
+  const handleAddInternalNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeThread || !newInternalNote.trim()) return;
+
+    try {
+      addAdminInternalNote(activeThread.id, newInternalNote.trim());
+      logAdminAuditAction({
+        action: 'COMMUNICATION_INTERNAL_NOTE_ADDED',
+        targetType: 'THREAD',
+        targetId: activeThread.threadCode,
+        description: `Added private internal note on project ${activeThread.projectId}`,
+      });
+      success('Internal note saved (Private to Admin).');
+      setNewInternalNote('');
+      loadData();
+    } catch (err: any) {
+      error(err.message || 'Failed to add note');
+    }
+  };
+
+  const handleSendAdminRouterMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeThread || !adminDirectMsg.trim()) return;
+
+    try {
+      sendAdminRouterMessage(activeThread.id, {
+        content: adminDirectMsg.trim(),
+        targetRole: adminDirectTarget,
+        adminName: 'BuildGhar Central Admin Desk',
+      });
+
+      logAdminAuditAction({
+        action: 'ADMIN_ROUTER_DIRECT_MESSAGE',
+        targetType: 'THREAD',
+        targetId: activeThread.threadCode,
+        description: `Admin sent advisory message to ${adminDirectTarget} on ${activeThread.projectTitle}`,
+      });
+
+      success(`Official Admin message delivered to ${adminDirectTarget}.`);
+      setAdminDirectMsg('');
+      loadData();
+    } catch (err: any) {
+      error(err.message || 'Failed to send direct message');
+    }
+  };
+
+  // Broadcast handlers
+  const handleSendBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !message.trim()) {
+      error('Please enter both title and message body');
+      return;
+    }
     setIsSending(true);
     try {
-      const recipientEst = roleCounts[targetRole] || 150;
-      const sent = sendPlatformBroadcastNotification({
+      const newBroadcast = sendPlatformBroadcastNotification({
         title: title.trim(),
         message: message.trim(),
         targetRole,
         channel,
-        sentBy: 'Super Administrator',
-        recipientCount: recipientEst,
+        sentBy: 'Super Admin',
       });
 
       recordPlatformAuditLog({
-        action: 'SEND_BROADCAST',
-        module: 'COMMUNICATIONS',
-        targetId: sent.id,
-        performedBy: 'Super Administrator',
-        notes: `Broadcast dispatched to ${targetRole} via ${channel} (${recipientEst} recipients)`,
+        action: 'BROADCAST_NOTIFICATION_SENT',
+        entityType: 'NOTIFICATION',
+        entityId: newBroadcast.id,
+        performedBy: 'Super Admin',
+        details: `Sent ${channel} announcement to ${targetRole}: "${title.trim()}"`,
       });
 
-      success(`Broadcast successfully sent to ${recipientEst} recipients via ${channel}!`);
+      setBroadcasts(getPlatformBroadcastNotifications());
+      success(`Broadcast dispatched via ${channel} to ${targetRole}!`);
       setTitle('');
       setMessage('');
-      refreshData();
-    } catch {
-      error('Failed to send broadcast');
+    } catch (err: any) {
+      error(err.message || 'Failed to dispatch broadcast');
     } finally {
       setIsSending(false);
     }
   };
 
-  const filteredBroadcasts = useMemo(() => {
-    return broadcasts.filter((b) => {
-      const matchesSearch =
-        b.title.toLowerCase().includes(search.toLowerCase()) ||
-        b.message.toLowerCase().includes(search.toLowerCase());
-      const matchesRole = selectedRole === 'ALL' || b.targetRole === selectedRole;
-      const matchesChannel = selectedChannel === 'ALL' || b.channel === selectedChannel;
-      return matchesSearch && matchesRole && matchesChannel;
-    });
-  }, [broadcasts, search, selectedRole, selectedChannel]);
-
-  const getChannelIcon = (ch: PlatformBroadcastNotification['channel']) => {
-    switch (ch) {
-      case 'IN_APP':
-        return <Bell className="w-3.5 h-3.5 text-sky-600" />;
-      case 'SMS':
-        return <Smartphone className="w-3.5 h-3.5 text-indigo-600" />;
-      case 'WHATSAPP':
-        return <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />;
-      case 'EMAIL':
-        return <Mail className="w-3.5 h-3.5 text-purple-600" />;
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+    <div className="space-y-6 font-sans">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
-              <Megaphone className="w-5 h-5" />
-            </span>
-            <div>
-              <h1 className="text-xl font-bold text-navy-950">Communications & Broadcast Hub</h1>
-              <p className="text-xs text-slate-500">
-                Multi-channel push notifications, SMS gateways, WhatsApp Business alerts, and platform announcements
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold font-display text-navy-950">
+              Communication Router & In-Flight Messaging
+            </h1>
+            <Badge variant="blue" className="text-[10px] uppercase font-bold tracking-wider">
+              Section 14 Compliant
+            </Badge>
           </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Strict Governance: All Customer ⇄ Architect dialogue passes through Admin Routing for review, mediation, and audit tracking.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Radio className="w-3 h-3 text-emerald-500 animate-pulse" />
-            <span>Gateways Active</span>
-          </span>
+        {/* Primary Tab Switcher */}
+        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 self-start sm:self-auto">
+          <button
+            onClick={() => setActiveMode('ROUTER')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+              activeMode === 'ROUTER'
+                ? 'bg-white text-blue-700 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Central Router Desk</span>
+            {routerStats.pendingMessages > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-mono animate-pulse">
+                {routerStats.pendingMessages}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveMode('BROADCASTS')}
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+              activeMode === 'BROADCASTS'
+                ? 'bg-white text-blue-700 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+            <span>Broadcasts & Alerts</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Grid: Composer on Left, History on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Composer (5 Cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h2 className="text-sm font-bold text-navy-950 flex items-center gap-2">
-                <Send className="w-4 h-4 text-sky-600" />
-                <span>Compose Broadcast Notice</span>
-              </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200">
-                Est. {roleCounts[targetRole] || 150} Recipients
-              </span>
-            </div>
-
-            {/* Quick Templates */}
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>Quick Preset Templates</span>
-              </p>
-              <div className="space-y-1.5">
-                {templates.map((tpl, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleApplyTemplate(tpl)}
-                    className="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/40 text-xs transition group cursor-pointer"
-                  >
-                    <p className="font-bold text-slate-800 group-hover:text-sky-700">{tpl.title}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{tpl.message}</p>
-                  </button>
-                ))}
+      {activeMode === 'ROUTER' ? (
+        <>
+          {/* Router KPI Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 bg-white rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/20 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-amber-800 text-xs font-semibold">
+                <span>Pending Admin Routing</span>
+                <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-amber-950 font-display">
+                {routerStats.pendingMessages}
+              </div>
+              <div className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                <span>Across {routerStats.pendingReviewThreads} thread(s) awaiting approval</span>
               </div>
             </div>
 
-            {/* Composer Form */}
-            <form onSubmit={handleSendBroadcast} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1.5">Target Audience</label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(['ALL', 'CUSTOMERS', 'ARCHITECTS', 'INTERIOR_DESIGNERS', 'CONTRACTORS', 'VENDORS'] as const).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setTargetRole(r)}
-                      className={`p-2 rounded-xl text-center font-bold text-[10px] transition border cursor-pointer ${
-                        targetRole === r
-                          ? 'bg-navy-950 text-white border-navy-950 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {r.replace(/_/g, ' ')}
-                    </button>
-                  ))}
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                <span>Forwarded & In-Flight</span>
+                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
               </div>
+              <div className="text-2xl font-bold text-navy-950 font-display">
+                {routerStats.forwardedThreads}
+              </div>
+              <div className="text-[11px] text-emerald-600 font-medium">
+                Successfully routed business conversations
+              </div>
+            </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1.5">Dispatch Channel</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['IN_APP', 'SMS', 'WHATSAPP', 'EMAIL'] as const).map((ch) => (
-                    <button
-                      key={ch}
-                      type="button"
-                      onClick={() => setChannel(ch)}
-                      className={`p-2 rounded-xl text-center font-bold text-[10px] flex flex-col items-center gap-1 transition border cursor-pointer ${
-                        channel === ch
-                          ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {getChannelIcon(ch)}
-                      <span>{ch.replace(/_/g, ' ')}</span>
-                    </button>
-                  ))}
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                <span>Clarification Pending</span>
+                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                  <HelpCircle className="w-4 h-4" />
                 </div>
               </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Notice Headline / Subject *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder=""
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-sky-500"
-                />
+              <div className="text-2xl font-bold text-blue-950 font-display">
+                {routerStats.clarificationThreads}
               </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="font-bold text-slate-700 block">Message Body *</label>
-                  <span className="text-[10px] text-slate-400 font-mono">{message.length}/500 chars</span>
-                </div>
-                <textarea
-                  required
-                  rows={4}
-                  maxLength={500}
-                  placeholder="Write announcement body clearly. This will be broadcasted to all selected stakeholders..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-sky-500"
-                />
+              <div className="text-[11px] text-blue-700 font-medium">
+                Sent back to sender for details
               </div>
+            </div>
 
-              {/* Message Live Preview Card */}
-              {title.trim() && (
-                <div className="p-3 bg-slate-900 text-white rounded-xl space-y-1.5">
-                  <p className="text-[10px] text-sky-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Eye className="w-3 h-3" />
-                    <span>Live Recipient Preview ({channel})</span>
-                  </p>
-                  <p className="text-xs font-bold text-white">{title}</p>
-                  <p className="text-[11px] text-slate-300 whitespace-pre-wrap">{message || 'Your message will appear here...'}</p>
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                <span>Held / Flagged Content</span>
+                <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSending || !title.trim() || !message.trim()}
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm shadow-sky-600/20 transition cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{isSending ? 'Transmitting Broadcast...' : `Dispatch Broadcast (${roleCounts[targetRole] || 150} Recipients)`}</span>
-              </button>
-            </form>
+              </div>
+              <div className="text-2xl font-bold text-rose-950 font-display">
+                {routerStats.heldThreads}
+              </div>
+              <div className="text-[11px] text-rose-700 font-medium">
+                Blocked contractually or policy violations
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Right Column: Broadcast History & Analytics (7 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Filter Bar */}
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+          {/* Search & Filter Bar */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             <div className="relative flex-1">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search history by title or message..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500"
+                placeholder="Search threads by Subject, Customer Name, Architect Name, Project ID (BG-2026-XXXX)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600"
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <select
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
               >
-                <option value="ALL">All Roles</option>
-                <option value="CUSTOMERS">Customers</option>
-                <option value="ARCHITECTS">Architects</option>
-                <option value="INTERIOR_DESIGNERS">Designers</option>
-                <option value="CONTRACTORS">Contractors</option>
-                <option value="VENDORS">Vendors</option>
+                <option value="ALL">All Routing Statuses</option>
+                <option value="PENDING_ADMIN_REVIEW">Pending Review</option>
+                <option value="FORWARDED">Forwarded</option>
+                <option value="CLARIFICATION_REQUESTED">Clarification Requested</option>
+                <option value="HELD">Held / Flagged</option>
               </select>
 
               <select
-                value={selectedChannel}
-                onChange={(e) => setSelectedChannel(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600 font-medium"
               >
-                <option value="ALL">All Channels</option>
-                <option value="IN_APP">In-App</option>
-                <option value="SMS">SMS</option>
-                <option value="WHATSAPP">WhatsApp</option>
-                <option value="EMAIL">Email</option>
+                <option value="ALL">All Categories</option>
+                <option value="DESIGN_INQUIRY">Design Inquiry</option>
+                <option value="TECHNICAL_CLARIFICATION">Technical Clarification</option>
+                <option value="TIMELINE_QUERY">Timeline Query</option>
+                <option value="BUDGET_REVISION">Budget Revision</option>
+                <option value="SITE_CONDITION">Site Condition</option>
               </select>
             </div>
           </div>
 
-          {/* Broadcast Logs List */}
-          <div className="space-y-3">
-            {filteredBroadcasts.length === 0 ? (
-              <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-400">
-                <Megaphone className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                <p className="font-semibold text-sm">No broadcast history found.</p>
+          {/* Master-Detail Split Pane */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Thread List (5 cols) */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
+              <div className="p-3.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Active Communication Threads</span>
+                <span className="px-2 py-0.5 rounded-full bg-slate-200 text-[10px] text-slate-700 font-mono">
+                  {filteredThreads.length}
+                </span>
               </div>
-            ) : (
-              filteredBroadcasts.map((b) => (
-                <div
-                  key={b.id}
-                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-navy-950">{b.title}</span>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-100 flex items-center gap-1">
-                          {getChannelIcon(b.channel)}
-                          <span>{b.channel}</span>
-                        </span>
+
+              <div className="divide-y divide-slate-100 max-h-[680px] overflow-y-auto">
+                {filteredThreads.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    No communication threads matching criteria
+                  </div>
+                ) : (
+                  filteredThreads.map((t) => {
+                    const isSelected = activeThread?.id === t.id;
+                    const hasPending = t.messages.some((m) => m.routingStatus === 'PENDING_ADMIN_ROUTING');
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedThreadId(t.id)}
+                        className={`p-4 cursor-pointer transition relative hover:bg-slate-50/90 ${
+                          isSelected
+                            ? 'bg-blue-50/50 border-l-4 border-l-blue-600'
+                            : 'border-l-4 border-l-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              {t.projectId}
+                            </span>
+                            <span className="text-[11px] font-bold text-navy-950 truncate max-w-[140px]">
+                              {t.threadCode}
+                            </span>
+                          </div>
+
+                          <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                            {formatDate(t.latestMessageAt)}
+                          </span>
+                        </div>
+
+                        <h4 className="text-xs font-bold text-slate-900 line-clamp-1 mb-1.5">
+                          {t.subject}
+                        </h4>
+
+                        {/* Parties info */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-600 mb-2">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-slate-800">{t.customerName}</span>
+                            <span className="text-slate-400">⇄</span>
+                            <span className="font-medium text-blue-700 truncate max-w-[110px]">
+                              {t.architectName}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Status badges */}
+                        <div className="flex items-center justify-between gap-1.5">
+                          <Badge
+                            variant={
+                              t.category === 'DESIGN_INQUIRY'
+                                ? 'purple'
+                                : t.category === 'TECHNICAL_CLARIFICATION'
+                                ? 'blue'
+                                : 'slate'
+                            }
+                            className="text-[9px] font-bold"
+                          >
+                            {t.category.replace(/_/g, ' ')}
+                          </Badge>
+
+                          {hasPending ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">
+                              <AlertCircle className="w-3 h-3 text-amber-600" />
+                              <span>Needs Routing</span>
+                            </span>
+                          ) : t.status === 'FORWARDED' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Forwarded</span>
+                            </span>
+                          ) : t.status === 'CLARIFICATION_REQUESTED' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                              <HelpCircle className="w-3 h-3 text-blue-600" />
+                              <span>Clarifying</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>Held</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap">{b.message}</p>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Message Routing Canvas (7 cols) */}
+            <div className="lg:col-span-7 space-y-4">
+              {activeThread ? (
+                <>
+                  {/* Thread Context Card */}
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {activeThread.projectId}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 font-bold">
+                            {activeThread.threadCode}
+                          </span>
+                        </div>
+                        <h2 className="text-sm font-bold text-navy-950 mt-1">{activeThread.subject}</h2>
+                        <div className="text-[11px] text-slate-500">{activeThread.projectTitle}</div>
+                      </div>
+
+                      <div className="text-right">
+                        <Badge variant="blue" className="text-[10px] font-bold uppercase tracking-wider">
+                          {activeThread.direction.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
                     </div>
 
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>{b.status}</span>
-                    </span>
+                    {/* Parties Overview */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer</div>
+                        <div className="font-bold text-slate-900">{activeThread.customerName}</div>
+                        <div className="text-[11px] text-slate-500">{activeThread.customerPhone}</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
+                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Architect Partner</div>
+                        <div className="font-bold text-blue-950">{activeThread.architectName}</div>
+                        <div className="text-[11px] text-slate-600">{activeThread.architectFirm}</div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-slate-700">
-                        Target: <span className="text-navy-950">{b.targetRole.replace(/_/g, ' ')}</span>
+                  {/* Messages Feed */}
+                  <div className="space-y-4">
+                    {activeThread.messages.map((msg) => {
+                      const isCustomer = msg.senderRole === 'CUSTOMER';
+                      const isArchitect = msg.senderRole === 'ARCHITECT';
+                      const isAdmin = msg.senderRole === 'ADMIN';
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`rounded-2xl border p-4 text-xs space-y-3 transition shadow-2xs ${
+                            isAdmin
+                              ? 'bg-gradient-to-r from-blue-900 to-indigo-950 text-white border-blue-950'
+                              : msg.routingStatus === 'PENDING_ADMIN_ROUTING'
+                              ? 'bg-amber-50/40 border-amber-300'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between border-b pb-2.5 border-slate-200/50">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
+                                  isAdmin
+                                    ? 'bg-white text-navy-950'
+                                    : isCustomer
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                              >
+                                {isAdmin ? 'BG' : msg.senderName.slice(0, 1)}
+                              </div>
+                              <div>
+                                <div className="font-bold flex items-center gap-1.5">
+                                  <span>{msg.senderName}</span>
+                                  <Badge
+                                    variant={isAdmin ? 'emerald' : isCustomer ? 'purple' : 'blue'}
+                                    className="text-[9px] py-0"
+                                  >
+                                    {msg.senderRole}
+                                  </Badge>
+                                </div>
+                                <div
+                                  className={`text-[10px] ${
+                                    isAdmin ? 'text-blue-200' : 'text-slate-400'
+                                  }`}
+                                >
+                                  To: {msg.recipientName} ({msg.recipientRole}) • {formatDate(msg.timestamp)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Routing Status */}
+                            <div>
+                              {msg.routingStatus === 'PENDING_ADMIN_ROUTING' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 animate-pulse">
+                                  <Clock className="w-3 h-3 text-amber-700" />
+                                  <span>Needs Admin Routing</span>
+                                </span>
+                              )}
+                              {msg.routingStatus === 'FORWARDED_TO_TARGET' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Forwarded by Admin</span>
+                                </span>
+                              )}
+                              {msg.routingStatus === 'CLARIFICATION_PENDING' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <HelpCircle className="w-3 h-3 text-blue-600" />
+                                  <span>Clarification Requested</span>
+                                </span>
+                              )}
+                              {msg.routingStatus === 'HELD_FLAGGED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                  <span>Held by Admin</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Message Content */}
+                          <div className={`text-xs leading-relaxed ${isAdmin ? 'text-blue-50' : 'text-slate-800'}`}>
+                            {msg.content}
+                          </div>
+
+                          {/* Attachments */}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="pt-2 flex flex-wrap gap-2">
+                              {msg.attachments.map((att, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-1.5 text-[11px] ${
+                                    isAdmin
+                                      ? 'bg-blue-800/50 border-blue-700 text-white'
+                                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <Paperclip className="w-3.5 h-3.5 text-blue-500" />
+                                  <span className="font-medium">{att.name}</span>
+                                  {att.size && <span className="text-[10px] opacity-70">({att.size})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Forwarding / Clarification Audit Notes */}
+                          {msg.forwardingNotes && (
+                            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900">
+                              <span className="font-bold">Admin Forwarding Note: </span>
+                              {msg.forwardingNotes}
+                            </div>
+                          )}
+                          {msg.clarificationRequest && (
+                            <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-[11px] text-blue-900">
+                              <span className="font-bold">Clarification Sent to Sender: </span>
+                              {msg.clarificationRequest}
+                            </div>
+                          )}
+                          {msg.holdReason && (
+                            <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-900">
+                              <span className="font-bold">Hold Reason: </span>
+                              {msg.holdReason}
+                            </div>
+                          )}
+
+                          {/* Admin Action Buttons for Pending Message */}
+                          {msg.routingStatus === 'PENDING_ADMIN_ROUTING' && (
+                            <div className="pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setHoldModalMsg({ threadId: activeThread.id, msg });
+                                  setHoldReason('');
+                                }}
+                                className="px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-700 font-bold text-xs flex items-center gap-1 transition"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Hold / Reject</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setClarifyModalMsg({ threadId: activeThread.id, msg });
+                                  setClarifyReason('');
+                                }}
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 text-blue-700 font-bold text-xs flex items-center gap-1 transition"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5" />
+                                <span>Ask Clarification</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setForwardModalMsg({ threadId: activeThread.id, msg });
+                                  setForwardNotes(
+                                    `Reviewed and forwarded by BuildGhar Admin Desk for ${msg.recipientName}.`
+                                  );
+                                }}
+                                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>Forward to {msg.recipientRole}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Private Internal Admin Notes (Strictly Confidential - Section 14) */}
+                  <div className="p-4 bg-amber-50/70 border-2 border-amber-300 rounded-2xl shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-amber-700" />
+                        <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                          Internal Admin Notes (Strictly Confidential)
+                        </h4>
+                      </div>
+                      <span className="text-[10px] text-amber-800 font-semibold bg-amber-200/60 px-2 py-0.5 rounded-full">
+                        Never visible to Customer or Architect
                       </span>
-                      <span>•</span>
-                      <span>
-                        Recipients: <span className="font-mono font-bold text-sky-700">{b.recipientCount}</span>
-                      </span>
-                      <span>•</span>
-                      <span>Sender: {b.sentBy}</span>
                     </div>
 
-                    <span className="font-mono text-slate-400 text-[10px]">
-                      {new Date(b.sentAt).toLocaleString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
+                    {activeThread.internalAdminNotes && activeThread.internalAdminNotes.length > 0 && (
+                      <div className="space-y-1.5">
+                        {activeThread.internalAdminNotes.map((note, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 bg-white rounded-xl border border-amber-200 text-xs text-slate-800 font-medium"
+                          >
+                            • {note}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAddInternalNote} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add confidential internal admin observation or checklist note..."
+                        value={newInternalNote}
+                        onChange={(e) => setNewInternalNote(e.target.value)}
+                        className="flex-1 p-2 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:border-amber-600"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newInternalNote.trim()}
+                        className="px-3.5 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
+                      >
+                        Add Private Note
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Send Admin Advisory Message (Direct Intervention) */}
+                  <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-navy-950 flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-blue-600" />
+                        <span>Send Official Platform Routing Message</span>
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-500 font-medium">Recipient:</span>
+                        <select
+                          value={adminDirectTarget}
+                          onChange={(e) => setAdminDirectTarget(e.target.value as any)}
+                          className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700"
+                        >
+                          <option value="CUSTOMER">Customer ({activeThread.customerName})</option>
+                          <option value="ARCHITECT">Architect ({activeThread.architectName})</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSendAdminRouterMessage} className="space-y-2">
+                      <textarea
+                        rows={2}
+                        placeholder={`Type official guidance or contractual advice for ${adminDirectTarget}...`}
+                        value={adminDirectMsg}
+                        onChange={(e) => setAdminDirectMsg(e.target.value)}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={!adminDirectMsg.trim()}
+                          className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Deliver Official Advice</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+                  Select a communication thread from the left to begin admin routing.
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* BROADCAST NOTIFICATIONS WORKSPACE */
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Compose Broadcast (5 cols) */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-950 text-sm">Compose Platform Broadcast</h3>
+                  <p className="text-[11px] text-slate-500">Dispatch SMS, WhatsApp, or In-App alerts</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSendBroadcast} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Target Stakeholder Group</label>
+                  <select
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                  >
+                    <option value="ALL">All Platform Users ({getRegisteredCustomers().length + getArchitectAccounts().length + getPlatformContractors().length})</option>
+                    <option value="CUSTOMERS">Homeowners / Customers ({getRegisteredCustomers().length})</option>
+                    <option value="ARCHITECTS">Architect Partners ({getArchitectAccounts().length})</option>
+                    <option value="CONTRACTORS">Civil Contractors ({getPlatformContractors().length})</option>
+                    <option value="VENDORS">Material Vendors</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Dispatch Channel</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['IN_APP', 'WHATSAPP', 'SMS'] as const).map((ch) => (
+                      <button
+                        key={ch}
+                        type="button"
+                        onClick={() => setChannel(ch)}
+                        className={`p-2 rounded-xl border text-center font-bold text-xs transition ${
+                          channel === ch
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {ch.replace(/_/g, ' ')}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))
-            )}
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Announcement Title</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Monsoon Site Protection Advisory..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Message Body</label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Type broadcast announcement message..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSending}
+                  className="btn-gold w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{isSending ? 'Dispatching...' : 'Dispatch Platform Broadcast'}</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Broadcast History (7 cols) */}
+            <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-navy-950">Broadcast Audit Log</h3>
+                  <p className="text-[11px] text-slate-500">Historical announcements and delivery telemetry</p>
+                </div>
+                <span className="font-mono text-xs text-slate-500 font-bold">
+                  {broadcasts.length} Dispatched
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[580px] overflow-y-auto">
+                {broadcasts.map((b) => (
+                  <div key={b.id} className="p-4 hover:bg-slate-50 transition space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-bold text-navy-950 flex items-center gap-1.5">
+                        <span>{b.title}</span>
+                        <Badge variant="blue" className="text-[9px] py-0">
+                          {b.targetRole}
+                        </Badge>
+                        <Badge variant="slate" className="text-[9px] py-0">
+                          {b.channel}
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {formatDate(b.sentAt)}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-600 text-xs">{b.message}</p>
+
+                    <div className="text-[10px] text-slate-400 pt-1 flex items-center justify-between border-t border-slate-100">
+                      <span>Sender: {b.sentBy || 'Super Admin'}</span>
+                      <span className="font-semibold text-emerald-600">DELIVERED</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Forward Modal */}
+      {forwardModalMsg && (
+        <div className="fixed inset-0 z-50 bg-navy-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <Check className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-950 text-sm">Forward Message Through Admin Router</h3>
+                  <p className="text-[11px] text-slate-500">
+                    To: {forwardModalMsg.msg.recipientName} ({forwardModalMsg.msg.recipientRole})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setForwardModalMsg(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 italic">
+                "{forwardModalMsg.msg.content}"
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Admin Forwarding Remark / Regulatory Note
+                </label>
+                <textarea
+                  rows={2}
+                  value={forwardNotes}
+                  onChange={(e) => setForwardNotes(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900">
+                <span className="font-bold">Governance Check: </span>
+                This message will now appear in {forwardModalMsg.msg.recipientRole}'s portal with verified BuildGhar routing stamp.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setForwardModalMsg(null)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmForward}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Confirm & Forward</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clarification Modal */}
+      {clarifyModalMsg && (
+        <div className="fixed inset-0 z-50 bg-navy-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-950 text-sm">Request Clarification from Sender</h3>
+                  <p className="text-[11px] text-slate-500">
+                    To: {clarifyModalMsg.msg.senderName} ({clarifyModalMsg.msg.senderRole})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setClarifyModalMsg(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Specify Clarification Required <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Please specify the room dimensions or attach structural engineer calculation sheet before we forward to architect..."
+                  value={clarifyReason}
+                  onChange={(e) => setClarifyReason(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setClarifyModalMsg(null)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmClarification}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+              >
+                <Send className="w-4 h-4" />
+                <span>Send Clarification Request</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hold Modal */}
+      {holdModalMsg && (
+        <div className="fixed inset-0 z-50 bg-navy-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-950 text-sm">Hold / Block Inappropriate Message</h3>
+                  <p className="text-[11px] text-slate-500">
+                    From: {holdModalMsg.msg.senderName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setHoldModalMsg(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Reason for Holding / Blocking Content <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Direct contact details sharing violation or unapproved scope expansion..."
+                  value={holdReason}
+                  onChange={(e) => setHoldReason(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-rose-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setHoldModalMsg(null)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmHold}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                <span>Freeze & Block Message</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-export default AdminCommunications;

@@ -37,6 +37,7 @@ import {
   logAdminAuditAction,
 } from '../../data/adminRbacStore.js';
 import { getCustomerPayments, getArchitectPayouts } from '../../data/financialLedgerStore.js';
+import { getComplaintDisputes } from '../../data/communicationDisputeStore.js';
 import { pullFromCloud, clearCloudData, pushToCloud } from '../../data/cloudSync.js';
 import { ensureDemoDataInitialized } from '../../data/seedDemoData.js';
 import { useToast } from '../../context/ToastContext.js';
@@ -387,10 +388,18 @@ export const AdminOverview: React.FC = () => {
       .reduce((sum, r) => sum + (r.quoteFeePaise || 99900), 0);
     const totalPlatformRevenuePaise = milestoneRevenue + materialCommission + consultationFees;
 
-    // 15. Open Complaints & Disputes
-    const openComplaints = supportTickets.filter(
+    // 15. Open Complaints & Disputes (Section 15)
+    let openComplaints = supportTickets.filter(
       (t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS' || t.status === 'ESCALATED'
     ).length;
+    try {
+      const activeDisputes = getComplaintDisputes().filter(
+        (d) => d.status !== 'RESOLVED' && d.status !== 'REJECTED'
+      );
+      openComplaints += activeDisputes.length;
+    } catch {
+      // ignore
+    }
 
     return {
       totalCustomers,
