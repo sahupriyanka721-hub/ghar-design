@@ -354,6 +354,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/quotations': true,
     '/admin/projects': true,
     '/admin/documents': true,
+    '/admin/timeline': true,
   });
   const { success } = useToast();
 
@@ -375,6 +376,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/documents')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/documents': true }));
+    }
+    if (location.pathname.startsWith('/admin/timeline')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/timeline': true }));
     }
   }, [location.pathname]);
 
@@ -620,7 +624,22 @@ export const AdminLayout: React.FC = () => {
             { label: 'Document Version History', path: '/admin/documents?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
           ],
         },
-        { label: 'Milestone & Progress Verification', path: '/admin/timeline', icon: HardHat },
+        {
+          label: 'Milestone & Work Progress Management',
+          path: '/admin/timeline',
+          icon: HardHat,
+          subItems: [
+            { label: 'Project Milestones', path: '/admin/timeline?view=PROJECT_MILESTONES', view: 'PROJECT_MILESTONES' },
+            { label: 'Pending Milestone Submissions', path: '/admin/timeline?view=PENDING_SUBMISSIONS', view: 'PENDING_SUBMISSIONS' },
+            { label: 'Work Progress Verification', path: '/admin/timeline?view=WORK_PROGRESS_VERIFICATION', view: 'WORK_PROGRESS_VERIFICATION' },
+            { label: 'Customer Approval Pending', path: '/admin/timeline?view=CUSTOMER_APPROVAL_PENDING', view: 'CUSTOMER_APPROVAL_PENDING' },
+            { label: 'Admin Inspection', path: '/admin/timeline?view=ADMIN_INSPECTION', view: 'ADMIN_INSPECTION' },
+            { label: 'Approved Milestones', path: '/admin/timeline?view=APPROVED_MILESTONES', view: 'APPROVED_MILESTONES' },
+            { label: 'Rejected Milestones', path: '/admin/timeline?view=REJECTED_MILESTONES', view: 'REJECTED_MILESTONES' },
+            { label: 'Delayed Milestones', path: '/admin/timeline?view=DELAYED_MILESTONES', view: 'DELAYED_MILESTONES' },
+            { label: 'Milestone Payment Eligibility', path: '/admin/timeline?view=PAYMENT_ELIGIBILITY', view: 'PAYMENT_ELIGIBILITY' },
+          ],
+        },
         { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
         { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
       ],
@@ -875,7 +894,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES')));
 
                               return (
                                 <Link

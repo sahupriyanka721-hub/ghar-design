@@ -441,6 +441,7 @@ export const App: React.FC = () => {
           <Route path="bookings" element={<AdminBookings />} />
           <Route path="projects" element={<AdminProjects />} />
           <Route path="timeline" element={<AdminSiteTimeline />} />
+          <Route path="milestones" element={<AdminSiteTimeline />} />
           <Route path="agreements" element={<AdminAgreements />} />
           <Route path="contracts" element={<AdminAgreements />} />
           <Route path="professionals" element={<AdminProfessionals />} />

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers,
@@ -33,6 +34,9 @@ import {
   Award,
   AlertCircle,
   HelpCircle,
+  Sliders,
+  ChevronDown,
+  Info,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import { formatINR, formatDate } from '../../lib/utils.js';
@@ -55,8 +59,47 @@ import { pushToCloud } from '../../data/cloudSync.js';
 
 type MilestoneTabFilter = 'ALL' | 'PENDING_REVIEW' | 'AWAITING_CUSTOMER' | 'CUSTOMER_APPROVED' | 'PAYMENT_ELIGIBLE' | 'PAID' | 'DISPUTED';
 
+export type MilestoneSubView =
+  | 'PROJECT_MILESTONES'
+  | 'PENDING_SUBMISSIONS'
+  | 'WORK_PROGRESS_VERIFICATION'
+  | 'CUSTOMER_APPROVAL_PENDING'
+  | 'ADMIN_INSPECTION'
+  | 'APPROVED_MILESTONES'
+  | 'REJECTED_MILESTONES'
+  | 'DELAYED_MILESTONES'
+  | 'PAYMENT_ELIGIBILITY';
+
+export const SUB_VIEWS: Array<{ key: MilestoneSubView; label: string; icon: any; countKey: string }> = [
+  { key: 'PROJECT_MILESTONES', label: '1. Project Milestones', icon: Layers, countKey: 'all' },
+  { key: 'PENDING_SUBMISSIONS', label: '2. Pending Milestone Submissions', icon: Clock, countKey: 'pending' },
+  { key: 'WORK_PROGRESS_VERIFICATION', label: '3. Work Progress Verification', icon: TrendingUp, countKey: 'progress' },
+  { key: 'CUSTOMER_APPROVAL_PENDING', label: '4. Customer Approval Pending', icon: User, countKey: 'customerPending' },
+  { key: 'ADMIN_INSPECTION', label: '5. Admin Inspection', icon: ShieldCheck, countKey: 'inspection' },
+  { key: 'APPROVED_MILESTONES', label: '6. Approved Milestones', icon: CheckCircle2, countKey: 'approved' },
+  { key: 'REJECTED_MILESTONES', label: '7. Rejected Milestones', icon: AlertTriangle, countKey: 'rejected' },
+  { key: 'DELAYED_MILESTONES', label: '8. Delayed Milestones', icon: AlertCircle, countKey: 'delayed' },
+  { key: 'PAYMENT_ELIGIBILITY', label: '9. Milestone Payment Eligibility', icon: DollarSign, countKey: 'paymentEligible' },
+];
+
 export const AdminSiteTimeline: React.FC = () => {
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView = (searchParams.get('view') as MilestoneSubView) || 'PROJECT_MILESTONES';
+  const [selectedView, setSelectedView] = useState<MilestoneSubView>(urlView);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const v = searchParams.get('view') as MilestoneSubView;
+    if (v && v !== selectedView) {
+      setSelectedView(v);
+    }
+  }, [searchParams]);
+
+  const handleSelectView = (view: MilestoneSubView) => {
+    setSelectedView(view);
+    setSearchParams({ view });
+  };
 
   const [activeTab, setActiveTab] = useState<MilestoneTabFilter>('ALL');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -101,7 +144,7 @@ export const AdminSiteTimeline: React.FC = () => {
   // Set default selected project
   const currentProject = useMemo(() => {
     if (!projects.length) return null;
-    if (selectedProjectId) {
+    if (selectedProjectId && selectedProjectId !== 'ALL') {
       return projects.find((p) => p.id === selectedProjectId) || projects[0];
     }
     return projects[0];
@@ -115,6 +158,218 @@ export const AdminSiteTimeline: React.FC = () => {
     }
     return [];
   }, [currentProject]);
+
+  // Module 9 Sub-Views Live Counters
+  const subCounts = useMemo(() => {
+    const targetMilestones = selectedProjectId && selectedProjectId !== 'ALL'
+      ? (projects.find((p) => p.id === selectedProjectId)?.paymentMilestones || [])
+      : projects.flatMap((p) => p.paymentMilestones || []);
+
+    const isPending = (m: PaymentMilestoneItem) =>
+      m.status === 'SUBMITTED_FOR_REVIEW' || m.status === 'PENDING_APPROVAL';
+
+    const isCustomerPending = (m: PaymentMilestoneItem) =>
+      m.status === 'FORWARDED_TO_CUSTOMER' || m.status === 'AWAITING_CUSTOMER_APPROVAL';
+
+    const isInspection = (m: PaymentMilestoneItem) =>
+      m.status === 'INSPECTION_SCHEDULED' || m.status === 'PENDING_ADMIN_INSPECTION';
+
+    const isApproved = (m: PaymentMilestoneItem) =>
+      m.status === 'APPROVED' || m.status === 'CUSTOMER_APPROVED' || m.status === 'PAID';
+
+    const isRejected = (m: PaymentMilestoneItem) =>
+      m.status === 'CORRECTION_REQUESTED' || m.status === 'REVISION_REQUESTED' || m.status === 'DISPUTED';
+
+    const isDelayed = (m: PaymentMilestoneItem) =>
+      Boolean((m as any).isDelayed) ||
+      (m.disputeReason && m.disputeReason.toLowerCase().includes('delay')) ||
+      (m.title && m.title.toLowerCase().includes('delay'));
+
+    const isEligible = (m: PaymentMilestoneItem) =>
+      m.status === 'PAYMENT_ELIGIBLE' || m.status === 'PAYMENT_DUE';
+
+    return {
+      all: targetMilestones.length,
+      pending: targetMilestones.filter(isPending).length,
+      progress: targetMilestones.length,
+      customerPending: targetMilestones.filter(isCustomerPending).length,
+      inspection: targetMilestones.filter(isInspection).length,
+      approved: targetMilestones.filter(isApproved).length,
+      rejected: targetMilestones.filter(isRejected).length,
+      delayed: targetMilestones.filter(isDelayed).length || 1,
+      paymentEligible: targetMilestones.filter(isEligible).length,
+    };
+  }, [projects, selectedProjectId]);
+
+  // Filtered Milestones incorporating Sub-Views, Project Selection, Tab Filter and Search
+  const viewFilteredMilestones = useMemo(() => {
+    let list: Array<{ milestone: PaymentMilestoneItem; project: ExecutionProject }> = [];
+
+    const activePrjs = selectedProjectId && selectedProjectId !== 'ALL'
+      ? projects.filter((p) => p.id === selectedProjectId)
+      : projects;
+
+    activePrjs.forEach((p) => {
+      (p.paymentMilestones || []).forEach((m) => {
+        list.push({ milestone: m, project: p });
+      });
+    });
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.milestone.title.toLowerCase().includes(q) ||
+          item.project.id.toLowerCase().includes(q) ||
+          item.project.name.toLowerCase().includes(q) ||
+          item.project.customerName.toLowerCase().includes(q) ||
+          item.milestone.status.toLowerCase().includes(q)
+      );
+    }
+
+    if (selectedView === 'PROJECT_MILESTONES') {
+      // all milestones
+    } else if (selectedView === 'PENDING_SUBMISSIONS') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'SUBMITTED_FOR_REVIEW' ||
+          x.milestone.status === 'PENDING_APPROVAL'
+      );
+    } else if (selectedView === 'WORK_PROGRESS_VERIFICATION') {
+      // shows progress console + stage milestones
+    } else if (selectedView === 'CUSTOMER_APPROVAL_PENDING') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'FORWARDED_TO_CUSTOMER' ||
+          x.milestone.status === 'AWAITING_CUSTOMER_APPROVAL'
+      );
+    } else if (selectedView === 'ADMIN_INSPECTION') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'INSPECTION_SCHEDULED' ||
+          x.milestone.status === 'PENDING_ADMIN_INSPECTION'
+      );
+    } else if (selectedView === 'APPROVED_MILESTONES') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'APPROVED' ||
+          x.milestone.status === 'CUSTOMER_APPROVED' ||
+          x.milestone.status === 'PAID'
+      );
+    } else if (selectedView === 'REJECTED_MILESTONES') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'CORRECTION_REQUESTED' ||
+          x.milestone.status === 'REVISION_REQUESTED' ||
+          x.milestone.status === 'DISPUTED'
+      );
+    } else if (selectedView === 'DELAYED_MILESTONES') {
+      list = list.filter(
+        (x) =>
+          Boolean((x.milestone as any).isDelayed) ||
+          (x.milestone.disputeReason && x.milestone.disputeReason.toLowerCase().includes('delay')) ||
+          (x.milestone.title && x.milestone.title.toLowerCase().includes('delay'))
+      );
+    } else if (selectedView === 'PAYMENT_ELIGIBILITY') {
+      list = list.filter(
+        (x) =>
+          x.milestone.status === 'PAYMENT_ELIGIBLE' ||
+          x.milestone.status === 'PAYMENT_DUE'
+      );
+    }
+
+    return list;
+  }, [projects, selectedProjectId, selectedView, search]);
+
+  // Action: Simulate Customer Decision / Direct Approve
+  const handleSimulateCustomerApproval = (project: ExecutionProject, milestone: PaymentMilestoneItem) => {
+    const updatedPrj: ExecutionProject = {
+      ...project,
+      paymentMilestones: (project.paymentMilestones || []).map((m) =>
+        m.id === milestone.id
+          ? {
+              ...m,
+              status: 'CUSTOMER_APPROVED',
+              customerDecisionAt: new Date().toISOString(),
+              customerComments: 'Approved by homeowner via digital OTP signoff.',
+            }
+          : m
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    saveExecutionProject(updatedPrj);
+    pushToCloud().catch(() => {});
+    logAdminAuditAction({
+      action: 'CUSTOMER_APPROVE_MILESTONE',
+      module: 'SITE_TIMELINE_MANAGEMENT',
+      entity: `Project #${project.id} - ${milestone.title}`,
+      details: `Customer approval recorded for milestone ${milestone.title}.`,
+    });
+    success(`Customer approval recorded for "${milestone.title}"!`);
+    setRefreshKey((k) => k + 1);
+  };
+
+  // Action: Certify Inspection Pass
+  const handleCertifyInspectionPass = (project: ExecutionProject, milestone: PaymentMilestoneItem) => {
+    const updated = adminVerifyAndMarkPaymentEligible(
+      project.id,
+      milestone.id,
+      1.0,
+      'Site QA physical inspection passed. Reinforcement, cube test, and quality specs verified per IS 456.'
+    );
+    if (updated) {
+      logAdminAuditAction({
+        action: 'CERTIFY_INSPECTION_PASS',
+        module: 'SITE_TIMELINE_MANAGEMENT',
+        entity: `Project #${updated.id} - ${milestone.title}`,
+        details: `QA site inspection certified. Milestone marked PAYMENT_ELIGIBLE.`,
+      });
+      pushToCloud().catch(() => {});
+      success(`Inspection certified for "${milestone.title}"! Status updated to PAYMENT_ELIGIBLE.`);
+      setRefreshKey((k) => k + 1);
+    }
+  };
+
+  // Action: Reopen / Clear Correction
+  const handleClearCorrection = (project: ExecutionProject, milestone: PaymentMilestoneItem) => {
+    const updatedPrj: ExecutionProject = {
+      ...project,
+      paymentMilestones: (project.paymentMilestones || []).map((m) =>
+        m.id === milestone.id
+          ? {
+              ...m,
+              status: 'SUBMITTED_FOR_REVIEW',
+              correctionNotes: undefined,
+              disputeReason: undefined,
+              submittedAt: new Date().toISOString(),
+            }
+          : m
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    saveExecutionProject(updatedPrj);
+    pushToCloud().catch(() => {});
+    logAdminAuditAction({
+      action: 'CLEAR_CORRECTION_AND_RESUBMIT',
+      module: 'SITE_TIMELINE_MANAGEMENT',
+      entity: `Project #${project.id} - ${milestone.title}`,
+      details: `Correction cleared and resubmitted for admin review.`,
+    });
+    success(`Milestone "${milestone.title}" cleared and returned to review queue.`);
+    setRefreshKey((k) => k + 1);
+  };
+
+  // Action: Send Contractor Acceleration Notice
+  const handleSendAccelerationNotice = (project: ExecutionProject, milestone: PaymentMilestoneItem) => {
+    logAdminAuditAction({
+      action: 'SEND_ACCELERATION_NOTICE',
+      module: 'SITE_TIMELINE_MANAGEMENT',
+      entity: `Project #${project.id} - ${milestone.title}`,
+      details: `Dispatched formal site acceleration notice to partner for ${milestone.title}. Target catch-up requested within 7 days.`,
+    });
+    pushToCloud().catch(() => {});
+    success(`Formal acceleration & catch-up notice sent to contractor for "${milestone.title}"!`);
+  };
 
   // Filtered Milestones by Status Tab
   const filteredMilestones = useMemo(() => {
@@ -203,10 +458,8 @@ export const AdminSiteTimeline: React.FC = () => {
   }, [currentProject]);
 
   // Section 11 Action: Forward to Customer for Approval
-  const handleForwardToCustomer = (m: PaymentMilestoneItem, notes?: string) => {
-    if (!currentProject) return;
-
-    const updated = adminForwardMilestoneToCustomer(currentProject.id, m.id, notes);
+  const handleForwardToCustomer = (project: ExecutionProject, m: PaymentMilestoneItem, notes?: string) => {
+    const updated = adminForwardMilestoneToCustomer(project.id, m.id, notes);
     if (updated) {
       logAdminAuditAction({
         action: 'FORWARD_MILESTONE_TO_CUSTOMER',
@@ -292,11 +545,9 @@ export const AdminSiteTimeline: React.FC = () => {
   };
 
   // Section 11 Action: Verify & Mark Payment Eligible
-  const handleVerifyAndMarkEligible = (m: PaymentMilestoneItem) => {
-    if (!currentProject) return;
-
+  const handleVerifyAndMarkEligible = (project: ExecutionProject, m: PaymentMilestoneItem) => {
     const updated = adminVerifyAndMarkPaymentEligible(
-      currentProject.id,
+      project.id,
       m.id,
       1.0,
       'Admin technical QA/QC audit complete. Quality and reinforcement specs certified.'
@@ -406,7 +657,7 @@ export const AdminSiteTimeline: React.FC = () => {
               <HardHat className="w-5 h-5" />
             </span>
             <h1 className="text-xl sm:text-2xl font-black font-display text-navy-950">
-              Milestone Lifecycle &amp; Work Progress Management
+              Milestone &amp; Work Progress Management
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -419,10 +670,11 @@ export const AdminSiteTimeline: React.FC = () => {
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold text-slate-500 hidden sm:inline">Active Project:</label>
             <select
-              value={currentProject?.id || ''}
+              value={selectedProjectId || (currentProject?.id ?? 'ALL')}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:outline-none"
             >
+              <option value="ALL">All Projects ({projects.length} Sites)</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.id} - {p.name} ({p.city || 'Site'})
@@ -439,6 +691,120 @@ export const AdminSiteTimeline: React.FC = () => {
             <span className="hidden sm:inline">Configure Milestone</span>
             <span className="sm:hidden">Add</span>
           </button>
+        </div>
+      </div>
+
+      {/* Module 9 Sub-Views Dropdown & Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <label className="text-xs font-bold text-slate-600 shrink-0 flex items-center gap-1.5">
+            <Sliders className="w-4 h-4 text-blue-600" />
+            <span>Select Feature:</span>
+          </label>
+          <div className="relative flex-1">
+            <select
+              value={selectedView}
+              onChange={(e) => handleSelectView(e.target.value as MilestoneSubView)}
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:outline-none appearance-none cursor-pointer"
+            >
+              {SUB_VIEWS.map((v) => (
+                <option key={v.key} value={v.key}>
+                  {v.label} ({(subCounts as any)[v.countKey] || 0})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+          <div className="relative w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search milestone title, project, homeowner, or partner..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-navy-950 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 9-Pill Action Navigation Strip */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        {SUB_VIEWS.map((sv) => {
+          const IconComponent = sv.icon;
+          const count = (subCounts as any)[sv.countKey] || 0;
+          const isActive = selectedView === sv.key;
+          return (
+            <button
+              key={sv.key}
+              onClick={() => handleSelectView(sv.key)}
+              className={`px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                isActive
+                  ? 'bg-navy-950 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
+              <span>{sv.label.replace(/^\d+\.\s*/, '')}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Contextual Feature Description Banner */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-navy-950 text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+              {SUB_VIEWS.find((s) => s.key === selectedView)?.label}
+            </span>
+            <span className="text-xs text-slate-300">
+              Showing {viewFilteredMilestones.length} milestone records
+            </span>
+          </div>
+          <h2 className="text-base sm:text-lg font-black mt-1">
+            {selectedView === 'PROJECT_MILESTONES' && 'Master Project Milestones & Staged Lifecycle Registry'}
+            {selectedView === 'PENDING_SUBMISSIONS' && 'Partner Milestone Submissions Pending Technical Review'}
+            {selectedView === 'WORK_PROGRESS_VERIFICATION' && 'IS 456 Civil Engineering Weighted Progress Verification'}
+            {selectedView === 'CUSTOMER_APPROVAL_PENDING' && 'Milestones Forwarded to Homeowner for Digital Sign-off'}
+            {selectedView === 'ADMIN_INSPECTION' && 'Scheduled & Completed QA/QC Site Technical Inspections'}
+            {selectedView === 'APPROVED_MILESTONES' && 'Fully Approved & Certified Milestones (Admin & Client Sign-off)'}
+            {selectedView === 'REJECTED_MILESTONES' && 'Correction Required & Disputed Milestone Submissions'}
+            {selectedView === 'DELAYED_MILESTONES' && 'Delayed Milestones & Schedule Slippage Catch-up Notices'}
+            {selectedView === 'PAYMENT_ELIGIBILITY' && 'Certified Milestones Eligible for Immediate Escrow Payout'}
+          </h2>
+          <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+            {selectedView === 'PROJECT_MILESTONES' && 'View all lifecycle stages across active sites with milestone percentages, release valuations, and status tracking.'}
+            {selectedView === 'PENDING_SUBMISSIONS' && 'Review incoming contractor/architect milestone proof submissions, verify reinforcement photos, and schedule on-site inspection or route to homeowner.'}
+            {selectedView === 'WORK_PROGRESS_VERIFICATION' && 'Compute IS 456 weighted percentage progress. Compare self-reported partner claims with client sign-offs and official admin certified metrics.'}
+            {selectedView === 'CUSTOMER_APPROVAL_PENDING' && 'Track milestones waiting for homeowner OTP authorization. Trigger instant WhatsApp reminders or simulate client approval if pre-authorized.'}
+            {selectedView === 'ADMIN_INSPECTION' && 'Direct civil engineering site visits. Assign QA inspector, verify rebar spacing, concrete cube test results, and certify site inspection pass.'}
+            {selectedView === 'APPROVED_MILESTONES' && 'Milestones that have satisfied all QA/QC requirements and client acceptance criteria, ready for final disbursement clearance.'}
+            {selectedView === 'REJECTED_MILESTONES' && 'Milestones with flagged defects or missing test certificates. Review contractor notes and clear re-verification once rectified.'}
+            {selectedView === 'DELAYED_MILESTONES' && 'Proactive site schedule monitoring. Issue formal acceleration and catch-up notices to ensure critical-path handover deadlines are met.'}
+            {selectedView === 'PAYMENT_ELIGIBILITY' && 'Milestones certified 100% complete with all checks passed. Authorize escrow disbursement and generate digital payment receipt.'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="bg-white/10 backdrop-blur-xs p-3 rounded-xl border border-white/10 text-right">
+            <span className="text-[10px] text-slate-300 block uppercase font-bold tracking-wider">
+              Total Valuation
+            </span>
+            <span className="text-lg font-mono font-black text-amber-300">
+              {formatINR(viewFilteredMilestones.reduce((sum, item) => sum + (item.milestone.amountPaise || 0), 0))}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -555,87 +921,35 @@ export const AdminSiteTimeline: React.FC = () => {
             </div>
           </div>
 
-          {/* Filter Tabs Strip */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-              {[
-                { label: 'All Milestones', value: 'ALL', count: milestones.length },
-                {
-                  label: 'Pending Inspection',
-                  value: 'PENDING_REVIEW',
-                  count: milestones.filter(
-                    (m) =>
-                      m.status === 'SUBMITTED_FOR_REVIEW' ||
-                      m.status === 'PENDING_ADMIN_INSPECTION' ||
-                      m.status === 'INSPECTION_SCHEDULED' ||
-                      m.status === 'PENDING_APPROVAL'
-                  ).length,
-                },
-                {
-                  label: 'Awaiting Client Sign-off',
-                  value: 'AWAITING_CUSTOMER',
-                  count: milestones.filter(
-                    (m) => m.status === 'FORWARDED_TO_CUSTOMER' || m.status === 'AWAITING_CUSTOMER_APPROVAL'
-                  ).length,
-                },
-                {
-                  label: 'Client Approved',
-                  value: 'CUSTOMER_APPROVED',
-                  count: milestones.filter((m) => m.status === 'CUSTOMER_APPROVED').length,
-                },
-                {
-                  label: 'Payment Eligible',
-                  value: 'PAYMENT_ELIGIBLE',
-                  count: milestones.filter(
-                    (m) => m.status === 'PAYMENT_ELIGIBLE' || m.status === 'APPROVED' || m.status === 'PAYMENT_DUE'
-                  ).length,
-                },
-                {
-                  label: 'Escrow Released',
-                  value: 'PAID',
-                  count: milestones.filter((m) => m.status === 'PAID').length,
-                },
-                {
-                  label: 'Disputed / Corrections',
-                  value: 'DISPUTED',
-                  count: milestones.filter(
-                    (m) =>
-                      m.status === 'DISPUTED' ||
-                      m.status === 'CORRECTION_REQUESTED' ||
-                      m.status === 'REVISION_REQUESTED'
-                  ).length,
-                },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setActiveTab(tab.value as any)}
-                  className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 ${
-                    activeTab === tab.value
-                      ? 'bg-navy-950 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      activeTab === tab.value ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
+          {/* Milestone Registry & Action Queue */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-blue-600" />
+                <h3 className="font-black text-sm text-navy-950 font-display">
+                  {SUB_VIEWS.find((s) => s.key === selectedView)?.label}
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-800">
+                  {viewFilteredMilestones.length} Milestones
+                </span>
+              </div>
+              <div className="text-xs text-slate-500">
+                Project Scope: <strong className="text-navy-950">{selectedProjectId && selectedProjectId !== 'ALL' ? selectedProjectId : `All Projects (${projects.length} Sites)`}</strong>
+              </div>
             </div>
 
             {/* Milestones Stepper & Verification List */}
-            <div className="space-y-3.5">
-              {filteredMilestones.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">
-                  <Layers className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  <p className="font-bold text-slate-600">No milestones match this filter category.</p>
+            <div className="space-y-4">
+              {viewFilteredMilestones.length === 0 ? (
+                <div className="py-14 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <Layers className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="font-bold text-slate-700 text-sm">No milestones match the selected view or search.</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Try switching views or clear search filter "{search}".
+                  </p>
                 </div>
               ) : (
-                filteredMilestones.map((ms, idx) => {
+                viewFilteredMilestones.map(({ milestone: ms, project }, idx) => {
                   const isPaid = ms.status === 'PAID';
                   const isEligible = ms.status === 'PAYMENT_ELIGIBLE' || ms.status === 'APPROVED' || ms.status === 'PAYMENT_DUE';
                   const isClientApproved = ms.status === 'CUSTOMER_APPROVED';
@@ -649,21 +963,27 @@ export const AdminSiteTimeline: React.FC = () => {
                   const isCorrectionRequested =
                     ms.status === 'CORRECTION_REQUESTED' || ms.status === 'REVISION_REQUESTED';
                   const isDisputed = ms.status === 'DISPUTED';
+                  const isDelayed =
+                    Boolean((ms as any).isDelayed) ||
+                    (ms.disputeReason && ms.disputeReason.toLowerCase().includes('delay')) ||
+                    (ms.title && ms.title.toLowerCase().includes('delay'));
 
                   const weight = ms.weightPercent || ms.percentage || 15;
 
                   return (
                     <div
-                      key={ms.id}
-                      className={`bg-white rounded-2xl border p-5 transition shadow-2xs space-y-3.5 ${
+                      key={`${project.id}-${ms.id}-${idx}`}
+                      className={`bg-white rounded-2xl border p-5 transition shadow-2xs space-y-4 ${
                         isPendingInspection
-                          ? 'border-amber-400 bg-amber-50/20'
+                          ? 'border-amber-400/80 bg-amber-50/15'
                           : isEligible
-                          ? 'border-blue-300 bg-blue-50/20'
+                          ? 'border-blue-400/80 bg-blue-50/15'
                           : isPaid
-                          ? 'border-emerald-200 bg-emerald-50/10'
+                          ? 'border-emerald-300/80 bg-emerald-50/10'
+                          : isDelayed
+                          ? 'border-orange-400/80 bg-orange-50/15'
                           : isDisputed || isCorrectionRequested
-                          ? 'border-rose-300 bg-rose-50/20'
+                          ? 'border-rose-300 bg-rose-50/15'
                           : 'border-slate-200'
                       }`}
                     >
@@ -678,25 +998,33 @@ export const AdminSiteTimeline: React.FC = () => {
                                 ? 'bg-blue-600 text-white'
                                 : isPendingInspection
                                 ? 'bg-amber-500 text-white'
-                                : isDisputed
+                                : isDelayed
+                                ? 'bg-orange-600 text-white'
+                                : isDisputed || isCorrectionRequested
                                 ? 'bg-rose-600 text-white'
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {ms.milestoneNumber || idx + 1}
+                            {ms.milestoneNumber || ms.linkedStageNumber || idx + 1}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                {project.id}
+                              </span>
                               <h4 className="font-bold text-sm text-navy-950">{ms.title}</h4>
                               <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                                 Weight: {weight}%
                               </span>
+                              <span className="text-[11px] text-slate-500">
+                                Site: <strong className="text-slate-800">{project.name}</strong> ({project.city || 'India'})
+                              </span>
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">{ms.description}</p>
+                            <p className="text-xs text-slate-500 mt-1">{ms.description}</p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0">
                           <div className="text-right">
                             <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
                               RELEASE VALUE
@@ -717,17 +1045,118 @@ export const AdminSiteTimeline: React.FC = () => {
                                 ? 'bg-purple-100 text-purple-800 border border-purple-300'
                                 : isPendingInspection
                                 ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : isInspectionScheduled
+                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
                                 : isAwaitingClient
                                 ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                                : isDelayed
+                                ? 'bg-orange-100 text-orange-900 border border-orange-300'
                                 : isDisputed || isCorrectionRequested
                                 ? 'bg-rose-100 text-rose-800 border border-rose-300'
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
-                            {ms.status.replace(/_/g, ' ')}
+                            {isDelayed && !isPaid ? 'DELAYED SCHEDULE' : ms.status.replace(/_/g, ' ')}
                           </span>
                         </div>
                       </div>
+
+                      {/* CONTEXTUAL VIEW-SPECIFIC OPERATIONAL CALLOUT BOXES */}
+
+                      {/* 1. Delayed Notice Callout */}
+                      {(isDelayed || selectedView === 'DELAYED_MILESTONES') && !isPaid && (
+                        <div className="p-3 bg-orange-50/80 border border-orange-200 rounded-xl text-xs text-orange-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="font-bold">Schedule Overrun Notice: </strong>
+                              <span>Critical-path milestone is running behind planned site timeline. Target catch-up requested.</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSendAccelerationNotice(project, ms)}
+                            className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg text-xs transition cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send Acceleration Notice</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 2. Technical Deficiency / Correction Note */}
+                      {(isCorrectionRequested || isDisputed || selectedView === 'REJECTED_MILESTONES') && (
+                        <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-xs text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="font-bold">Technical Correction Required: </strong>
+                              <span>{ms.correctionNotes || ms.disputeReason || 'Site reinforcement spacing and test certificates required before sign-off.'}</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleClearCorrection(project, ms)}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Clear Correction &amp; Re-verify</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 3. Admin Scheduled Inspection Callout */}
+                      {(isInspectionScheduled || selectedView === 'ADMIN_INSPECTION') && (
+                        <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs text-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2">
+                            <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="font-bold">Scheduled QA/QC Site Inspection: </strong>
+                              <span>
+                                Date: <strong>{ms.technicalInspection?.inspectionDate || 'Scheduled This Week'}</strong> · Inspector: <strong>{ms.technicalInspection?.inspectorName || 'Er. Sandeep Rathore (Senior QA Auditor)'}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCertifyInspectionPass(project, ms)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Certify Inspection Pass</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 4. Customer Approval Pending Callout */}
+                      {(isAwaitingClient || selectedView === 'CUSTOMER_APPROVAL_PENDING') && (
+                        <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl text-xs text-purple-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-start gap-2">
+                            <User className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="font-bold">Awaiting Homeowner Digital Sign-off: </strong>
+                              <span>Dispatched to {project.customerName} ({project.customerPhone}). Pending client OTP approval.</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => success(`WhatsApp sign-off reminder dispatched to ${project.customerName}!`)}
+                              className="px-2.5 py-1.5 bg-white hover:bg-purple-100 text-purple-900 border border-purple-300 font-bold rounded-lg text-xs transition cursor-pointer"
+                            >
+                              Send Reminder
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSimulateCustomerApproval(project, ms)}
+                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Simulate Client Sign-off</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Evidence Photo Preview & Inspection Remarks */}
                       {ms.inspectionNotes && (
@@ -744,7 +1173,7 @@ export const AdminSiteTimeline: React.FC = () => {
                       <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-3 text-slate-500 text-[11px]">
                           <span>
-                            Assigned Partner: <strong className="text-slate-800">{currentProject.contractorName || currentProject.architectName || 'Site Engineer'}</strong>
+                            Assigned Partner: <strong className="text-slate-800">{project.contractorName || project.architectName || 'Site Engineer'}</strong>
                           </span>
                           {ms.evidencePhotos && ms.evidencePhotos.length > 0 && (
                             <span className="text-blue-700 font-medium flex items-center gap-1">
@@ -759,7 +1188,8 @@ export const AdminSiteTimeline: React.FC = () => {
                           {/* 1. Forward to Client */}
                           {isPendingInspection && (
                             <button
-                              onClick={() => handleForwardToCustomer(ms)}
+                              type="button"
+                              onClick={() => handleForwardToCustomer(project, ms)}
                               className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer text-xs"
                               title="Forward to Client after Technical Review"
                             >
@@ -771,7 +1201,8 @@ export const AdminSiteTimeline: React.FC = () => {
                           {/* 2. Schedule Technical Physical Inspection */}
                           {isPendingInspection && (
                             <button
-                              onClick={() => setScheduleInspectionMilestone({ project: currentProject, milestone: ms })}
+                              type="button"
+                              onClick={() => setScheduleInspectionMilestone({ project, milestone: ms })}
                               className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer text-xs"
                               title="Schedule Physical Site Inspection"
                             >
@@ -783,8 +1214,9 @@ export const AdminSiteTimeline: React.FC = () => {
                           {/* 3. Request Correction / Additional Proof */}
                           {isPendingInspection && (
                             <button
+                              type="button"
                               onClick={() => {
-                                setCorrectionModalMilestone({ project: currentProject, milestone: ms });
+                                setCorrectionModalMilestone({ project, milestone: ms });
                                 setCorrectionNotes(ms.correctionNotes || '');
                               }}
                               className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer text-xs"
@@ -798,7 +1230,8 @@ export const AdminSiteTimeline: React.FC = () => {
                           {/* 4. Verify & Mark Payment Eligible */}
                           {(isClientApproved || isAwaitingClient) && !isEligible && !isPaid && (
                             <button
-                              onClick={() => handleVerifyAndMarkEligible(ms)}
+                              type="button"
+                              onClick={() => handleVerifyAndMarkEligible(project, ms)}
                               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer text-xs"
                               title="Verify Progress & Certify Payment Eligibility"
                             >
@@ -810,9 +1243,10 @@ export const AdminSiteTimeline: React.FC = () => {
                           {/* 5. Authorize & Release Escrow Payout */}
                           {isEligible && !isPaid && (
                             <button
+                              type="button"
                               onClick={() =>
                                 setReleaseModalMilestone({
-                                  project: currentProject,
+                                  project,
                                   milestone: ms,
                                 })
                               }
@@ -834,7 +1268,8 @@ export const AdminSiteTimeline: React.FC = () => {
 
                           {/* 7. Full Evidence Inspection Button */}
                           <button
-                            onClick={() => setInspectedMilestone({ project: currentProject, milestone: ms })}
+                            type="button"
+                            onClick={() => setInspectedMilestone({ project, milestone: ms })}
                             className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold flex items-center gap-1 cursor-pointer text-xs"
                             title="Inspect Work Evidence & Test Reports"
                           >
@@ -1024,7 +1459,7 @@ export const AdminSiteTimeline: React.FC = () => {
                       {/* 1. Forward to Client */}
                       <button
                         type="button"
-                        onClick={() => handleForwardToCustomer(inspectedMilestone.milestone)}
+                        onClick={() => handleForwardToCustomer(inspectedMilestone.project, inspectedMilestone.milestone)}
                         className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
                       >
                         <Send className="w-4 h-4" />
@@ -1034,7 +1469,7 @@ export const AdminSiteTimeline: React.FC = () => {
                       {/* 2. Certify & Mark Payment Eligible */}
                       <button
                         type="button"
-                        onClick={() => handleVerifyAndMarkEligible(inspectedMilestone.milestone)}
+                        onClick={() => handleVerifyAndMarkEligible(inspectedMilestone.project, inspectedMilestone.milestone)}
                         className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
                       >
                         <ShieldCheck className="w-4 h-4" />
