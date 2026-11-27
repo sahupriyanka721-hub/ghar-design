@@ -357,6 +357,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/timeline': true,
     '/admin/payments': true,
     '/admin/payouts': true,
+    '/admin/invoices': true,
   });
   const { success } = useToast();
 
@@ -387,6 +388,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/payouts')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/payouts': true }));
+    }
+    if (location.pathname.startsWith('/admin/invoices')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/invoices': true }));
     }
   }, [location.pathname]);
 
@@ -687,7 +691,20 @@ export const AdminLayout: React.FC = () => {
             { label: 'Payout Reconciliation', path: '/admin/payouts?view=PAYOUT_RECONCILIATION', view: 'PAYOUT_RECONCILIATION' },
           ],
         },
-        { label: 'Invoice & Billing Management', path: '/admin/invoices', icon: FileText },
+        {
+          label: 'Invoice & Billing Management',
+          path: '/admin/invoices',
+          icon: FileText,
+          subItems: [
+            { label: 'Customer Invoices', path: '/admin/invoices?view=CUSTOMER_INVOICES', view: 'CUSTOMER_INVOICES' },
+            { label: 'Architect Invoices', path: '/admin/invoices?view=ARCHITECT_INVOICES', view: 'ARCHITECT_INVOICES' },
+            { label: 'Payment Receipts', path: '/admin/invoices?view=PAYMENT_RECEIPTS', view: 'PAYMENT_RECEIPTS' },
+            { label: 'Credit Notes', path: '/admin/invoices?view=CREDIT_NOTES', view: 'CREDIT_NOTES' },
+            { label: 'Refund Records', path: '/admin/invoices?view=REFUND_RECORDS', view: 'REFUND_RECORDS' },
+            { label: 'Tax Reports', path: '/admin/invoices?view=TAX_REPORTS', view: 'TAX_REPORTS' },
+            { label: 'Final Settlement', path: '/admin/invoices?view=FINAL_SETTLEMENT', view: 'FINAL_SETTLEMENT' },
+          ],
+        },
         { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
         { label: 'Communication Router (Inbox)', path: '/admin/communications', icon: Megaphone },
         { label: 'Complaint & Dispute Resolution', path: '/admin/support', icon: LifeBuoy },
@@ -932,7 +949,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES')));
 
                               return (
                                 <Link

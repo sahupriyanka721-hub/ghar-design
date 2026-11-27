@@ -10,7 +10,16 @@ import { getExecutionProjects } from './projectExecutionStore.js';
 export type PaymentMethodType = 'RAZORPAY_UPI' | 'RAZORPAY_CARD' | 'NET_BANKING' | 'NEFT_RTGS' | 'BANK_TRANSFER';
 export type PaymentVerificationStatus = 'PENDING_VERIFICATION' | 'VERIFIED_SUCCESSFUL' | 'FAILED' | 'REFUND_REQUESTED' | 'REFUNDED';
 export type PayoutStatus = 'ELIGIBLE' | 'PENDING_APPROVAL' | 'PROCESSING' | 'PAID' | 'HELD' | 'REJECTED';
-export type InvoiceType = 'CUSTOMER_TAX_INVOICE' | 'CUSTOMER_PAYMENT_RECEIPT' | 'ARCHITECT_PAYOUT_VOUCHER' | 'PLATFORM_COMMISSION_NOTE';
+export type InvoiceType =
+  | 'CUSTOMER_TAX_INVOICE'
+  | 'ARCHITECT_INVOICE'
+  | 'CUSTOMER_PAYMENT_RECEIPT'
+  | 'CREDIT_NOTE'
+  | 'REFUND_RECORD'
+  | 'TAX_REPORT'
+  | 'FINAL_SETTLEMENT'
+  | 'ARCHITECT_PAYOUT_VOUCHER'
+  | 'PLATFORM_COMMISSION_NOTE';
 
 export interface CustomerPaymentItem {
   id: string; // e.g. PAY-2026-001
@@ -110,11 +119,15 @@ export interface TaxInvoiceItem {
   dueDate?: string;
   projectId: string;
   projectTitle: string;
-  // Billed To
+  // Billed To / Partner
   billedToName: string;
   billedToPhone: string;
   billedToAddress: string;
   billedToGstin?: string;
+  // Architect details (for Architect Invoices / Final Settlement)
+  architectId?: string;
+  architectName?: string;
+  architectFirm?: string;
   // Billed By
   billedByName: string;
   billedByGstin: string;
@@ -134,8 +147,22 @@ export interface TaxInvoiceItem {
   igstPaise: number; // 18% if inter-state
   totalTaxPaise: number;
   grandTotalPaise: number;
-  paymentStatus: 'PAID' | 'PENDING' | 'CANCELLED';
+  paymentStatus: 'PAID' | 'PENDING' | 'CANCELLED' | 'REFUNDED' | 'SETTLED';
   linkedTransactionId?: string;
+  originalInvoiceRef?: string;
+  creditNoteReason?: string;
+  refundArn?: string;
+  refundReason?: string;
+  paymentMethod?: string;
+  settlementSummary?: {
+    contractTotalPaise: number;
+    collectedPaise: number;
+    disbursedPaise: number;
+    platformFeePaise: number;
+    tdsPaise: number;
+    balancePaise: number;
+    isFullyClosed: boolean;
+  };
 }
 
 // Storage Keys
@@ -740,6 +767,7 @@ export const getDefaultSeedPayouts = (): ArchitectPayoutItem[] => [
 ];
 
 export const getDefaultSeedInvoices = (): TaxInvoiceItem[] => [
+  // 1. CUSTOMER TAX INVOICES (Section 16 B2C Invoicing)
   {
     id: 'INV-2026-CUST-1001',
     invoiceNumber: 'BG/2026-27/INV-1001',
@@ -803,6 +831,445 @@ export const getDefaultSeedInvoices = (): TaxInvoiceItem[] => [
     grandTotalPaise: 29500000,
     paymentStatus: 'PAID',
     linkedTransactionId: 'PAY-2026-0002',
+  },
+  {
+    id: 'INV-2026-CUST-1003',
+    invoiceNumber: 'BG/2026-27/INV-1003',
+    invoiceType: 'CUSTOMER_TAX_INVOICE',
+    invoiceDate: new Date(Date.now() - 86400000 * 7).toISOString().split('T')[0],
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    billedToName: 'Vikramaditya Roy',
+    billedToPhone: '+91 98112 00099',
+    billedToAddress: 'Villa 14, Nirvana Country, Sector 50, Gurugram, HR - 122018',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    items: [
+      {
+        description: '2D Architectural Drawings, Elevations & Structural Calculation (Milestone 2)',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 15000000,
+        amountPaise: 15000000,
+      },
+    ],
+    subtotalPaise: 15000000,
+    cgstPaise: 1350000,
+    sgstPaise: 1350000,
+    igstPaise: 0,
+    totalTaxPaise: 2700000,
+    grandTotalPaise: 17700000,
+    paymentStatus: 'PAID',
+    linkedTransactionId: 'PAY-2026-0009',
+  },
+
+  // 2. ARCHITECT INVOICES (Professional Fee Bills submitted by Partner Architects)
+  {
+    id: 'INV-2026-ARCH-2001',
+    invoiceNumber: 'VA/2026/BILL-042',
+    invoiceType: 'ARCHITECT_INVOICE',
+    invoiceDate: new Date(Date.now() - 86400000 * 9).toISOString().split('T')[0],
+    projectId: 'BG-2026-0001',
+    projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+    billedToName: 'BuildGhar Technologies Private Limited',
+    billedToPhone: '1800-GHAR-DES',
+    billedToAddress: 'Tower B, 4th Floor, Signature Towers, Gurugram, HR - 122001',
+    billedByName: 'Verma & Associates Architects',
+    billedByGstin: '23AABFV1928K1Z3',
+    billedByPan: 'AABFV1928K',
+    billedByAddress: '104 Apollo Premier, Vijay Nagar, Indore, MP - 452010',
+    architectId: 'ARC-2026-001',
+    architectName: 'Ar. Rajesh Verma',
+    architectFirm: 'Verma & Associates Architects',
+    items: [
+      {
+        description: 'Architectural Professional Fee: Milestone 1 Mobilization & Sign-off',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 15000000,
+        amountPaise: 15000000,
+      },
+    ],
+    subtotalPaise: 15000000,
+    cgstPaise: 0,
+    sgstPaise: 0,
+    igstPaise: 0,
+    totalTaxPaise: 0,
+    grandTotalPaise: 15000000,
+    paymentStatus: 'PAID',
+    linkedTransactionId: 'PAYOUT-2026-001',
+  },
+  {
+    id: 'INV-2026-ARCH-2002',
+    invoiceNumber: 'KA/2026/BILL-118',
+    invoiceType: 'ARCHITECT_INVOICE',
+    invoiceDate: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0],
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    billedToName: 'BuildGhar Technologies Private Limited',
+    billedToPhone: '1800-GHAR-DES',
+    billedToAddress: 'Tower B, 4th Floor, Signature Towers, Gurugram, HR - 122001',
+    billedByName: 'Kulkarni Atelier & Associates',
+    billedByGstin: '07AAEFK4499M1ZX',
+    billedByPan: 'AAEFK4499M',
+    billedByAddress: 'DLF Phase 4, Galleria Complex, Gurugram, HR - 122009',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Kulkarni Atelier & Associates',
+    items: [
+      {
+        description: 'Architectural Professional Fee: Milestone 2 Working Drawings & MEP',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 15000000,
+        amountPaise: 15000000,
+      },
+    ],
+    subtotalPaise: 15000000,
+    cgstPaise: 0,
+    sgstPaise: 0,
+    igstPaise: 0,
+    totalTaxPaise: 0,
+    grandTotalPaise: 15000000,
+    paymentStatus: 'PENDING',
+    linkedTransactionId: 'PAYOUT-2026-003',
+  },
+
+  // 3. PAYMENT RECEIPTS (Official Electronic Receipt Vouchers)
+  {
+    id: 'RCPT-2026-1001',
+    invoiceNumber: 'BG/2026-27/RCPT-1001',
+    invoiceType: 'CUSTOMER_PAYMENT_RECEIPT',
+    invoiceDate: new Date(Date.now() - 86400000 * 10).toISOString().split('T')[0],
+    projectId: 'BG-2026-0001',
+    projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+    billedToName: 'Sharika Mishra',
+    billedToPhone: '+91 98765 43210',
+    billedToAddress: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    items: [
+      {
+        description: 'Electronic Receipt: Milestone 1 Mobilization Advance via Razorpay UPI',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 17700000,
+        amountPaise: 17700000,
+      },
+    ],
+    subtotalPaise: 15000000,
+    cgstPaise: 1350000,
+    sgstPaise: 1350000,
+    igstPaise: 0,
+    totalTaxPaise: 2700000,
+    grandTotalPaise: 17700000,
+    paymentStatus: 'PAID',
+    linkedTransactionId: 'pay_rzp_bg_indore_001',
+    paymentMethod: 'RAZORPAY_UPI',
+  },
+  {
+    id: 'RCPT-2026-1002',
+    invoiceNumber: 'BG/2026-27/RCPT-1002',
+    invoiceType: 'CUSTOMER_PAYMENT_RECEIPT',
+    invoiceDate: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0],
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    billedToName: 'Vikramaditya Roy',
+    billedToPhone: '+91 98112 00099',
+    billedToAddress: 'Villa 14, Nirvana Country, Sector 50, Gurugram, HR - 122018',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    items: [
+      {
+        description: 'Electronic Receipt: Milestone 2 Architectural Drawings via Corporate Net Banking',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 17700000,
+        amountPaise: 17700000,
+      },
+    ],
+    subtotalPaise: 15000000,
+    cgstPaise: 1350000,
+    sgstPaise: 1350000,
+    igstPaise: 0,
+    totalTaxPaise: 2700000,
+    grandTotalPaise: 17700000,
+    paymentStatus: 'PAID',
+    linkedTransactionId: 'pay_rzp_991122334',
+    paymentMethod: 'NET_BANKING',
+  },
+
+  // 4. CREDIT NOTES (Section 34 CGST Act Reversals & Alterations)
+  {
+    id: 'CN-2026-001',
+    invoiceNumber: 'BG/2026-27/CN-001',
+    invoiceType: 'CREDIT_NOTE',
+    invoiceDate: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
+    projectId: 'BG-2026-0006',
+    projectTitle: 'Lakeview G+3 Penthouse - Gomti Nagar, Lucknow',
+    billedToName: 'Rajeev Singhania',
+    billedToPhone: '+91 99350 44332',
+    billedToAddress: 'Plot 104, Gomti Nagar Extension, Lucknow, UP - 226010',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    originalInvoiceRef: 'BG/2026-27/INV-1007',
+    creditNoteReason: 'Architectural scope reduction: Basement excavation drawings excluded post geotechnical report.',
+    items: [
+      {
+        description: 'GST Credit Note: Reversal of Scope - Basement Structural Design',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 2500000,
+        amountPaise: 2500000,
+      },
+    ],
+    subtotalPaise: 2500000,
+    cgstPaise: 225000,
+    sgstPaise: 225000,
+    igstPaise: 0,
+    totalTaxPaise: 450000,
+    grandTotalPaise: 2950000,
+    paymentStatus: 'SETTLED',
+    linkedTransactionId: 'PAY-2026-0007',
+  },
+  {
+    id: 'CN-2026-002',
+    invoiceNumber: 'BG/2026-27/CN-002',
+    invoiceType: 'CREDIT_NOTE',
+    invoiceDate: new Date(Date.now() - 86400000 * 6).toISOString().split('T')[0],
+    projectId: 'BG-2026-0004',
+    projectTitle: 'Boutique Heritage Villa Renovation - Civil Lines, Jaipur',
+    billedToName: 'Priya Sharma',
+    billedToPhone: '+91 94140 55667',
+    billedToAddress: 'C-Scheme, Subhash Marg, Jaipur, RJ - 302001',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    originalInvoiceRef: 'BG/2026-27/INV-1004',
+    creditNoteReason: 'Festival promotional concession credit applied to architectural consultation.',
+    items: [
+      {
+        description: 'GST Credit Note: Platform Promotional Concession Credit',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 1500000,
+        amountPaise: 1500000,
+      },
+    ],
+    subtotalPaise: 1500000,
+    cgstPaise: 135000,
+    sgstPaise: 135000,
+    igstPaise: 0,
+    totalTaxPaise: 270000,
+    grandTotalPaise: 1770000,
+    paymentStatus: 'SETTLED',
+  },
+
+  // 5. REFUND RECORDS (Centralized Customer Refund Register)
+  {
+    id: 'REF-2026-001',
+    invoiceNumber: 'BG/2026-27/REF-001',
+    invoiceType: 'REFUND_RECORD',
+    invoiceDate: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0],
+    projectId: 'BG-2026-0007',
+    projectTitle: 'Heritage Bungalow Refurbishment - Salt Lake, Kolkata',
+    billedToName: 'Ananya Sen',
+    billedToPhone: '+91 98300 77889',
+    billedToAddress: 'FD Block, Sector 3, Salt Lake, Kolkata, WB - 700091',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    refundArn: 'ARN-RZP-2026-REF-098412',
+    refundReason: 'Duplicate consultation deposit reversed back to customer UPI ID via Razorpay instant refund.',
+    items: [
+      {
+        description: 'Escrow Refund Reversal: Duplicate Consultation Deposit',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 2118644,
+        amountPaise: 2118644,
+      },
+    ],
+    subtotalPaise: 2118644,
+    cgstPaise: 190678,
+    sgstPaise: 190678,
+    igstPaise: 0,
+    totalTaxPaise: 381356,
+    grandTotalPaise: 2500000,
+    paymentStatus: 'REFUNDED',
+    linkedTransactionId: 'pay_rzp_ref_778899',
+  },
+  {
+    id: 'REF-2026-002',
+    invoiceNumber: 'BG/2026-27/REF-002',
+    invoiceType: 'REFUND_RECORD',
+    invoiceDate: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+    projectId: 'BG-2026-0006',
+    projectTitle: 'Lakeview G+3 Penthouse - Gomti Nagar, Lucknow',
+    billedToName: 'Rajeev Singhania',
+    billedToPhone: '+91 99350 44332',
+    billedToAddress: 'Plot 104, Gomti Nagar Extension, Lucknow, UP - 226010',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    refundArn: 'ARN-HDFC-2026-NEFT-5512',
+    refundReason: 'Customer requested architectural scope reduction & advance refund for uninitiated site excavation.',
+    items: [
+      {
+        description: 'Customer Refund: Uninitiated Site Excavation Advance',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 2500000,
+        amountPaise: 2500000,
+      },
+    ],
+    subtotalPaise: 2500000,
+    cgstPaise: 225000,
+    sgstPaise: 225000,
+    igstPaise: 0,
+    totalTaxPaise: 450000,
+    grandTotalPaise: 2950000,
+    paymentStatus: 'REFUNDED',
+    linkedTransactionId: 'PAY-2026-0007',
+  },
+
+  // 6. TAX REPORTS (Statutory Filing Summaries - GSTR-1, GSTR-3B & Form 26Q)
+  {
+    id: 'TAX-2026-M11',
+    invoiceNumber: 'GSTR-1/2026-11/SUMMARY',
+    invoiceType: 'TAX_REPORT',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    projectId: 'ALL-PROJECTS-M11',
+    projectTitle: 'November 2026 Monthly Outward GST Supplies Register (GSTR-1)',
+    billedToName: 'Government of India - GST Portal (GSTN)',
+    billedToPhone: '1800-103-4786',
+    billedToAddress: 'GSTN, Worldmark 1, Aerocity, New Delhi - 110037',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    items: [
+      {
+        description: 'GSTR-1 Table 4: Taxable outward supplies made to consumers (B2C & B2B)',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 125000000, // ₹12,50,000 taxable
+        amountPaise: 125000000,
+      },
+      {
+        description: 'Form 26Q Section 194M/194C: TDS with respect to professional services retained',
+        hsnSacCode: '194M',
+        quantity: 1,
+        ratePaise: 1250000, // ₹12,500 TDS
+        amountPaise: 1250000,
+      },
+    ],
+    subtotalPaise: 125000000,
+    cgstPaise: 11250000, // 9%
+    sgstPaise: 11250000, // 9%
+    igstPaise: 0,
+    totalTaxPaise: 22500000,
+    grandTotalPaise: 147500000,
+    paymentStatus: 'PAID',
+  },
+
+  // 7. FINAL SETTLEMENT (Project Completion Financial Closure & Zero-Liability Statements)
+  {
+    id: 'SETTLE-2026-001',
+    invoiceNumber: 'BG/2026/FINAL-SETTLE-001',
+    invoiceType: 'FINAL_SETTLEMENT',
+    invoiceDate: new Date(Date.now() - 86400000 * 1).toISOString().split('T')[0],
+    projectId: 'BG-2026-0001',
+    projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+    billedToName: 'Sharika Mishra',
+    billedToPhone: '+91 98765 43210',
+    billedToAddress: 'Plot 42, Super Corridor, Scheme 151, Indore, MP - 452005',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    architectId: 'ARC-2026-001',
+    architectName: 'Ar. Rajesh Verma',
+    architectFirm: 'Verma & Associates Architects',
+    items: [
+      {
+        description: 'Final Account Settlement: Modern Luxury Villa Contract Scope Completion',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 85000000, // ₹8,50,000 contract sum
+        amountPaise: 85000000,
+      },
+    ],
+    subtotalPaise: 85000000,
+    cgstPaise: 7650000,
+    sgstPaise: 7650000,
+    igstPaise: 0,
+    totalTaxPaise: 15300000,
+    grandTotalPaise: 100300000,
+    paymentStatus: 'SETTLED',
+    settlementSummary: {
+      contractTotalPaise: 85000000,
+      collectedPaise: 85000000,
+      disbursedPaise: 75650000, // 8.5L - 10% comm (85k) - 1% TDS (8.5k)
+      platformFeePaise: 8500000,
+      tdsPaise: 850000,
+      balancePaise: 0,
+      isFullyClosed: true,
+    },
+  },
+  {
+    id: 'SETTLE-2026-002',
+    invoiceNumber: 'BG/2026/FINAL-SETTLE-002',
+    invoiceType: 'FINAL_SETTLEMENT',
+    invoiceDate: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+    projectId: 'BG-2026-0003',
+    projectTitle: 'Contemporary 3BHK Duplex - Bodakdev, Ahmedabad',
+    billedToName: 'Amit Patel',
+    billedToPhone: '+91 98980 11223',
+    billedToAddress: 'B-402, Shivalik Highstreet, Bodakdev, Ahmedabad, GJ - 380054',
+    billedByName: 'BuildGhar Technologies Private Limited',
+    billedByGstin: '07AAACB2489C1Z5',
+    billedByPan: 'AAACB2489C',
+    billedByAddress: 'Tower B, 4th Floor, Signature Towers, South City 1, Gurugram, HR - 122001',
+    architectId: 'ARC-2026-002',
+    architectName: 'Ar. Meera Sengupta',
+    architectFirm: 'Studio Vistara Architecture',
+    items: [
+      {
+        description: 'Interim Milestone Settlement: Stages 1 & 2 Completed and Reconciled',
+        hsnSacCode: '998321',
+        quantity: 1,
+        ratePaise: 32000000,
+        amountPaise: 32000000,
+      },
+    ],
+    subtotalPaise: 32000000,
+    cgstPaise: 2880000,
+    sgstPaise: 2880000,
+    igstPaise: 0,
+    totalTaxPaise: 5760000,
+    grandTotalPaise: 37760000,
+    paymentStatus: 'SETTLED',
+    settlementSummary: {
+      contractTotalPaise: 60000000,
+      collectedPaise: 32000000,
+      disbursedPaise: 28480000,
+      platformFeePaise: 3200000,
+      tdsPaise: 320000,
+      balancePaise: 28000000,
+      isFullyClosed: false,
+    },
   },
 ];
 
