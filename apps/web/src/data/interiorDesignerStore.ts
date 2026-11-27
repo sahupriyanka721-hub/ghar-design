@@ -1851,8 +1851,24 @@ export const saveInteriorBooking = (bk: Partial<InteriorBooking>): InteriorBooki
 };
 
 // ==========================================
-// SECTION C: PROJECT MANAGEMENT & EXECUTION
+// SECTION C: PROJECT MANAGEMENT & EXECUTION (Section 8)
 // ==========================================
+export type InteriorProjectStatus =
+  | 'ASSIGNED'
+  | 'PENDING_KICKOFF'
+  | 'ACTIVE'
+  | 'DESIGN_IN_PROGRESS'
+  | 'SUBMITTED_FOR_ADMIN_REVIEW'
+  | 'CUSTOMER_REVIEW_PENDING'
+  | 'REVISION_REQUIRED'
+  | 'APPROVED'
+  | 'EXECUTION_IN_PROGRESS'
+  | 'ON_HOLD'
+  | 'DELAYED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'DISPUTED';
+
 export type InteriorProjectStage =
   | 'INITIAL_CONSULTATION'
   | 'SITE_MEASUREMENT'
@@ -1878,27 +1894,64 @@ export interface InteriorProjectMilestone {
   escrowStatus: 'LOCKED_IN_ESCROW' | 'RELEASED_TO_DESIGNER' | 'AWAITING_CLIENT_APPROVAL';
 }
 
-export interface InteriorProject {
+// Section 9A: Approved Customer Design Brief
+export interface InteriorDesignBriefRoom {
+  roomName: string;
+  dimensions: string; // e.g. "22 ft x 18 ft"
+  style: string;
+  colorScheme: string;
+  requirements: string;
+}
+
+export interface InteriorDesignBrief {
   id: string;
   projectId: string;
-  bookingId: string;
-  quotationId: string;
+  customerRequirements: string;
+  roomBreakdown: InteriorDesignBriefRoom[];
+  designStyle: string; // e.g. 'Contemporary Luxury', 'Minimalist Scandinavian'
+  colorPreferences: string[];
+  materialPreferences: string[];
+  furnitureRequirements: string[];
+  lightingRequirements: string[];
+  targetBudget: number;
+  specialInstructions: string;
+  referenceImages: string[];
+  adminApprovalStatus: 'APPROVED_BY_ADMIN' | 'PENDING_ADMIN_REVIEW';
+  approvedAt: string;
+}
+
+export interface InteriorProject {
+  id: string;
+  projectId: string; // Shared format: BG-2026-0002
+  bookingId?: string;
+  quotationId?: string;
+  quotationNumber?: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
   designerId: string;
   designerName: string;
   title: string;
-  propertyType: string;
+  projectAddress: string;
   location: string;
+  propertyType: string;
+  carpetAreaSqFt: number;
+  approvedScope: string[];
+  status: InteriorProjectStatus;
   currentStage: InteriorProjectStage;
   overallProgressPercent: number;
   startDate: string;
   targetEndDate: string;
+  projectBudget: number;
   totalContractValue: number;
   paidAmount: number;
   pendingEscrowAmount: number;
+  assignedArchitect?: string;
+  assignedContractor?: string;
+  assignedSiteSupervisor?: string;
   milestones: InteriorProjectMilestone[];
+  designBrief?: InteriorDesignBrief;
+  documents?: { id: string; name: string; type: string; url: string; uploadedAt: string }[];
   notes?: string;
   updatedAt: string;
 }
@@ -1906,60 +1959,197 @@ export interface InteriorProject {
 export const TEST_PROJECTS: InteriorProject[] = [
   {
     id: 'prj-int-1',
-    projectId: 'BG-PRJ-INT-101',
+    projectId: 'BG-2026-0002',
     bookingId: 'bk-int-1',
     quotationId: 'quote-int-1',
+    quotationNumber: 'BG-Q-INT-101',
     customerId: 'cust-101',
     customerName: 'Aman Saxena',
     customerPhone: '9811223344',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
     title: 'DLF The Crest Penthouse Oasis',
-    propertyType: '4BHK Apartment',
+    projectAddress: 'Tower 4, 18th Floor, DLF The Crest, Sector 54, Gurugram',
     location: 'DLF The Crest, Sector 54, Gurugram',
+    propertyType: '4BHK Luxury Apartment',
+    carpetAreaSqFt: 2800,
+    approvedScope: [
+      'Residential Interior Design',
+      'Living Room Design',
+      'Modular Kitchen Design',
+      'False Ceiling Design',
+      'Wardrobe Design',
+      'Lighting Design',
+      'Interior Execution and Implementation',
+    ],
+    status: 'EXECUTION_IN_PROGRESS',
     currentStage: 'SITE_EXECUTION',
-    overallProgressPercent: 35,
+    overallProgressPercent: 45,
     startDate: '2026-11-01',
-    targetEndDate: '2027-01-15',
-    totalContractValue: 712130,
-    paidAmount: 350000,
-    pendingEscrowAmount: 362130,
-    updatedAt: '2026-11-20T10:00:00Z',
+    targetEndDate: '2027-01-20',
+    projectBudget: 3500000,
+    totalContractValue: 924440,
+    paidAmount: 554664,
+    pendingEscrowAmount: 369776,
+    assignedArchitect: 'Ar. Rajesh Verma (BuildGhar Senior Council)',
+    assignedContractor: 'Apex Civil & Woodcraft Contractors',
+    assignedSiteSupervisor: 'Er. Sandeep Yadav (PMC Lead)',
+    updatedAt: '2026-11-25T10:00:00Z',
+    designBrief: {
+      id: 'brief-int-1',
+      projectId: 'prj-int-1',
+      customerRequirements: 'Contemporary luxury interior with bookmatched Statuario Italian marble, Blum motorized tandem kitchen, and acoustic suede headboards.',
+      roomBreakdown: [
+        { roomName: 'Living & Dining Room', dimensions: '26 ft x 18 ft', style: 'Contemporary Luxury', colorScheme: 'Charcoal, Off-White & Brass Accents', requirements: 'Statuario marble cladding with indirect warm cove and custom 8-seater table.' },
+        { roomName: 'Modular Kitchen', dimensions: '16 ft x 12 ft', style: 'German Minimalist', colorScheme: 'Matte Anthracite & Quartz', requirements: 'Blum Tandembox soft-close, Blum Aventos lift-ups, island breakfast counter.' },
+        { roomName: 'Master Bedroom Suite', dimensions: '20 ft x 16 ft', style: 'Modern Luxe', colorScheme: 'Champagne Gold & Warm Beige', requirements: 'Floor-to-ceiling walk-in wardrobe with sensor LED profiles and fluted paneling.' },
+      ],
+      designStyle: 'Contemporary Luxury with Italian Finishes',
+      colorPreferences: ['Off-White', 'Warm Charcoal', 'Champagne Brass', 'Smoked Oak'],
+      materialPreferences: ['Statuario Marble', 'Greenlam Marine Ply 710', 'Blum Austria Hardware', 'Caesarstone Quartz'],
+      furnitureRequirements: ['Custom 8-Seater Statuario Dining Table', 'King Size Hydraulic Storage Bed', 'L-Shaped Velvet Sectional Lounge'],
+      lightingRequirements: ['Magnetic Track Lighting 3000K', 'Perimeter Gyproc Cove Trough', 'Dimmable Architectural Spotlights'],
+      targetBudget: 3500000,
+      specialInstructions: 'Homeowner requests strict noise restriction between 2 PM and 4 PM as per DLF society bylaws.',
+      referenceImages: [
+        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+      ],
+      adminApprovalStatus: 'APPROVED_BY_ADMIN',
+      approvedAt: '2026-10-18T14:00:00Z',
+    },
     milestones: [
-      { id: 'm-1', name: 'Concept Approval & 3D Renders', weightPercent: 20, status: 'COMPLETED', dueDate: '2026-11-10', payoutAmount: 142426, escrowStatus: 'RELEASED_TO_DESIGNER' },
-      { id: 'm-2', name: 'Civil & Flooring Demarcation', weightPercent: 20, status: 'IN_PROGRESS', dueDate: '2026-11-25', payoutAmount: 142426, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-3', name: 'Modular Woodwork Carcass', weightPercent: 25, status: 'PENDING', dueDate: '2026-12-15', payoutAmount: 178032, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-4', name: 'Finishes, Veneers & Lighting', weightPercent: 20, status: 'PENDING', dueDate: '2027-01-05', payoutAmount: 142426, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-5', name: 'Deep Cleaning & Snag Handover', weightPercent: 15, status: 'PENDING', dueDate: '2027-01-15', payoutAmount: 106820, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-1', name: 'Stage 1: Advance Booking & 2D Layout Approval', weightPercent: 25, status: 'COMPLETED', dueDate: '2026-11-10', payoutAmount: 231110, escrowStatus: 'RELEASED_TO_DESIGNER' },
+      { id: 'm-2', name: 'Stage 2: Woodwork Carcass & Frame Approval', weightPercent: 35, status: 'COMPLETED', dueDate: '2026-11-25', payoutAmount: 323554, escrowStatus: 'RELEASED_TO_DESIGNER' },
+      { id: 'm-3', name: 'Stage 3: Veneer/Laminate Pressing & False Ceiling', weightPercent: 25, status: 'IN_PROGRESS', dueDate: '2026-12-15', payoutAmount: 231110, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-4', name: 'Stage 4: Snag Clearance & Final Handover', weightPercent: 15, status: 'PENDING', dueDate: '2027-01-20', payoutAmount: 138666, escrowStatus: 'LOCKED_IN_ESCROW' },
+    ],
+    documents: [
+      { id: 'doc-1', name: 'Tri-Party Interior Execution Contract', type: 'PDF', url: 'https://example.com/contract-bg-2026-0002.pdf', uploadedAt: '2026-10-20' },
+      { id: 'doc-2', name: 'Structural Column Load Clearance Report', type: 'PDF', url: 'https://example.com/structural-audit.pdf', uploadedAt: '2026-10-22' },
+      { id: 'doc-3', name: 'DLF Crest Society Work Permit & Gate Pass', type: 'PDF', url: 'https://example.com/dlf-permit.pdf', uploadedAt: '2026-10-28' },
     ],
   },
   {
     id: 'prj-int-2',
-    projectId: 'BG-PRJ-INT-102',
+    projectId: 'BG-2026-0008',
     bookingId: 'bk-int-2',
     quotationId: 'quote-int-2',
+    quotationNumber: 'BG-Q-INT-102',
     customerId: 'cust-102',
     customerName: 'Meera Chawla',
     customerPhone: '9822334455',
     designerId: 'id-101',
     designerName: 'Ar. Pooja Mehra',
     title: 'Scandinavian Minimalist Penthouse',
-    propertyType: '3BHK Penthouse',
+    projectAddress: 'Tower B, Jaypee Greens, Greater Noida',
     location: 'Jaypee Greens, Greater Noida',
-    currentStage: 'INITIAL_CONSULTATION',
-    overallProgressPercent: 15,
+    propertyType: '3BHK Penthouse',
+    carpetAreaSqFt: 2200,
+    approvedScope: [
+      'Residential Interior Design',
+      'Modular Kitchen Design',
+      'Bedroom Design',
+      '3D Interior Design',
+      'Lighting Design',
+    ],
+    status: 'DESIGN_IN_PROGRESS',
+    currentStage: 'VISUALIZATION_3D',
+    overallProgressPercent: 25,
     startDate: '2026-11-05',
-    targetEndDate: '2026-12-20',
-    totalContractValue: 269040,
-    paidAmount: 50000,
-    pendingEscrowAmount: 219040,
+    targetEndDate: '2026-12-25',
+    projectBudget: 2500000,
+    totalContractValue: 405330,
+    paidAmount: 101332,
+    pendingEscrowAmount: 303998,
+    assignedArchitect: 'Ar. Pooja Mehra',
+    assignedContractor: 'BuildGhar Verified Woodcraft Partner',
     updatedAt: '2026-11-22T12:00:00Z',
+    designBrief: {
+      id: 'brief-int-2',
+      projectId: 'prj-int-2',
+      customerRequirements: 'Minimalist Scandinavian design with light natural oak woodwork, acoustic fabric panels, and warm neutral tones.',
+      roomBreakdown: [
+        { roomName: 'Master Bedroom Suite', dimensions: '18 ft x 14 ft', style: 'Scandinavian', colorScheme: 'Muted Taupe & Nordic Pine', requirements: 'Fluted oak headboard, integrated reading sconces, and sliding wardrobe.' },
+        { roomName: 'Modular Kitchen', dimensions: '14 ft x 10 ft', style: 'Modern Scandi', colorScheme: 'Warm White & Light Ash', requirements: 'Concealed cutlery trays and quartz breakfast bar.' },
+      ],
+      designStyle: 'Minimalist Scandinavian with Acoustic Elements',
+      colorPreferences: ['Nordic White', 'Light Ash Grey', 'Sage Green Accents'],
+      materialPreferences: ['Natural Oak Veneer', 'Century Ply Gold 710', 'Hettich Soft-Close', 'Kalinga Stone Quartz'],
+      furnitureRequirements: ['Scandinavian Platform Bed', 'Concealed Vanity Unit'],
+      lightingRequirements: ['Warm 2700K Architectural Downlights', 'Nordic Pendant over Dining'],
+      targetBudget: 2500000,
+      specialInstructions: 'Preference for sustainable low-VOC paints and non-toxic wood polish.',
+      referenceImages: [
+        'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80',
+      ],
+      adminApprovalStatus: 'APPROVED_BY_ADMIN',
+      approvedAt: '2026-10-25T11:00:00Z',
+    },
     milestones: [
-      { id: 'm-11', name: 'Site Inspection & Moodboard', weightPercent: 20, status: 'COMPLETED', dueDate: '2026-11-10', payoutAmount: 53808, escrowStatus: 'RELEASED_TO_DESIGNER' },
-      { id: 'm-12', name: '2D Layout & Elevations', weightPercent: 20, status: 'IN_PROGRESS', dueDate: '2026-11-20', payoutAmount: 53808, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-13', name: 'Woodwork Orders Placed', weightPercent: 25, status: 'PENDING', dueDate: '2026-12-01', payoutAmount: 67260, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-14', name: 'Site Assembly', weightPercent: 20, status: 'PENDING', dueDate: '2026-12-12', payoutAmount: 53808, escrowStatus: 'LOCKED_IN_ESCROW' },
-      { id: 'm-15', name: 'Final Handover', weightPercent: 15, status: 'PENDING', dueDate: '2026-12-20', payoutAmount: 40356, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-11', name: 'Stage 1: Advance Booking & 2D Layout Approval', weightPercent: 25, status: 'COMPLETED', dueDate: '2026-11-12', payoutAmount: 101332, escrowStatus: 'RELEASED_TO_DESIGNER' },
+      { id: 'm-12', name: 'Stage 2: 3D Visualization & Finishes Sign-Off', weightPercent: 25, status: 'IN_PROGRESS', dueDate: '2026-11-28', payoutAmount: 101332, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-13', name: 'Stage 3: Woodwork Carcass & Factory Fabrication', weightPercent: 30, status: 'PENDING', dueDate: '2026-12-10', payoutAmount: 121599, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-14', name: 'Stage 4: On-Site Assembly & Handover', weightPercent: 20, status: 'PENDING', dueDate: '2026-12-25', payoutAmount: 81067, escrowStatus: 'LOCKED_IN_ESCROW' },
+    ],
+  },
+  {
+    id: 'prj-int-3',
+    projectId: 'BG-2026-0015',
+    bookingId: 'bk-int-3',
+    quotationId: 'quote-int-5',
+    quotationNumber: 'BG-Q-INT-105',
+    customerId: 'cust-103',
+    customerName: 'Vikramaditya Oberoi',
+    customerPhone: '9844001122',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    title: 'Sushant Lok Modern Art Deco Villa',
+    projectAddress: 'Plot 42, Block C, Sushant Lok 1, Sector 43, Gurugram',
+    location: 'Sushant Lok 1, Gurugram',
+    propertyType: '4BHK Duplex Villa',
+    carpetAreaSqFt: 3400,
+    approvedScope: [
+      'Residential Interior Design',
+      'Living Room Design',
+      'False Ceiling Design',
+      'Lighting Design',
+      'Interior Execution and Implementation',
+    ],
+    status: 'PENDING_KICKOFF',
+    currentStage: 'INITIAL_CONSULTATION',
+    overallProgressPercent: 5,
+    startDate: '2026-12-01',
+    targetEndDate: '2027-03-15',
+    projectBudget: 4500000,
+    totalContractValue: 1250000,
+    paidAmount: 0,
+    pendingEscrowAmount: 1250000,
+    assignedArchitect: 'Ar. Pooja Mehra',
+    updatedAt: '2026-11-26T16:00:00Z',
+    designBrief: {
+      id: 'brief-int-3',
+      projectId: 'prj-int-3',
+      customerRequirements: 'Modern Art Deco villa interior with double-height ceiling accents, brass fluting, and chevron parquet wooden flooring.',
+      roomBreakdown: [
+        { roomName: 'Foyer & Grand Staircase', dimensions: '24 ft x 14 ft', style: 'Art Deco', colorScheme: 'Emerald Green & Burnished Brass', requirements: 'Geometric CNC metal balustrades and statement chandelier.' },
+      ],
+      designStyle: 'Modern Art Deco & Luxury Classic',
+      colorPreferences: ['Emerald Green', 'Deep Navy', 'Champagne Gold'],
+      materialPreferences: ['Chevron Engineered Oak', 'Bespoke Brass PVD Inlays', 'Kevlar Backed Louvers'],
+      furnitureRequirements: ['Curved Velvet Boucle Sofa', 'Art Deco Console with Tinted Mirror'],
+      lightingRequirements: ['Multi-Tier Geometric Chandelier', 'Concealed Step Lighting'],
+      targetBudget: 4500000,
+      specialInstructions: 'Admin site inspection scheduled for site measurement verification.',
+      referenceImages: [],
+      adminApprovalStatus: 'APPROVED_BY_ADMIN',
+      approvedAt: '2026-11-25T14:00:00Z',
+    },
+    milestones: [
+      { id: 'm-21', name: 'Stage 1: Advance & Demarcation', weightPercent: 25, status: 'PENDING', dueDate: '2026-12-10', payoutAmount: 312500, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-22', name: 'Stage 2: Civil & Structural Framing', weightPercent: 35, status: 'PENDING', dueDate: '2027-01-10', payoutAmount: 437500, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-23', name: 'Stage 3: Woodcraft & Finishes', weightPercent: 25, status: 'PENDING', dueDate: '2027-02-15', payoutAmount: 312500, escrowStatus: 'LOCKED_IN_ESCROW' },
+      { id: 'm-24', name: 'Stage 4: Snag Sign-off & Delivery', weightPercent: 15, status: 'PENDING', dueDate: '2027-03-15', payoutAmount: 187500, escrowStatus: 'LOCKED_IN_ESCROW' },
     ],
   },
 ];
@@ -1976,13 +2166,18 @@ export const getInteriorProjects = (designerId?: string): InteriorProject[] => {
       }
     }
   } catch (e) {}
-  const defaults = isTest ? TEST_PROJECTS : [];
+  const defaults = TEST_PROJECTS;
   return designerId ? defaults.filter((p) => p.designerId === designerId) : defaults;
+};
+
+export const getInteriorProjectById = (id: string): InteriorProject | null => {
+  const all = getInteriorProjects();
+  return all.find((p) => p.id === id || p.projectId === id) || null;
 };
 
 export const saveInteriorProject = (p: Partial<InteriorProject>): InteriorProject => {
   const current = getInteriorProjects();
-  const existingIdx = current.findIndex((item) => item.id === p.id);
+  const existingIdx = current.findIndex((item) => item.id === p.id || (p.projectId && item.projectId === p.projectId));
   const now = new Date().toISOString();
   let updated: InteriorProject;
   if (existingIdx >= 0) {
@@ -1991,66 +2186,363 @@ export const saveInteriorProject = (p: Partial<InteriorProject>): InteriorProjec
   } else {
     updated = {
       id: p.id || ('prj-int-' + Date.now()),
-      projectId: p.projectId || ('PRJ-INT-' + Math.floor(100 + Math.random() * 900)),
+      projectId: p.projectId || ('BG-2026-' + Math.floor(1000 + Math.random() * 9000)),
       bookingId: p.bookingId || '',
       quotationId: p.quotationId || '',
-      customerId: p.customerId || '',
-      customerName: p.customerName || 'Client',
+      quotationNumber: p.quotationNumber || '',
+      customerId: p.customerId || 'cust-101',
+      customerName: p.customerName || 'Homeowner',
       customerPhone: p.customerPhone || '',
       designerId: p.designerId || 'id-101',
-      designerName: p.designerName || 'Pooja Mehra',
+      designerName: p.designerName || 'Ar. Pooja Mehra',
       title: p.title || 'Interior Project',
-      propertyType: p.propertyType || 'Apartment',
+      projectAddress: p.projectAddress || 'DLF Phase 5, Gurugram',
       location: p.location || 'Gurugram',
+      propertyType: p.propertyType || 'Apartment',
+      carpetAreaSqFt: p.carpetAreaSqFt || 2000,
+      approvedScope: p.approvedScope || ['Residential Interior Design'],
+      status: p.status || 'ACTIVE',
       currentStage: p.currentStage || 'CONCEPT_DESIGN',
       overallProgressPercent: p.overallProgressPercent || 15,
       startDate: p.startDate || now.slice(0, 10),
       targetEndDate: p.targetEndDate || '2027-02-28',
+      projectBudget: p.projectBudget || 2500000,
       totalContractValue: p.totalContractValue || 1500000,
       paidAmount: p.paidAmount || 300000,
       pendingEscrowAmount: p.pendingEscrowAmount || 1200000,
       milestones: p.milestones || [],
+      designBrief: p.designBrief,
+      documents: p.documents || [],
       notes: p.notes || '',
       updatedAt: now,
     };
     current.push(updated);
   }
-  localStorage.setItem('gd_interior_projects_v1', JSON.stringify(current));
+  try {
+    localStorage.setItem('gd_interior_projects_v1', JSON.stringify(current));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_projects_updated'));
+    }
+  } catch (e) {}
   return updated;
 };
 
 // ==========================================
-// SECTION D: Design & 3D Renders
+// SECTION D: INTERIOR DESIGN MANAGEMENT & WORKSPACE (Section 9)
 // ==========================================
+export type InteriorDesignCategory =
+  | 'SPACE_PLANNING' // 9B: Space Planning & Furniture Layout
+  | 'LAYOUT_2D' // 9C: 2D Working CAD Plans
+  | 'VISUALIZATION_3D' // 9D: 3D Photorealistic Renders
+  | 'MATERIAL_FINISHES' // 9E: Material and Finish Selection
+  | 'MOOD_BOARD';
+
 export interface InteriorDesignAsset {
   id: string;
+  documentId: string; // BG-DOC-INT-XXXX
   projectId: string;
   projectName: string;
   title: string;
-  category: '2D_LAYOUT' | '3D_RENDER' | 'MOOD_BOARD' | 'CEILING_LIGHTING' | 'ELEVATION';
-  version: string;
+  category: InteriorDesignCategory;
+  roomName: string;
+  version: string; // 'v1.0', 'v2.0'
   fileUrl: string;
   thumbnailUrl: string;
   fileSize: string;
+  dimensionsOrSpecs?: string;
+  uploadedBy: string;
   uploadedAt: string;
-  clientApprovalStatus: 'APPROVED' | 'PENDING' | 'REVISION_REQUESTED';
+  adminReviewStatus: 'PENDING_ADMIN_REVIEW' | 'APPROVED_BY_ADMIN' | 'REVISION_REQUESTED';
+  adminFeedback?: string;
+  clientApprovalStatus: 'PENDING_CUSTOMER_REVIEW' | 'APPROVED' | 'REVISION_REQUESTED';
   clientFeedback?: string;
+  isLatestApproved: boolean;
+  versionHistory?: { version: string; fileUrl: string; uploadedAt: string; comments?: string }[];
 }
 
-export const SEED_INTERIOR_DESIGN_ASSETS: InteriorDesignAsset[] = [];
+export const TEST_INTERIOR_DESIGN_ASSETS: InteriorDesignAsset[] = [
+  {
+    id: 'asset-int-1',
+    documentId: 'BG-DOC-INT-101',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    title: 'Living Room 4K Photorealistic Evening Render',
+    category: 'VISUALIZATION_3D',
+    roomName: 'Living & Dining Room',
+    version: 'v1.0',
+    fileUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=400&q=80',
+    fileSize: '4.8 MB (PNG)',
+    dimensionsOrSpecs: '3840 x 2160 • 4K UHD Render • 3ds Max + V-Ray 6',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-12T14:30:00Z',
+    adminReviewStatus: 'APPROVED_BY_ADMIN',
+    clientApprovalStatus: 'APPROVED',
+    isLatestApproved: true,
+  },
+  {
+    id: 'asset-int-2',
+    documentId: 'BG-DOC-INT-102',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    title: 'Island Modular Kitchen Working CAD Layout & Elevations',
+    category: 'LAYOUT_2D',
+    roomName: 'Modular Kitchen',
+    version: 'v1.0',
+    fileUrl: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=400&q=80',
+    fileSize: '2.1 MB (DWG/PDF)',
+    dimensionsOrSpecs: 'Scale 1:25 • Blum Tandembox & Aventos Lift-Up Specs',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-14T11:00:00Z',
+    adminReviewStatus: 'APPROVED_BY_ADMIN',
+    clientApprovalStatus: 'APPROVED',
+    isLatestApproved: true,
+  },
+  {
+    id: 'asset-int-3',
+    documentId: 'BG-DOC-INT-103',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    title: 'Floor Zoning & Spatial Clearance Plan',
+    category: 'SPACE_PLANNING',
+    roomName: 'Full Penthouse',
+    version: 'v1.0',
+    fileUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80',
+    fileSize: '3.4 MB (PDF)',
+    dimensionsOrSpecs: 'Anthropometric Clearances • 2800 sq ft Master Layout',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-08T09:00:00Z',
+    adminReviewStatus: 'APPROVED_BY_ADMIN',
+    clientApprovalStatus: 'APPROVED',
+    isLatestApproved: true,
+  },
+  {
+    id: 'asset-int-4',
+    documentId: 'BG-DOC-INT-104',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    title: 'Luxury Material & Hardware Swatch Schedule',
+    category: 'MATERIAL_FINISHES',
+    roomName: 'Living & Kitchen',
+    version: 'v1.0',
+    fileUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=400&q=80',
+    fileSize: '5.2 MB (PDF)',
+    dimensionsOrSpecs: 'Statuario Marble • Greenlam 710 • Century Natural Teak • Blum Antaro',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-16T16:00:00Z',
+    adminReviewStatus: 'APPROVED_BY_ADMIN',
+    clientApprovalStatus: 'APPROVED',
+    isLatestApproved: true,
+  },
+  {
+    id: 'asset-int-5',
+    documentId: 'BG-DOC-INT-105',
+    projectId: 'prj-int-2',
+    projectName: 'Scandinavian Minimalist Penthouse',
+    title: 'Master Bedroom Nordic Oak Headboard 3D Render',
+    category: 'VISUALIZATION_3D',
+    roomName: 'Master Bedroom Suite',
+    version: 'v1.1',
+    fileUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80',
+    fileSize: '4.2 MB (PNG)',
+    dimensionsOrSpecs: '3840 x 2160 • Daylight Ambience • Light Oak Louvers',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-20T15:00:00Z',
+    adminReviewStatus: 'APPROVED_BY_ADMIN',
+    clientApprovalStatus: 'PENDING_CUSTOMER_REVIEW',
+    isLatestApproved: false,
+  },
+  {
+    id: 'asset-int-6',
+    documentId: 'BG-DOC-INT-106',
+    projectId: 'prj-int-2',
+    projectName: 'Scandinavian Minimalist Penthouse',
+    title: 'Ceiling False Cove & Lighting Wiring Schedule',
+    category: 'LAYOUT_2D',
+    roomName: 'Living & Bedroom',
+    version: 'v1.0',
+    fileUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=80',
+    fileSize: '1.9 MB (DWG)',
+    dimensionsOrSpecs: 'Magnetic 3000K Tracks • Perimeter Gyproc Cove Rafters',
+    uploadedBy: 'Ar. Pooja Mehra',
+    uploadedAt: '2026-11-18T10:00:00Z',
+    adminReviewStatus: 'PENDING_ADMIN_REVIEW',
+    clientApprovalStatus: 'PENDING_CUSTOMER_REVIEW',
+    isLatestApproved: false,
+  },
+];
 
-export const getInteriorDesignAssets = (projectId?: string): InteriorDesignAsset[] => {
+export const SEED_INTERIOR_DESIGN_ASSETS: InteriorDesignAsset[] = TEST_INTERIOR_DESIGN_ASSETS;
+
+export const getInteriorDesignAssets = (projectId?: string, category?: string): InteriorDesignAsset[] => {
   try {
     const data = localStorage.getItem('gd_interior_assets_v1');
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return projectId ? parsed.filter((a: InteriorDesignAsset) => a.projectId === projectId) : parsed;
+        let filtered = parsed;
+        if (projectId && projectId !== 'ALL') {
+          filtered = filtered.filter((a: InteriorDesignAsset) => a.projectId === projectId);
+        }
+        if (category && category !== 'ALL') {
+          filtered = filtered.filter((a: InteriorDesignAsset) => a.category === category);
+        }
+        return filtered;
       }
     }
   } catch (e) {}
-  return projectId ? SEED_INTERIOR_DESIGN_ASSETS.filter((a) => a.projectId === projectId) : SEED_INTERIOR_DESIGN_ASSETS;
+  let defaults = TEST_INTERIOR_DESIGN_ASSETS;
+  if (projectId && projectId !== 'ALL') {
+    defaults = defaults.filter((a) => a.projectId === projectId);
+  }
+  if (category && category !== 'ALL') {
+    defaults = defaults.filter((a) => a.category === category);
+  }
+  return defaults;
 };
+
+export const saveInteriorDesignAsset = (asset: Partial<InteriorDesignAsset>): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const existingIdx = all.findIndex((a) => a.id === asset.id || (asset.documentId && a.documentId === asset.documentId));
+  const now = new Date().toISOString();
+
+  let updated: InteriorDesignAsset;
+  if (existingIdx >= 0) {
+    updated = {
+      ...all[existingIdx],
+      ...asset,
+    } as InteriorDesignAsset;
+    all[existingIdx] = updated;
+  } else {
+    updated = {
+      id: asset.id || `asset-int-${Date.now()}`,
+      documentId: asset.documentId || `BG-DOC-INT-${Math.floor(100 + Math.random() * 900)}`,
+      projectId: asset.projectId || 'prj-int-1',
+      projectName: asset.projectName || 'Interior Project',
+      title: asset.title || 'Design Submission',
+      category: asset.category || 'VISUALIZATION_3D',
+      roomName: asset.roomName || 'Living Room',
+      version: asset.version || 'v1.0',
+      fileUrl: asset.fileUrl || 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1600',
+      thumbnailUrl: asset.thumbnailUrl || asset.fileUrl || 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=400',
+      fileSize: asset.fileSize || '3.5 MB (PNG)',
+      dimensionsOrSpecs: asset.dimensionsOrSpecs || '3840 x 2160 UHD',
+      uploadedBy: asset.uploadedBy || 'Ar. Pooja Mehra',
+      uploadedAt: now,
+      adminReviewStatus: asset.adminReviewStatus || 'PENDING_ADMIN_REVIEW',
+      clientApprovalStatus: asset.clientApprovalStatus || 'PENDING_CUSTOMER_REVIEW',
+      isLatestApproved: asset.isLatestApproved || false,
+    };
+    all.unshift(updated);
+  }
+
+  try {
+    localStorage.setItem('gd_interior_assets_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_assets_updated'));
+    }
+  } catch (e) {}
+
+  return updated;
+};
+
+export const submitDesignAssetToAdmin = (assetId: string, notes?: string): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  asset.adminReviewStatus = 'PENDING_ADMIN_REVIEW';
+  if (notes) {
+    asset.dimensionsOrSpecs = asset.dimensionsOrSpecs ? `${asset.dimensionsOrSpecs} | Note: ${notes}` : notes;
+  }
+  return saveInteriorDesignAsset(asset);
+};
+
+export const adminReviewDesignAsset = (
+  assetId: string,
+  action: 'APPROVE' | 'REJECT' | 'REQUEST_REVISION',
+  feedback?: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  if (action === 'APPROVE') {
+    asset.adminReviewStatus = 'APPROVED_BY_ADMIN';
+    asset.clientApprovalStatus = 'PENDING_CUSTOMER_REVIEW';
+    asset.isLatestApproved = true;
+  } else if (action === 'REQUEST_REVISION') {
+    asset.adminReviewStatus = 'REVISION_REQUESTED';
+    asset.adminFeedback = feedback;
+  } else {
+    asset.adminReviewStatus = 'REVISION_REQUESTED';
+    asset.adminFeedback = feedback || 'Rejected by Admin';
+  }
+
+  return saveInteriorDesignAsset(asset);
+};
+
+export const customerReviewDesignAsset = (
+  assetId: string,
+  action: 'APPROVE' | 'REQUEST_REVISION',
+  feedback?: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  if (action === 'APPROVE') {
+    asset.clientApprovalStatus = 'APPROVED';
+    asset.isLatestApproved = true;
+  } else {
+    asset.clientApprovalStatus = 'REVISION_REQUESTED';
+    asset.clientFeedback = feedback;
+  }
+
+  return saveInteriorDesignAsset(asset);
+};
+
+export const createDesignAssetRevision = (
+  assetId: string,
+  newFileUrl: string,
+  specs?: string
+): InteriorDesignAsset => {
+  const all = getInteriorDesignAssets();
+  const asset = all.find((a) => a.id === assetId || a.documentId === assetId);
+  if (!asset) throw new Error('Design asset not found');
+
+  const prevVersion = asset.version || 'v1.0';
+  const match = prevVersion.match(/^v?(\d+)/i);
+  const major = match ? parseInt(match[1], 10) : 1;
+  const nextVersion = `v${major + 1}.0`;
+
+  const snapshot = {
+    version: prevVersion,
+    fileUrl: asset.fileUrl,
+    uploadedAt: asset.uploadedAt,
+    comments: asset.clientFeedback || asset.adminFeedback,
+  };
+
+  asset.versionHistory = [...(asset.versionHistory || []), snapshot];
+  asset.version = nextVersion;
+  asset.fileUrl = newFileUrl;
+  asset.thumbnailUrl = newFileUrl;
+  if (specs) asset.dimensionsOrSpecs = specs;
+  asset.uploadedAt = new Date().toISOString();
+  asset.adminReviewStatus = 'PENDING_ADMIN_REVIEW';
+  asset.clientApprovalStatus = 'PENDING_CUSTOMER_REVIEW';
+  asset.isLatestApproved = false;
+
+  return saveInteriorDesignAsset(asset);
+};
+
 
 // ==========================================
 // SECTION E: ESTIMATION & BOQ (BILL OF QUANTITIES)
