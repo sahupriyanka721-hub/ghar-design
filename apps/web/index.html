@@ -54,5 +54,14 @@
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function() {
+        if (window.location.pathname.endsWith('[') || window.location.hash.endsWith('[')) {
+          var cleanPath = window.location.pathname.replace(/\[+$/, '');
+          var cleanHash = window.location.hash.replace(/\[+$/, '');
+          window.history.replaceState(null, '', (cleanPath || '/') + window.location.search + cleanHash);
+        }
+      })();
+    </script>
   </body>
 </html>

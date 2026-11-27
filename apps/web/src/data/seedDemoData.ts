@@ -1,4 +1,5 @@
 import { broadcastStoreUpdate } from './customerStore.js';
+import { safeSetStorage } from '../lib/safeStorage.js';
 
 export const ensureDemoDataInitialized = (forceReload: boolean = false): void => {
   if (typeof window === 'undefined' || !window.localStorage) return;
@@ -844,31 +845,28 @@ export const ensureDemoDataInitialized = (forceReload: boolean = false): void =>
   ];
 
   try {
-    localStorage.setItem('gd_architect_accounts_v2', JSON.stringify(sampleArchitects));
-    localStorage.setItem('platform_project_requests', JSON.stringify(sampleRequests));
-    localStorage.setItem('platform_quotations', JSON.stringify(sampleQuotations));
-    localStorage.setItem('gd_projects_v1', JSON.stringify(sampleProjects));
-    localStorage.setItem('platform_execution_projects', JSON.stringify(sampleProjects));
-    localStorage.setItem('ghar_architect_designs', JSON.stringify(sampleDesigns));
-    localStorage.setItem('ghar_architect_boqs', JSON.stringify(sampleBOQs));
-    localStorage.setItem('ghar_architect_site_visits', JSON.stringify(sampleSiteVisits));
-    localStorage.setItem('ghar_architect_deliverables', JSON.stringify(sampleDeliverables));
-    localStorage.setItem('ghar_architect_reviews', JSON.stringify(sampleReviews));
-    localStorage.setItem('ghar_architect_notifications', JSON.stringify(sampleNotifications));
+    safeSetStorage('gd_architect_accounts_v2', sampleArchitects);
+    safeSetStorage('platform_project_requests', sampleRequests);
+    safeSetStorage('platform_quotations', sampleQuotations);
+    safeSetStorage('gd_projects_v1', sampleProjects);
+    safeSetStorage('platform_execution_projects', sampleProjects);
+    safeSetStorage('ghar_architect_designs', sampleDesigns);
+    safeSetStorage('ghar_architect_boqs', sampleBOQs);
+    safeSetStorage('ghar_architect_site_visits', sampleSiteVisits);
+    safeSetStorage('ghar_architect_deliverables', sampleDeliverables);
+    safeSetStorage('ghar_architect_reviews', sampleReviews);
+    safeSetStorage('ghar_architect_notifications', sampleNotifications);
 
     // Also populate primary customer session if not logged in
     const activeUser = localStorage.getItem('user');
     if (!activeUser) {
-      localStorage.setItem(
-        'user',
-        JSON.stringify({
-          id: 'cust-4819',
-          name: 'Rohit Malhotra',
-          phone: '9876543210',
-          email: 'rohit.malhotra@gmail.com',
-          role: 'CUSTOMER',
-        })
-      );
+      safeSetStorage('user', {
+        id: 'cust-4819',
+        name: 'Rohit Malhotra',
+        phone: '9876543210',
+        email: 'rohit.malhotra@gmail.com',
+        role: 'CUSTOMER',
+      });
     }
 
     broadcastStoreUpdate('PROJECT_REQUESTS_UPDATED');

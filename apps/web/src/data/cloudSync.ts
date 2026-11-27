@@ -155,16 +155,23 @@ async function syncFetch(method: 'GET' | 'POST', payload?: any): Promise<any> {
   if (candidateApi) {
     try {
       const url = `${candidateApi.replace(/\/$/, '')}/api/sync`;
-      const res = await fetch(method === 'GET' ? `${url}?t=${Date.now()}` : url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        ...(payload ? { body: JSON.stringify(payload) } : {}),
-      });
-      if (res.ok) {
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-          return await res.json();
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 7000) : null;
+      try {
+        const res = await fetch(method === 'GET' ? `${url}?t=${Date.now()}` : url, {
+          method,
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          ...(payload ? { body: JSON.stringify(payload) } : {}),
+          signal: controller ? controller.signal : undefined,
+        });
+        if (res.ok) {
+          const ct = res.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            return await res.json();
+          }
         }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     } catch (e) {
       console.debug('Render API sync attempt error:', e);

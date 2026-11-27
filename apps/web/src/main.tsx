@@ -12,13 +12,25 @@ import { ensureDemoDataInitialized } from './data/seedDemoData.js';
 import './index.css';
 
 // Universal pre-boot data sanitization to prevent any schema corruption crashes
-sanitizeStorage();
+try {
+  sanitizeStorage();
+} catch (e) {
+  console.warn('[Bootstrap] sanitizeStorage error:', e);
+}
 
 // Ensure rich, realistic demo data is initialized for review & testing
-ensureDemoDataInitialized();
+try {
+  ensureDemoDataInitialized();
+} catch (e) {
+  console.warn('[Bootstrap] ensureDemoDataInitialized error:', e);
+}
 
 // Initialize background real-time cloud database synchronization with 30s interval
-initAutoCloudSync(30000);
+try {
+  initAutoCloudSync(30000);
+} catch (e) {
+  console.warn('[Bootstrap] initAutoCloudSync error:', e);
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

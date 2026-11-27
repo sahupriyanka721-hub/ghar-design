@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:web": "vite build",
+    "build": "vite build && node -e \"const fs=require('fs'); if(fs.existsSync('../../package.json')){try{fs.cpSync('dist', '../../dist', {recursive:true});}catch(e){}}\"",
+    "build:web": "vite build && node -e \"const fs=require('fs'); if(fs.existsSync('../../package.json')){try{fs.cpSync('dist', '../../dist', {recursive:true});}catch(e){}}\"",
     "preview": "vite preview",
     "test": "vitest run"
   },
