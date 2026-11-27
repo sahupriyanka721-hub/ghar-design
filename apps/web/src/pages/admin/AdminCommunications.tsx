@@ -237,11 +237,6 @@ export const AdminCommunications: React.FC = () => {
     };
   }, []);
 
-  const activeThread = useMemo(() => {
-    if (!selectedThreadId) return filteredThreads[0] || threads[0] || null;
-    return filteredThreads.find((t) => t.id === selectedThreadId) || filteredThreads[0] || threads[0] || null;
-  }, [filteredThreads, threads, selectedThreadId]);
-
   // Sub-feature counts
   const subCounts = useMemo(() => {
     return {
@@ -346,6 +341,11 @@ export const AdminCommunications: React.FC = () => {
       return true;
     });
   }, [threads, selectedView, statusFilter, categoryFilter, searchQuery]);
+
+  const activeThread = useMemo(() => {
+    if (!selectedThreadId) return filteredThreads[0] || threads[0] || null;
+    return filteredThreads.find((t) => t.id === selectedThreadId) || filteredThreads[0] || threads[0] || null;
+  }, [filteredThreads, threads, selectedThreadId]);
 
   // Keep selectedThreadId aligned with filtered list
   useEffect(() => {

@@ -41,6 +41,7 @@ import {
   History,
   Upload,
   Calculator,
+  ChevronDown,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import { formatDate } from '../../lib/utils.js';
