@@ -8,6 +8,11 @@ import { broadcastStoreUpdate, getPlatformRequests } from './customerStore.js';
 import { DEFAULT_STAGES_BLUEPRINT } from './projectTimelineStore.js';
 
 export type ProjectStatus =
+  | 'PENDING_ADMIN_REVIEW'
+  | 'AGREEMENT_PENDING'
+  | 'ADVANCE_PAYMENT_PENDING'
+  | 'READY_FOR_KICKOFF'
+  | 'ACTIVE'
   | 'AWAITING_KICKOFF'
   | 'START_REQUESTED'
   | 'SCHEDULED'
@@ -18,7 +23,8 @@ export type ProjectStatus =
   | 'AWAITING_CUSTOMER_APPROVAL'
   | 'COMPLETED'
   | 'HANDED_OVER'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'DISPUTED';
 
 export type StageStatus =
   | 'NOT_STARTED'
@@ -238,7 +244,8 @@ export interface ProjectKickoffInfo {
 }
 
 export interface ExecutionProject {
-  id: string; // e.g. PRJ-2026-101
+  id: string; // e.g. BG-2026-0001
+  code?: string; // Compatibility alias
   requestCode: string;
   quotationId: string;
   quotationCode: string;
@@ -532,6 +539,179 @@ export const saveExecutionProject = (project: ExecutionProject): void => {
   }
 };
 
+export const generateNextProjectId = (): string => {
+  const existing = getExecutionProjects();
+  let maxSeq = 0;
+  existing.forEach((p) => {
+    const idStr = p.id || p.projectCode || '';
+    const match = idStr.match(/BG-2026-(\d+)/i) || idStr.match(/PRJ-2026-(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+  });
+  const nextSeq = maxSeq + 1;
+  return `BG-2026-${String(nextSeq).padStart(4, '0')}`;
+};
+
+/**
+ * Section 9 Kickoff Approval: Transitions project from PENDING/READY status to ACTIVE.
+ * Records timestamp, confirms advance payment, and initiates execution tracking.
+ */
+export const approveProjectKickoff = (projectId: string, notes?: string): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedProject: ExecutionProject = {
+    ...project,
+    status: 'ACTIVE',
+    actualStartDate: now,
+    startDate: project.startDate || now,
+    kickoff: {
+      ...project.kickoff,
+      confirmedAt: now,
+      advancePaid: true,
+      contractAgreed: true,
+      siteDemarcationReady: true,
+      sanctionReceived: true,
+      utilityConnectionReady: true,
+      specialInstructions: notes || project.kickoff?.specialInstructions || 'Official kickoff approved by Admin Desk.',
+    },
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Updates individual items in the Section 9 Pre-commencement Verification Checklist.
+ */
+export const updateProjectKickoffChecklist = (
+  projectId: string,
+  checklist: Partial<ProjectKickoffInfo>
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const mergedKickoff: ProjectKickoffInfo = {
+    ...project.kickoff,
+    ...checklist,
+  };
+
+  // If all critical readiness criteria are met, transition status to READY_FOR_KICKOFF
+  const isReady =
+    mergedKickoff.contractAgreed &&
+    mergedKickoff.advancePaid &&
+    mergedKickoff.siteDemarcationReady &&
+    mergedKickoff.sanctionReceived;
+
+  let newStatus = project.status;
+  if (isReady && (project.status === 'PENDING_ADMIN_REVIEW' || project.status === 'AGREEMENT_PENDING' || project.status === 'ADVANCE_PAYMENT_PENDING')) {
+    newStatus = 'READY_FOR_KICKOFF';
+  }
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    status: newStatus,
+    kickoff: mergedKickoff,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Reassigns architect, contractor, or interior designer to a project.
+ */
+export const reassignProjectTeam = (
+  projectId: string,
+  params: {
+    architectId?: string;
+    architectName?: string;
+    architectFirm?: string;
+    contractorId?: string;
+    contractorName?: string;
+    contractorFirm?: string;
+    interiorDesignerId?: string;
+    interiorDesignerName?: string;
+  }
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const updatedProject: ExecutionProject = {
+    ...project,
+    architectId: params.architectId !== undefined ? params.architectId : project.architectId,
+    architectName: params.architectName !== undefined ? params.architectName : project.architectName,
+    contractorId: params.contractorId !== undefined ? params.contractorId : project.contractorId,
+    contractorName: params.contractorName !== undefined ? params.contractorName : project.contractorName,
+    contractorFirm: params.contractorFirm !== undefined ? params.contractorFirm : project.contractorFirm,
+    interiorDesignerId: params.interiorDesignerId !== undefined ? params.interiorDesignerId : project.interiorDesignerId,
+    interiorDesignerName: params.interiorDesignerName !== undefined ? params.interiorDesignerName : project.interiorDesignerName,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Flags delay or places a project on hold with specific reason notes.
+ */
+export const flagProjectDelayOrHold = (
+  projectId: string,
+  status: 'DELAYED' | 'ON_HOLD' | 'ACTIVE',
+  reason: string
+): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedProject: ExecutionProject = {
+    ...project,
+    status,
+    kickoff: {
+      ...project.kickoff,
+      pauseReason: status !== 'ACTIVE' ? reason : undefined,
+    },
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
+/**
+ * Marks project fully completed and executes final settlement handover.
+ */
+export const completeProjectClosure = (projectId: string, notes?: string): ExecutionProject | undefined => {
+  const project = getExecutionProjectById(projectId);
+  if (!project) return undefined;
+
+  const now = new Date().toISOString();
+  const updatedProject: ExecutionProject = {
+    ...project,
+    status: 'COMPLETED',
+    actualEndDate: now,
+    overallVerifiedProgress: 100,
+    overallReportedProgress: 100,
+    handover: {
+      ...project.handover,
+      status: 'HANDED_OVER',
+      possessionSignoff: true,
+      handoverDate: now,
+      completionSummary: notes || 'Project successfully completed and handed over to homeowner.',
+    },
+    updatedAt: now,
+  };
+
+  saveExecutionProject(updatedProject);
+  return updatedProject;
+};
+
 /**
  * Creates and initializes a formal project when a quotation is accepted
  */
@@ -541,11 +721,23 @@ export const createProjectFromAcceptedQuotation = (params: {
   quotation: { id: string; quotationCode: string; finalAmountPaise: number; advancePercentage?: number; scopeOfWork?: string; professional?: { id?: string; name?: string; firmName?: string; phone?: string } };
   bookingCode?: string;
 }): ExecutionProject => {
+  // 1. Idempotency Check: Do not create duplicate project records when a customer clicks Accept multiple times
+  const existing = getExecutionProjects();
+  const alreadyCreated = existing.find(
+    (p) =>
+      (params.quotation.id && (p.quotationId === params.quotation.id || p.quotationCode === params.quotation.id)) ||
+      (params.quotation.quotationCode && (p.quotationCode === params.quotation.quotationCode || p.quotationId === params.quotation.quotationCode)) ||
+      (params.request.requestCode && p.requestCode === params.request.requestCode)
+  );
+  if (alreadyCreated) {
+    return alreadyCreated;
+  }
+
   const now = new Date().toISOString();
-  const projSeq = Math.floor(1000 + Math.random() * 9000);
-  const projectId = `PRJ-2026-${projSeq}`;
-  const workOrderNumber = `WO-2026-${projSeq}`;
-  const bookingCode = params.bookingCode || `GHR-BK-2026-${projSeq}`;
+  // Shared Project ID (Section 9 Specification: BG-2026-0001)
+  const projectId = generateNextProjectId();
+  const workOrderNumber = `WO-${projectId}`;
+  const bookingCode = params.bookingCode || `BK-${projectId}`;
 
   const totalPaise = params.quotation.finalAmountPaise || 150000000;
   const advPct = params.quotation.advancePercentage || 15;
@@ -556,9 +748,11 @@ export const createProjectFromAcceptedQuotation = (params: {
 
   const initialProject: ExecutionProject = {
     id: projectId,
-    requestCode: params.request.requestCode || `REQ-${projSeq}`,
+    projectCode: projectId,
+    code: projectId,
+    requestCode: params.request.requestCode || `REQ-${projectId}`,
     quotationId: params.quotation.id,
-    quotationCode: params.quotation.quotationCode || `QT-2026-${projSeq}`,
+    quotationCode: params.quotation.quotationCode || `QT-${projectId}`,
     bookingCode,
     workOrderNumber,
     name: `${params.request.serviceType || 'Civil Construction'} - ${params.request.locality || params.request.city}`,
@@ -590,6 +784,8 @@ export const createProjectFromAcceptedQuotation = (params: {
     contractorFirm: params.quotation.professional?.firmName || 'Certified Engineering Associate',
     contractorPhone: params.quotation.professional?.phone || '+91 98765 00000',
     contractorRole: 'Principal Civil Engineer & Contractor',
+    architectId: params.quotation.professional?.id || 'ARC-2026-001',
+    architectName: params.quotation.professional?.name || 'Lead Architect Partner',
     contractValuePaise: totalPaise,
     originalContractPaise: totalPaise,
     approvedVariationsPaise: 0,
@@ -597,7 +793,7 @@ export const createProjectFromAcceptedQuotation = (params: {
     amountAwaitingApprovalPaise: 0,
     amountDuePaise: advancePaise,
     retentionPaise: Math.round(totalPaise * 0.05), // 5% Defect liability retention
-    status: 'AWAITING_KICKOFF',
+    status: 'PENDING_ADMIN_REVIEW',
     plannedStartDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     plannedEndDate: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
     currentStage: 'Stage 1: Working Drawings & Sanctions',
