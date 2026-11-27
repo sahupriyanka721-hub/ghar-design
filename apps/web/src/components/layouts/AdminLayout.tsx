@@ -348,88 +348,9 @@ export const AdminLayout: React.FC = () => {
   const [activeRole, setActiveRoleState] = useState<MasterAdminRole>(getActiveAdminRole());
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    '/admin/architects': true,
-    '/admin/requests': true,
-    '/admin/assignments': true,
-    '/admin/quotations': true,
-    '/admin/projects': true,
-    '/admin/documents': true,
-    '/admin/timeline': true,
-    '/admin/payments': true,
-    '/admin/payouts': true,
-    '/admin/invoices': true,
-    '/admin/communications': true,
-    '/admin/support': true,
-    '/admin/reports': true,
-    '/admin/notifications': true,
-    '/admin/cms': true,
-    '/admin/services-config': true,
-    '/admin/staff': true,
-    '/admin/settings': true,
-    '/admin/audit-logs': true,
-  });
+  // All submenus closed by default; only open when explicitly clicked by user
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const { success } = useToast();
-
-  useEffect(() => {
-    if (location.pathname.startsWith('/admin/architects')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/architects': true }));
-    }
-    if (location.pathname.startsWith('/admin/requests')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/requests': true }));
-    }
-    if (location.pathname.startsWith('/admin/assignments')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/assignments': true }));
-    }
-    if (location.pathname.startsWith('/admin/quotations')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/quotations': true }));
-    }
-    if (location.pathname.startsWith('/admin/projects')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/projects': true }));
-    }
-    if (location.pathname.startsWith('/admin/documents')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/documents': true }));
-    }
-    if (location.pathname.startsWith('/admin/timeline')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/timeline': true }));
-    }
-    if (location.pathname.startsWith('/admin/payments')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/payments': true }));
-    }
-    if (location.pathname.startsWith('/admin/payouts')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/payouts': true }));
-    }
-    if (location.pathname.startsWith('/admin/invoices')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/invoices': true }));
-    }
-    if (location.pathname.startsWith('/admin/communications')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/communications': true }));
-    }
-    if (location.pathname.startsWith('/admin/support')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/support': true }));
-    }
-    if (location.pathname.startsWith('/admin/reports')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/reports': true }));
-    }
-    if (location.pathname.startsWith('/admin/notifications')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/notifications': true }));
-    }
-    if (location.pathname.startsWith('/admin/cms')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/cms': true }));
-    }
-    if (location.pathname.startsWith('/admin/services-config') || location.pathname.startsWith('/admin/categories')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/services-config': true }));
-    }
-    if (location.pathname.startsWith('/admin/staff')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/staff': true }));
-    }
-    if (location.pathname.startsWith('/admin/settings')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/settings': true }));
-    }
-    if (location.pathname.startsWith('/admin/audit-logs')) {
-      setExpandedMenus((prev) => ({ ...prev, '/admin/audit-logs': true }));
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     const onRoleSwitched = (e: any) => {
