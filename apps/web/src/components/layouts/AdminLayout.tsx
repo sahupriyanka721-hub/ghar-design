@@ -8,6 +8,14 @@ import { SectionErrorBoundary } from '../common/SectionErrorBoundary.js';
 import { getAdminByPhone } from '../../data/customerStore.js';
 import { pullFromCloud, pushToCloud } from '../../data/cloudSync.js';
 import {
+  MasterAdminRole,
+  ADMIN_ROLE_DEFINITIONS,
+  INITIAL_ADMIN_STAFF_V2,
+  getActiveAdminRole,
+  setActiveAdminRole,
+  hasAdminPermission,
+} from '../../data/adminRbacStore.js';
+import {
   LayoutDashboard,
   Users,
   Layers,
@@ -47,6 +55,9 @@ import {
   Megaphone,
   Tag,
   MapPin,
+  Sparkles,
+  HelpCircle,
+  FolderGit2,
 } from 'lucide-react';
 /**
  * AdminAuthGate
@@ -158,6 +169,34 @@ const AdminAuthGate: React.FC = () => {
         </div>
         {/* Compact Card Body */}
         <div className="bg-white/95 backdrop-blur-xl border border-sky-200/90 rounded-2xl p-5 sm:p-6 shadow-[0_15px_35px_rgba(14,165,233,0.12)] space-y-4">
+          {/* Quick RBAC Test Persona Picker */}
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+              <span>Quick Test Personas (8 Roles)</span>
+              <Sparkles className="w-3 h-3 text-amber-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1 scrollbar-thin">
+              {INITIAL_ADMIN_STAFF_V2.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setPhone(p.phone);
+                    setName(p.name);
+                    setActiveAdminRole(p.role);
+                  }}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:border-sky-400 bg-slate-50/70 hover:bg-sky-50 text-left transition flex items-center gap-1.5 cursor-pointer text-[10px]"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+                  <div className="truncate">
+                    <div className="font-bold text-navy-950 truncate">{p.name.split(' ')[0]}</div>
+                    <div className="text-[9px] text-slate-500 uppercase font-mono truncate">{p.role.replace('_ADMIN', '').replace('_MANAGER', '')}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {step === 'PHONE' ? (
             <form onSubmit={handleRequestOtp} className="space-y-3.5">
               <div>
@@ -304,9 +343,19 @@ export const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [activeRole, setActiveRoleState] = useState<MasterAdminRole>(getActiveAdminRole());
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { success } = useToast();
+
+  useEffect(() => {
+    const onRoleSwitched = (e: any) => {
+      setActiveRoleState(e.detail || getActiveAdminRole());
+    };
+    window.addEventListener('admin_role_switched', onRoleSwitched);
+    return () => window.removeEventListener('admin_role_switched', onRoleSwitched);
+  }, []);
 
   const handleGlobalRefresh = async () => {
     setRefreshing(true);
@@ -328,6 +377,7 @@ export const AdminLayout: React.FC = () => {
       setTimeout(() => setRefreshing(false), 600);
     }
   };
+
   const handleAdminLogout = () => {
     setProfileDropdownOpen(false);
     setSidebarOpen(false);
@@ -345,8 +395,10 @@ export const AdminLayout: React.FC = () => {
     success('Logged out of Admin Console successfully.');
     window.location.href = '/admin';
   };
+
   const configuredPhone = (import.meta.env.VITE_ADMIN_PHONE || '8319955741').replace(/\D/g, '').slice(-10);
   const userPhone = (user?.phone || '').replace(/\D/g, '').slice(-10);
+  
   // Strict RBAC gate: Only authenticated users with role === 'ADMIN'
   const isAuthorizedAdmin = Boolean(
     user &&
@@ -356,6 +408,7 @@ export const AdminLayout: React.FC = () => {
   if (!isAuthorizedAdmin) {
     return <AdminAuthGate />;
   }
+
   const handleAdminSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -407,58 +460,65 @@ export const AdminLayout: React.FC = () => {
     }
     setSearchQuery('');
   };
+
   const navSections = [
     {
-      title: 'Overview & Security',
+      title: '1. Core Governance & RBAC',
       items: [
-        { label: 'Admin Overview', path: '/admin', icon: LayoutDashboard, exact: true },
+        { label: 'Dashboard / Overview', path: '/admin', icon: LayoutDashboard, exact: true },
+        { label: 'Admin Users & RBAC (8 Roles)', path: '/admin/staff', icon: Lock },
         { label: 'Security Audit Trail', path: '/admin/audit-logs', icon: ShieldCheck },
+        { label: 'Platform Global Settings', path: '/admin/settings', icon: Sliders },
       ],
     },
     {
-      title: 'Stakeholder Ecosystem',
+      title: '2. Stakeholder Ecosystem & KYC',
       items: [
-        { label: 'Customers Directory', path: '/admin/customers', icon: Users },
-        { label: 'Contractors Directory & KYC', path: '/admin/contractors', icon: HardHat },
+        { label: 'Customer Management', path: '/admin/customers', icon: Users },
+        { label: 'Architect Management & COA', path: '/admin/architects', icon: Compass },
+        { label: 'Contractor Directory & KYC', path: '/admin/contractors', icon: HardHat },
+        { label: 'Interior Designers Network', path: '/admin/interior-designers', icon: Palette },
         { label: 'Material Vendors & Depots', path: '/admin/vendors', icon: Store },
-        { label: 'Architects Network', path: '/admin/architects', icon: Compass },
-        { label: 'Interior Designers', path: '/admin/interior-designers', icon: Palette },
-        { label: 'Professional Verification', path: '/admin/professionals', icon: UserCheck },
-        { label: 'Platform Staff & RBAC', path: '/admin/staff', icon: Lock },
       ],
     },
     {
-      title: 'Operations & Execution',
+      title: '3. Quotation & Assignment Desk',
       items: [
-        { label: 'Customer Requests & Inquiries', path: '/admin/requests', icon: FileText },
-        { label: 'Quotations Review & Publish', path: '/admin/quotations', icon: FileCheck2 },
-        { label: 'Confirmed Bookings', path: '/admin/bookings', icon: CalendarCheck },
-        { label: 'Projects & Team Matching', path: '/admin/projects', icon: Briefcase },
-        { label: 'Site Timeline & Milestones', path: '/admin/timeline', icon: HardHat },
-        { label: 'Legal Agreements (Print)', path: '/admin/agreements', icon: ShieldAlert },
-        { label: 'Service Categories', path: '/admin/categories', icon: Layers },
+        { label: 'Quotation Request Inbox', path: '/admin/requests', icon: FileText },
+        { label: 'Architect Assignment Desk', path: '/admin/assignments', icon: Briefcase },
+        { label: 'Quotation Review & Publish', path: '/admin/quotations', icon: FileCheck2 },
+        { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
+        { label: 'Service & Category Pricing', path: '/admin/categories', icon: Layers },
       ],
     },
     {
-      title: 'Commerce & Financials',
+      title: '4. Project Management & Delivery',
       items: [
-        { label: 'Material Orders (Store)', path: '/admin/materials', icon: ShoppingBag },
-        { label: 'Escrow Payouts & Settlements', path: '/admin/payments', icon: CreditCard },
-        { label: 'Cost Estimator Rates', path: '/admin/calculator', icon: Calculator },
-        { label: 'Financial Reports & GMV', path: '/admin/reports', icon: BarChart3 },
+        { label: 'Central Project Management', path: '/admin/projects', icon: FolderGit2 },
+        { label: 'Design & Document Management', path: '/admin/documents', icon: FileCheck2 },
+        { label: 'Milestone & Progress Verification', path: '/admin/timeline', icon: HardHat },
+        { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
+        { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
       ],
     },
     {
-      title: 'Growth & System Control',
+      title: '5. Finance, Payouts & Resolutions',
       items: [
-        { label: 'Support & Grievance Desk', path: '/admin/support', icon: LifeBuoy },
-        { label: 'Broadcast Communications', path: '/admin/communications', icon: Megaphone },
-        { label: 'Coupons & Promo Engine', path: '/admin/coupons', icon: Tag },
-        { label: 'Territory & PIN Coverage', path: '/admin/locations', icon: MapPin },
-        { label: 'Global Platform Settings', path: '/admin/settings', icon: Sliders },
+        { label: 'Payment Management & Escrow', path: '/admin/payments', icon: CreditCard },
+        { label: 'Architect Payout Management', path: '/admin/payouts', icon: CreditCard },
+        { label: 'Invoice & Billing Management', path: '/admin/invoices', icon: FileText },
+        { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
+        { label: 'Communication Router (Inbox)', path: '/admin/communications', icon: Megaphone },
+        { label: 'Complaint & Dispute Resolution', path: '/admin/support', icon: LifeBuoy },
+        { label: 'Reports & Analytics (GMV & SLA)', path: '/admin/reports', icon: BarChart3 },
+        { label: 'Notification Broadcast Center', path: '/admin/notifications', icon: Bell },
+        { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
+        { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
       ],
     },
   ];
+
+  const currentRoleMeta = ADMIN_ROLE_DEFINITIONS[activeRole] || ADMIN_ROLE_DEFINITIONS.SUPER_ADMIN;
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#edf4fc] via-[#f7faff] to-[#edf4fc]/70 flex flex-col font-sans">
       {/* ---------------- ADMIN TOP NAVBAR (Light Blue Glassmorphic & Logo Colors) ---------------- */}
@@ -497,6 +557,64 @@ export const AdminLayout: React.FC = () => {
         </form>
         {/* Right Admin Utilities */}
         <div className="flex items-center gap-2.5">
+          {/* Active Admin Persona Role Switcher Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/80 transition text-xs font-bold text-navy-950 shadow-2xs cursor-pointer"
+              title="Switch role mode to test permissions (Super Admin, Quotation Mgr, Finance Mgr, etc.)"
+            >
+              <span className={`w-2 h-2 rounded-full ${activeRole === 'SUPER_ADMIN' ? 'bg-purple-500' : 'bg-blue-500'} animate-pulse`} />
+              <div className="text-left hidden md:block">
+                <span className="text-[9px] text-slate-400 block uppercase font-mono leading-none">Role Mode</span>
+                <span className="text-xs font-black text-navy-950">{currentRoleMeta.title.split(' ')[0]}</span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {roleMenuOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-blue-200/90 py-2 z-50 text-xs text-slate-800">
+                <div className="px-3.5 py-2 border-b border-blue-100 bg-blue-50/50">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                    <span>Admin Roles (8 Personas)</span>
+                    <Crown className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="text-[11px] text-slate-600 mt-0.5">Switch perspective to test role permissions</div>
+                </div>
+                <div className="max-h-64 overflow-y-auto p-1.5 space-y-1 scrollbar-thin">
+                  {(Object.keys(ADMIN_ROLE_DEFINITIONS) as MasterAdminRole[]).map((r) => {
+                    const meta = ADMIN_ROLE_DEFINITIONS[r];
+                    const isSelected = activeRole === r;
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setActiveAdminRole(r);
+                          setActiveRoleState(r);
+                          setRoleMenuOpen(false);
+                          success(`Switched active view to ${meta.title}`);
+                        }}
+                        className={`w-full text-left p-2 rounded-xl transition flex items-start gap-2.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50/90 border border-blue-300 text-blue-950 font-bold'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${isSelected ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                        <div>
+                          <div className="font-bold text-xs text-navy-950">{meta.title}</div>
+                          <div className="text-[10px] text-slate-500 leading-tight">{meta.department}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Global Refresh & Cloud Sync Button */}
           <button
             type="button"

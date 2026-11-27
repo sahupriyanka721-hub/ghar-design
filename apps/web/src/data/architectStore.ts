@@ -1766,6 +1766,7 @@ export const updateArchitectStatus = (
   return current[idx];
 };
 
+export const updateArchitectAccountStatus = updateArchitectStatus;
 export const getRegisteredArchitects = getArchitectAccounts;
 
 export const deleteArchitectAccount = (id: string): boolean => {

@@ -443,7 +443,13 @@ export const App: React.FC = () => {
           <Route path="coverage" element={<AdminLocations />} />
           <Route path="staff" element={<AdminStaff />} />
           <Route path="settings" element={<AdminPlatformSettings />} />
+          <Route path="cms" element={<AdminPlatformSettings />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
+          <Route path="assignments" element={<AdminRequests />} />
+          <Route path="documents" element={<AdminProjects />} />
+          <Route path="payouts" element={<AdminPayments />} />
+          <Route path="invoices" element={<AdminPayments />} />
+          <Route path="notifications" element={<AdminCommunications />} />
         </Route>
 
         {/* Direct Shortcuts for Homeowner Quotation Request */}
