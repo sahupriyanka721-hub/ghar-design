@@ -139,6 +139,8 @@ import { InteriorDesignerTeam } from './pages/interior-designer/InteriorDesigner
 import { InteriorDesignerBilling } from './pages/interior-designer/InteriorDesignerBilling.js';
 import { InteriorDesignerReports } from './pages/interior-designer/InteriorDesignerReports.js';
 import { InteriorDesignerSupport } from './pages/interior-designer/InteriorDesignerSupport.js';
+import { InteriorDesignerMessages } from './pages/interior-designer/InteriorDesignerMessages.js';
+import { InteriorDesignerNotifications } from './pages/interior-designer/InteriorDesignerNotifications.js';
 import { InteriorDesignerSettings } from './pages/interior-designer/InteriorDesignerSettings.js';
 import { AdminInteriorDesigners } from './pages/admin/AdminInteriorDesigners.js';
 
@@ -388,10 +390,15 @@ export const App: React.FC = () => {
           <Route path="milestones" element={<InteriorDesignerMilestones />} />
           <Route path="deliverables" element={<InteriorDesignerMilestones />} />
           <Route path="clients" element={<InteriorDesignerClients />} />
+          <Route path="messages" element={<InteriorDesignerMessages />} />
+          <Route path="communication" element={<InteriorDesignerMessages />} />
+          <Route path="notifications" element={<InteriorDesignerNotifications />} />
           <Route path="team" element={<InteriorDesignerTeam />} />
           <Route path="billing" element={<InteriorDesignerBilling />} />
           <Route path="reports" element={<InteriorDesignerReports />} />
           <Route path="support" element={<InteriorDesignerSupport />} />
+          <Route path="reviews" element={<InteriorDesignerSupport />} />
+          <Route path="disputes" element={<InteriorDesignerSupport />} />
           <Route path="settings" element={<InteriorDesignerSettings />} />
         </Route>
 

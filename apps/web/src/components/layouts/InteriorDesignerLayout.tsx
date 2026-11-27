@@ -26,11 +26,14 @@ import {
   CheckCircle2,
   Bell,
   ArrowRight,
+  MessageSquare,
+  CheckSquare,
+  Star,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo.js';
 import { SectionErrorBoundary } from '../common/SectionErrorBoundary.js';
 import { useAuth } from '../../context/AuthContext.js';
-import { getInteriorDesignerByPhone } from '../../data/interiorDesignerStore.js';
+import { getInteriorDesignerByPhone, getInteriorNotifications } from '../../data/interiorDesignerStore.js';
 
 export const InteriorDesignerLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -55,6 +58,9 @@ export const InteriorDesignerLayout: React.FC = () => {
     }
   }
 
+  const notifications = getInteriorNotifications(user.phone || 'id-101');
+  const unreadNotifs = notifications.filter((n) => !n.read).length;
+
   const navItems = [
     { label: 'A. Dashboard', path: '/interior-designer/dashboard', icon: LayoutDashboard, exact: true },
     { label: 'B. Quotation Management', path: '/interior-designer/quotations', icon: FileCheck2 },
@@ -65,11 +71,13 @@ export const InteriorDesignerLayout: React.FC = () => {
     { label: 'G. Site & Snag List', path: '/interior-designer/site-management', icon: Camera },
     { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
     { label: 'I. Client Management', path: '/interior-designer/clients', icon: Users },
-    { label: 'J. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
-    { label: 'K. Billing & Payments', path: '/interior-designer/billing', icon: CreditCard },
-    { label: 'L. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
-    { label: 'M. Support Desk', path: '/interior-designer/support', icon: LifeBuoy },
-    { label: 'N. Settings', path: '/interior-designer/settings', icon: Sliders },
+    { label: 'J. Communication Desk', path: '/interior-designer/messages', icon: MessageSquare },
+    { label: 'K. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
+    { label: 'L. Billing & Payments', path: '/interior-designer/billing', icon: CreditCard },
+    { label: 'M. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
+    { label: 'N. Support & Disputes', path: '/interior-designer/support', icon: LifeBuoy },
+    { label: 'O. Notifications', path: '/interior-designer/notifications', icon: Bell },
+    { label: 'P. Settings', path: '/interior-designer/settings', icon: Sliders },
   ];
 
   return (
@@ -104,6 +112,20 @@ export const InteriorDesignerLayout: React.FC = () => {
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Verified Partner</span>
           </div>
+
+          {/* Notifications Bell */}
+          <Link
+            to="/interior-designer/notifications"
+            className="relative p-2 rounded-xl text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition border border-slate-200 bg-white"
+            title="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotifs > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 text-white font-mono text-[9px] font-black flex items-center justify-center">
+                {unreadNotifs}
+              </span>
+            )}
+          </Link>
 
           {/* Profile Dropdown */}
           <div className="relative">

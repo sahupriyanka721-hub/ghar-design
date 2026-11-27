@@ -69,8 +69,33 @@ import {
   recordLedgerEntry,
   createLedgerReversalEntry,
   processPaymentWebhook,
+  getInteriorReviews,
+  saveInteriorReview,
+  adminForwardReviewToDesigner,
+  getInteriorDesignerAnalytics,
+  generateAnalyticsCSV,
+  getInteriorNotifications,
+  markInteriorNotificationRead,
+  markAllInteriorNotificationsRead,
+  dispatchInteriorNotification,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
+import {
+  getCommunicationThreads,
+  getCommunicationThreadById,
+  saveCommunicationThread,
+  sendRoutedMessage,
+  adminForwardMessage,
+  getVisibleMessagesForRole,
+  addAdminInternalNote,
+  getComplaintDisputes,
+  saveComplaintDispute,
+  assignDisputeOfficer,
+  toggleDisputePayoutHold,
+  canCloseDispute,
+  closeDisputeWithAudit,
+  resolveDispute,
+} from '../data/communicationDisputeStore.js';
 
 // Mock localStorage for node test environment
 const mockStorage: Record<string, string> = {};
@@ -922,5 +947,271 @@ describe('Interior Designer Panel & Store Tests', () => {
     const rejected = adminRejectPayout(payout2.id, 'Duplicate invoice submitted by designer');
     expect(rejected.status).toBe('REJECTED');
     expect(rejected.rejectionReason).toContain('Duplicate invoice');
+  });
+
+  // ==============================================================================
+  // PHASE 9: SECTION 15, 16, 17, 18 & MANDATORY TEST 7
+  // ==============================================================================
+
+  it('implements Mandatory Section 23 Test 7: Communication workflow (Designer -> Admin -> Customer -> Admin -> Designer)', () => {
+    // Setup communication thread
+    const threadId = 'TH-TEST-ROUTED-101';
+    saveCommunicationThread({
+      id: threadId,
+      threadCode: 'COMM-TEST-1001',
+      projectId: 'BG-INT-2026-TEST',
+      projectTitle: 'Modern Penthouse Test',
+      customerId: 'usr-cust-test',
+      customerName: 'Vikramaditya Roy',
+      customerPhone: '+91 98112 00099',
+      designerId: 'INT-DES-TEST',
+      designerName: 'Aanya Sharma',
+      designerFirm: 'Aura Studio',
+      subject: 'Italian Marble Finish Query',
+      category: 'MATERIAL_SELECTION',
+      direction: 'DESIGNER_TO_CUSTOMER',
+      status: 'PENDING_ADMIN_REVIEW',
+      latestMessageAt: new Date().toISOString(),
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Step 1: Interior Designer sends message
+    const msg1 = sendRoutedMessage({
+      threadId,
+      senderRole: 'INTERIOR_DESIGNER',
+      senderName: 'Aanya Sharma',
+      recipientRole: 'CUSTOMER',
+      recipientName: 'Vikramaditya Roy',
+      content: 'Preliminary selection for master bedroom flooring is ready for review.',
+    });
+
+    expect(msg1.routingStatus).toBe('PENDING_ADMIN_ROUTING');
+
+    // Admin receives in inbox
+    const threadAfterMsg1 = getCommunicationThreadById(threadId)!;
+    expect(threadAfterMsg1.status).toBe('PENDING_ADMIN_REVIEW');
+    expect(threadAfterMsg1.messages.length).toBe(1);
+
+    // CRITICAL SECURITY RULE: Customer CANNOT see unforwarded message
+    const customerVisibleBeforeForward = getVisibleMessagesForRole(threadAfterMsg1, 'CUSTOMER');
+    expect(customerVisibleBeforeForward.length).toBe(0);
+
+    // Designer can see their own sent message
+    const designerVisibleBeforeForward = getVisibleMessagesForRole(threadAfterMsg1, 'INTERIOR_DESIGNER');
+    expect(designerVisibleBeforeForward.length).toBe(1);
+    expect(designerVisibleBeforeForward[0].routingStatus).toBe('PENDING_ADMIN_ROUTING');
+
+    // Step 2: Admin reviews & forwards message to Customer
+    const forwardedToCustomer = adminForwardMessage({
+      threadId,
+      messageId: msg1.id,
+      forwardedBy: 'BuildGhar Operations Desk',
+      forwardingNotes: 'Quality verified against architectural MEP specs.',
+    })!;
+
+    expect(forwardedToCustomer.status).toBe('FORWARDED');
+
+    // Customer NOW sees the forwarded message
+    const customerVisibleAfterForward = getVisibleMessagesForRole(forwardedToCustomer, 'CUSTOMER');
+    expect(customerVisibleAfterForward.length).toBe(1);
+    expect(customerVisibleAfterForward[0].content).toContain('flooring is ready');
+    expect(customerVisibleAfterForward[0].routingStatus).toBe('FORWARDED_TO_TARGET');
+
+    // Step 3: Customer replies
+    const customerReply = sendRoutedMessage({
+      threadId,
+      senderRole: 'CUSTOMER',
+      senderName: 'Vikramaditya Roy',
+      recipientRole: 'INTERIOR_DESIGNER',
+      recipientName: 'Aanya Sharma',
+      content: 'Flooring looks great, but please verify if slip resistance R10 is certified.',
+    });
+
+    expect(customerReply.routingStatus).toBe('PENDING_ADMIN_ROUTING');
+
+    // Admin receives reply in inbox
+    const threadAfterReply = getCommunicationThreadById(threadId)!;
+    expect(threadAfterReply.status).toBe('PENDING_ADMIN_REVIEW');
+    expect(threadAfterReply.messages.length).toBe(2);
+
+    // CRITICAL RULE: Interior Designer CANNOT see customer reply before Admin forwards
+    const designerVisibleBeforeReplyForward = getVisibleMessagesForRole(threadAfterReply, 'INTERIOR_DESIGNER');
+    expect(designerVisibleBeforeReplyForward.length).toBe(1); // Only their first message visible
+
+    // Step 4: Admin forwards customer reply to Interior Designer
+    const forwardedToDesigner = adminForwardMessage({
+      threadId,
+      messageId: customerReply.id,
+      forwardedBy: 'BuildGhar Operations Desk',
+      forwardingNotes: 'Customer satisfaction acknowledged. Requesting R10 test cert.',
+    })!;
+
+    expect(forwardedToDesigner.status).toBe('FORWARDED');
+
+    // Designer NOW sees customer reply
+    const designerVisibleAfterReplyForward = getVisibleMessagesForRole(forwardedToDesigner, 'INTERIOR_DESIGNER');
+    expect(designerVisibleAfterReplyForward.length).toBe(2);
+    expect(designerVisibleAfterReplyForward[1].content).toContain('slip resistance R10');
+
+    // Step 5: Internal Admin Notes must NEVER be visible to Customer or Designer (Section 15 Rule)
+    addAdminInternalNote(threadId, 'Customer is VIP client from Gurugram. Expedite test cert response.');
+    const updatedThreadWithNotes = getCommunicationThreadById(threadId)!;
+
+    const designerClean = getVisibleMessagesForRole(updatedThreadWithNotes, 'INTERIOR_DESIGNER');
+    designerClean.forEach((m) => {
+      expect((m as any).internalAdminNotes).toBeUndefined();
+    });
+
+    const customerClean = getVisibleMessagesForRole(updatedThreadWithNotes, 'CUSTOMER');
+    customerClean.forEach((m) => {
+      expect((m as any).internalAdminNotes).toBeUndefined();
+    });
+  });
+
+  it('manages Section 16 Customer Reviews, Complaints & Dispute Resolution', () => {
+    // 1. Customer Review forwarded by Admin
+    const review = saveInteriorReview({
+      id: 'BG-REV-TEST-1',
+      projectId: 'BG-PRJ-REV',
+      projectName: 'Test Penthouse',
+      customerId: 'CUST-101',
+      customerName: 'Sharika Mishra',
+      designerId: 'id-101',
+      designerName: 'Ar. Pooja Mehra',
+      rating: 5,
+      categories: {
+        designQuality: 5,
+        responsiveness: 5,
+        timeliness: 4.8,
+        professionalism: 5,
+      },
+      reviewText: 'Flawless false ceiling cove lighting execution.',
+      status: 'PENDING_ADMIN_REVIEW',
+      createdAt: new Date().toISOString(),
+    });
+
+    const forwardedRev = adminForwardReviewToDesigner(review.id, 'Super Admin');
+    expect(forwardedRev?.status).toBe('FORWARDED_TO_DESIGNER');
+    expect(forwardedRev?.forwardedBy).toBe('Super Admin');
+
+    // 2. Designer raises formal project dispute (Section 16 categories)
+    const disputeId = 'DISP-INT-TEST-1';
+    saveComplaintDispute({
+      id: disputeId,
+      disputeCode: 'DISP-INT-2026-999',
+      projectId: 'BG-PRJ-REV',
+      projectTitle: 'Test Penthouse',
+      complainantRole: 'INTERIOR_DESIGNER',
+      complainantName: 'Ar. Pooja Mehra',
+      complainantPhone: '+91 98110 55990',
+      respondentRole: 'CONTRACTOR',
+      respondentName: 'Apex Electricals',
+      disputeType: 'SITE_ACCESS_PROBLEMS',
+      priority: 'HIGH',
+      subject: 'Conduit framing delayed by 5 days',
+      description: 'Site locked and MEP contractor unreachable.',
+      evidenceFiles: [{ name: 'site_lock.jpg', type: 'IMAGE', url: '#' }],
+      status: 'OPEN_RECEIVED',
+      assignedAdmin: 'Unassigned',
+      holdAssociatedPayout: false,
+      associatedPayoutId: 'BG-PO-TEST-999',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      auditHistory: [],
+    });
+
+    // Admin assigns officer
+    const assigned = assignDisputeOfficer(disputeId, 'Senior Grievance Officer');
+    expect(assigned?.assignedAdmin).toBe('Senior Grievance Officer');
+    expect(assigned?.status).toBe('INVESTIGATING');
+
+    // Admin toggles payout hold
+    const held = toggleDisputePayoutHold(disputeId, true, 'Senior Grievance Officer');
+    expect(held?.holdAssociatedPayout).toBe(true);
+
+    // Section 16 Core Rule: Designer CANNOT unilaterally close the dispute
+    const perm = canCloseDispute(disputeId, 'INTERIOR_DESIGNER');
+    expect(perm.allowed).toBe(false);
+    expect(perm.reason).toContain('Do not allow one party to silently close');
+
+    expect(() => {
+      closeDisputeWithAudit(disputeId, {
+        actorRole: 'INTERIOR_DESIGNER',
+        actorName: 'Ar. Pooja Mehra',
+        resolutionNotes: 'Attempting self-closure',
+        decision: 'MUTUAL_SETTLEMENT',
+      });
+    }).toThrow(/silently close/i);
+
+    // Admin CAN resolve and close dispute
+    const resolved = closeDisputeWithAudit(disputeId, {
+      actorRole: 'ADMIN',
+      actorName: 'Senior Grievance Officer',
+      resolutionNotes: 'Site access restored with security key card handover. Payout hold released.',
+      decision: 'MUTUAL_SETTLEMENT',
+    });
+    expect(resolved.status).toBe('RESOLVED');
+    expect(resolved.resolutionDecision).toBe('MUTUAL_SETTLEMENT');
+    expect(resolved.holdAssociatedPayout).toBe(false);
+  });
+
+  it('computes Section 17 Real Database Analytics and generates valid CSV report', () => {
+    const analytics = getInteriorDesignerAnalytics();
+
+    expect(analytics.assignedRequests).toBeGreaterThan(0);
+    expect(analytics.customerAcceptanceRate).toBeGreaterThanOrEqual(0);
+    expect(analytics.customerAcceptanceRate).toBeLessThanOrEqual(100);
+    expect(analytics.milestoneCompletion).toBeGreaterThanOrEqual(0);
+    expect(analytics.milestoneCompletion).toBeLessThanOrEqual(100);
+    expect(analytics.customerRatings.average).toBeGreaterThan(0);
+    expect(analytics.monthlyEarnings.length).toBeGreaterThan(0);
+
+    // Test filter by specific status
+    const filteredAnalytics = getInteriorDesignerAnalytics(undefined, {
+      quotationStatus: 'ACCEPTED',
+    });
+    expect(filteredAnalytics.approvedQuotations).toBeGreaterThanOrEqual(0);
+
+    // Test CSV generation
+    const csv = generateAnalyticsCSV(analytics);
+    expect(csv).toContain('Metric Category,Metric Name,Value,Unit');
+    expect(csv).toContain('Customer Acceptance Rate');
+    expect(csv).toContain('Milestone Completion Rate');
+    expect(csv).toContain('Average Customer Rating');
+  });
+
+  it('manages Section 18 Multi-Channel Notifications Dispatcher', () => {
+    // 1. Dispatch new notification event
+    const notif = dispatchInteriorNotification({
+      designerId: 'id-101',
+      designerPhone: '9811055990',
+      eventType: 'CUSTOMER_ACCEPTED_QUOTATION',
+      title: 'Quotation BG-Q-INT-99 Accepted',
+      message: 'Homeowner accepted living room and dining package.',
+      channels: ['IN_APP', 'EMAIL', 'SMS', 'WHATSAPP'],
+      link: '/interior-designer/quotations',
+    });
+
+    expect(notif.read).toBe(false);
+    expect(notif.channels).toContain('WHATSAPP');
+    expect(notif.channels).toContain('SMS');
+
+    // 2. Query notifications for designer
+    const list = getInteriorNotifications('9811055990');
+    expect(list.some((n) => n.id === notif.id)).toBe(true);
+
+    // 3. Mark single notification read
+    markInteriorNotificationRead(notif.id);
+    const updatedList = getInteriorNotifications('9811055990');
+    const updatedNotif = updatedList.find((n) => n.id === notif.id);
+    expect(updatedNotif?.read).toBe(true);
+
+    // 4. Mark all read
+    markAllInteriorNotificationsRead('9811055990');
+    const allReadList = getInteriorNotifications('9811055990');
+    const hasUnread = allReadList.some((n) => !n.read);
+    expect(hasUnread).toBe(false);
   });
 });

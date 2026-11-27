@@ -564,8 +564,8 @@ export const AdminCommunications: React.FC = () => {
                           <div className="flex items-center gap-1">
                             <span className="font-medium text-slate-800">{t.customerName}</span>
                             <span className="text-slate-400">⇄</span>
-                            <span className="font-medium text-blue-700 truncate max-w-[110px]">
-                              {t.architectName}
+                            <span className="font-medium text-blue-700 truncate max-w-[130px]">
+                              {t.designerName ? `Interior: ${t.designerName}` : t.architectName || 'Assigned Partner'}
                             </span>
                           </div>
                         </div>
@@ -649,9 +649,15 @@ export const AdminCommunications: React.FC = () => {
                         <div className="text-[11px] text-slate-500">{activeThread.customerPhone}</div>
                       </div>
                       <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Architect Partner</div>
-                        <div className="font-bold text-blue-950">{activeThread.architectName}</div>
-                        <div className="text-[11px] text-slate-600">{activeThread.architectFirm}</div>
+                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                          {activeThread.designerName ? 'Interior Designer' : 'Architect Partner'}
+                        </div>
+                        <div className="font-bold text-blue-950">
+                          {activeThread.designerName || activeThread.architectName || 'Assigned Partner'}
+                        </div>
+                        <div className="text-[11px] text-slate-600">
+                          {activeThread.designerFirm || activeThread.architectFirm || 'Design Partner'}
+                        </div>
                       </div>
                     </div>
                   </div>

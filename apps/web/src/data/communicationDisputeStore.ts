@@ -7,7 +7,13 @@ import { holdArchitectPayout } from './financialLedgerStore.js';
 // Core Rule: Admin acts as Central Router for all business communication
 // ==============================================================================
 
-export type MessageSenderRole = 'CUSTOMER' | 'ARCHITECT' | 'ADMIN';
+export type MessageSenderRole =
+  | 'CUSTOMER'
+  | 'ARCHITECT'
+  | 'ADMIN'
+  | 'INTERIOR_DESIGNER'
+  | 'CONTRACTOR'
+  | 'VENDOR';
 export type MessageRoutingStatus =
   | 'PENDING_ADMIN_ROUTING'
   | 'FORWARDED_TO_TARGET'
@@ -20,7 +26,11 @@ export type CommunicationCategory =
   | 'TECHNICAL_CLARIFICATION'
   | 'TIMELINE_QUERY'
   | 'BUDGET_REVISION'
-  | 'SITE_CONDITION';
+  | 'SITE_CONDITION'
+  | 'MATERIAL_SELECTION'
+  | 'ARCHITECT_COORDINATION'
+  | 'CONTRACTOR_COORDINATION'
+  | 'INTERIOR_DESIGN_REVIEW';
 
 export interface CommunicationMessage {
   id: string; // e.g. MSG-1001
@@ -49,12 +59,26 @@ export interface CommunicationThread {
   customerId: string;
   customerName: string;
   customerPhone: string;
-  architectId: string;
-  architectName: string;
-  architectFirm: string;
+  architectId?: string;
+  architectName?: string;
+  architectFirm?: string;
+  designerId?: string;
+  designerName?: string;
+  designerFirm?: string;
+  contractorId?: string;
+  contractorName?: string;
   subject: string;
   category: CommunicationCategory;
-  direction: 'CUSTOMER_TO_ARCHITECT' | 'ARCHITECT_TO_CUSTOMER';
+  direction:
+    | 'CUSTOMER_TO_ARCHITECT'
+    | 'ARCHITECT_TO_CUSTOMER'
+    | 'DESIGNER_TO_CUSTOMER'
+    | 'CUSTOMER_TO_DESIGNER'
+    | 'DESIGNER_TO_ARCHITECT'
+    | 'ARCHITECT_TO_DESIGNER'
+    | 'DESIGNER_TO_CONTRACTOR'
+    | 'CONTRACTOR_TO_DESIGNER'
+    | 'ADMIN_BROADCAST';
   status: 'PENDING_ADMIN_REVIEW' | 'FORWARDED' | 'CLARIFICATION_REQUESTED' | 'HELD' | 'RESOLVED';
   latestMessageAt: string;
   messages: CommunicationMessage[];
@@ -71,7 +95,14 @@ export type DisputeCategory =
   | 'PAYMENT_DISPUTE'
   | 'PAYOUT_DISPUTE'
   | 'PROJECT_CANCELLATION'
-  | 'COMMUNICATION_COMPLAINT';
+  | 'COMMUNICATION_COMPLAINT'
+  | 'PAYMENT_COMPLAINTS'
+  | 'SCOPE_DISPUTES'
+  | 'CUSTOMER_REQUIREMENT_DISPUTES'
+  | 'SITE_ACCESS_PROBLEMS'
+  | 'MATERIAL_QUALITY_ISSUES'
+  | 'PROJECT_DELAY_ISSUES'
+  | 'TECHNICAL_ISSUES';
 
 export type DisputePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL_URGENT';
 
@@ -97,11 +128,11 @@ export interface ComplaintDisputeItem {
   disputeCode: string; // e.g. DISP-2026-1001
   projectId: string; // BG-2026-XXXX
   projectTitle: string;
-  complainantRole: 'CUSTOMER' | 'ARCHITECT' | 'CONTRACTOR';
+  complainantRole: 'CUSTOMER' | 'ARCHITECT' | 'CONTRACTOR' | 'INTERIOR_DESIGNER';
   complainantName: string;
   complainantPhone: string;
   complainantEmail?: string;
-  respondentRole: 'ARCHITECT' | 'CUSTOMER' | 'PLATFORM';
+  respondentRole: 'ARCHITECT' | 'CUSTOMER' | 'PLATFORM' | 'INTERIOR_DESIGNER' | 'CONTRACTOR';
   respondentName: string;
   disputeType: DisputeCategory;
   priority: DisputePriority;
@@ -250,6 +281,63 @@ export const getDefaultSeedThreads = (): CommunicationThread[] => [
       },
     ],
   },
+  {
+    id: 'TH-INT-2026-001',
+    threadCode: 'COMM-INT-2026-1001',
+    projectId: 'BG-INT-2026-001',
+    projectTitle: 'Modern Minimalist 3BHK Penthouse - Golf Course Rd, Gurugram',
+    customerId: 'usr-cust-102',
+    customerName: 'Vikramaditya Roy',
+    customerPhone: '+91 98112 00099',
+    designerId: 'INT-DES-2026-001',
+    designerName: 'Aanya Sharma',
+    designerFirm: 'Aura Interior Studio',
+    subject: 'Living Room Italian Marble Flooring & Cove Lighting Selection',
+    category: 'MATERIAL_SELECTION',
+    direction: 'DESIGNER_TO_CUSTOMER',
+    status: 'FORWARDED',
+    latestMessageAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    internalAdminNotes: [
+      'Customer has high sensitivity to ceiling drop height. Verified cove profile meets 150mm clearance.',
+    ],
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    messages: [
+      {
+        id: 'MSG-INT-1001-1',
+        threadId: 'TH-INT-2026-001',
+        senderRole: 'INTERIOR_DESIGNER',
+        senderName: 'Aanya Sharma',
+        recipientRole: 'CUSTOMER',
+        recipientName: 'Vikramaditya Roy',
+        content:
+          'Namaste Mr. Roy, we have shortlisted Botticino Fiorito Italian Marble for the formal living area along with warm 3000K indirect LED cove profiles. Please review the 3D moodboard attached.',
+        timestamp: new Date(Date.now() - 3600000 * 6).toISOString(),
+        routingStatus: 'FORWARDED_TO_TARGET',
+        forwardedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+        forwardedByAdmin: 'Operations Desk',
+        forwardingNotes: 'Reviewed and forwarded by BuildGhar Admin Desk.',
+        attachments: [
+          { name: 'Botticino_Cove_Moodboard_v2.pdf', url: '#', size: '3.4 MB' },
+        ],
+      },
+      {
+        id: 'MSG-INT-1001-2',
+        threadId: 'TH-INT-2026-001',
+        senderRole: 'CUSTOMER',
+        senderName: 'Vikramaditya Roy',
+        recipientRole: 'INTERIOR_DESIGNER',
+        recipientName: 'Aanya Sharma',
+        content:
+          'The moodboard looks wonderful. Could we also check if the Italian marble requires pre-sealing before installation to avoid any etching?',
+        timestamp: new Date(Date.now() - 3600000 * 4.5).toISOString(),
+        routingStatus: 'FORWARDED_TO_TARGET',
+        forwardedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+        forwardedByAdmin: 'Operations Desk',
+        forwardingNotes: 'Forwarded to designer for technical advice.',
+      },
+    ],
+  },
 ];
 
 // ==============================================================================
@@ -339,6 +427,45 @@ export const getDefaultSeedDisputes = (): ComplaintDisputeItem[] => [
         action: 'ADMIN_PROPOSAL_SENT',
         actor: 'Chief Architect',
         details: 'Proposed standard Change Order for ₹15,000 for additional architectural drafting.',
+      },
+    ],
+  },
+  {
+    id: 'DISP-INT-2026-001',
+    disputeCode: 'DISP-INT-2026-1001',
+    projectId: 'BG-INT-2026-001',
+    projectTitle: 'Modern Minimalist 3BHK Penthouse - Golf Course Rd, Gurugram',
+    complainantRole: 'INTERIOR_DESIGNER',
+    complainantName: 'Aanya Sharma',
+    complainantPhone: '+91 98110 55990',
+    complainantEmail: 'aanya@aurastudio.in',
+    respondentRole: 'CONTRACTOR',
+    respondentName: 'Apex MEP Contractors',
+    disputeType: 'SITE_ACCESS_PROBLEMS',
+    priority: 'HIGH',
+    subject: 'Electrical Conduiting Delay Impeding False Ceiling Framing',
+    description:
+      'MEP contractor has not finished ceiling conduit drops in master bedroom, holding up channel installation by 4 days beyond scheduled handover date.',
+    evidenceFiles: [
+      { name: 'Site_Delay_Ceiling_Conduits.jpg', type: 'IMAGE', url: '#' },
+    ],
+    status: 'INVESTIGATING',
+    assignedAdmin: 'Senior Project Coordinator (Interiors)',
+    holdAssociatedPayout: false,
+    createdAt: new Date(Date.now() - 86400000 * 1.5).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    auditHistory: [
+      {
+        timestamp: new Date(Date.now() - 86400000 * 1.5).toISOString(),
+        action: 'COMPLAINT_FILED',
+        actor: 'Aanya Sharma (Interior Designer)',
+        details: 'Reported site access and coordination delay with MEP contractor.',
+      },
+      {
+        timestamp: new Date(Date.now() - 86400000 * 1).toISOString(),
+        action: 'INVESTIGATION_OPENED',
+        actor: 'Senior Project Coordinator',
+        details: 'Dispatched site inspection notice to MEP contractor.',
       },
     ],
   },
@@ -642,7 +769,23 @@ export const toggleDisputePayoutHold = (
   if (!item) return null;
 
   if (hold && item.associatedPayoutId) {
-    holdArchitectPayout(item.associatedPayoutId, `Dispute ${item.disputeCode}: ${item.subject}`);
+    if (item.associatedPayoutId.startsWith('BG-PO-')) {
+      try {
+        const interiorStore = localStorage.getItem('gd_interior_payouts_v1');
+        if (interiorStore) {
+          const list = JSON.parse(interiorStore);
+          const pIdx = list.findIndex((p: any) => p.payoutId === item.associatedPayoutId);
+          if (pIdx >= 0) {
+            list[pIdx].status = 'ON_HOLD';
+            localStorage.setItem('gd_interior_payouts_v1', JSON.stringify(list));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to hold interior payout:', e);
+      }
+    } else {
+      holdArchitectPayout(item.associatedPayoutId, `Dispute ${item.disputeCode}: ${item.subject}`);
+    }
   }
 
   const now = new Date().toISOString();
@@ -657,7 +800,7 @@ export const toggleDisputePayoutHold = (
         action: hold ? 'PAYOUT_FROZEN' : 'PAYOUT_HOLD_RELEASED',
         actor,
         details: hold
-          ? 'Architect payout frozen under Section 15 contract dispute clause.'
+          ? 'Payout frozen under Section 15/16 contract dispute clause.'
           : 'Payout hold released by Admin.',
       },
     ],
@@ -736,4 +879,142 @@ export const escalateDisputeToSuperAdmin = (
 
   saveComplaintDispute(updated);
   return updated;
+};
+
+// ==============================================================================
+// 3. SECTION 15 & MANDATORY TEST 7: ROUTED COMMUNICATION METHODS
+// ==============================================================================
+
+/**
+ * Send a message within a project thread.
+ * Core Rule: Message always starts with routingStatus = 'PENDING_ADMIN_ROUTING'
+ * Target party CANNOT see this message until Admin reviews and forwards it.
+ */
+export const sendRoutedMessage = (params: {
+  threadId: string;
+  senderRole: MessageSenderRole;
+  senderName: string;
+  recipientRole: MessageSenderRole;
+  recipientName: string;
+  content: string;
+  attachments?: Array<{ name: string; url: string; size?: string }>;
+}): CommunicationMessage => {
+  const thread = getCommunicationThreadById(params.threadId);
+  if (!thread) {
+    throw new Error(`Thread not found: ${params.threadId}`);
+  }
+
+  const now = new Date().toISOString();
+  const newMsg: CommunicationMessage = {
+    id: `MSG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    threadId: thread.id,
+    senderRole: params.senderRole,
+    senderName: params.senderName,
+    recipientRole: params.recipientRole,
+    recipientName: params.recipientName,
+    content: params.content,
+    timestamp: now,
+    routingStatus: 'PENDING_ADMIN_ROUTING',
+    attachments: params.attachments,
+  };
+
+  const updatedThread: CommunicationThread = {
+    ...thread,
+    status: 'PENDING_ADMIN_REVIEW',
+    latestMessageAt: now,
+    messages: [...thread.messages, newMsg],
+    updatedAt: now,
+  };
+
+  saveCommunicationThread(updatedThread);
+  return newMsg;
+};
+
+/**
+ * Admin forwards a message to its intended target party (Section 15 & Test 7)
+ */
+export const adminForwardMessage = (params: {
+  threadId: string;
+  messageId: string;
+  forwardedBy: string;
+  forwardingNotes?: string;
+}): CommunicationThread | null => {
+  return forwardMessageToTarget(params.threadId, params.messageId, {
+    forwardedBy: params.forwardedBy,
+    forwardingNotes: params.forwardingNotes || 'Reviewed and forwarded by BuildGhar Admin Desk.',
+  });
+};
+
+/**
+ * Get messages visible to a specific user role.
+ * - Admin sees all messages and internal notes.
+ * - Senders see their own messages (even if pending admin review).
+ * - Recipients ONLY see messages once forwarded by Admin ('FORWARDED_TO_TARGET').
+ * - Non-admin roles NEVER receive internalAdminNotes!
+ */
+export const getVisibleMessagesForRole = (
+  thread: CommunicationThread,
+  role: MessageSenderRole
+): CommunicationMessage[] => {
+  return thread.messages
+    .filter((msg) => {
+      if (role === 'ADMIN') return true;
+      if (msg.senderRole === role) return true;
+      return msg.recipientRole === role && msg.routingStatus === 'FORWARDED_TO_TARGET';
+    })
+    .map((msg) => {
+      if (role !== 'ADMIN') {
+        const { internalAdminNotes, ...rest } = msg;
+        return rest as CommunicationMessage;
+      }
+      return msg;
+    });
+};
+
+/**
+ * Section 16 Core Rule:
+ * Do not allow one party to silently close a dispute raised by another party.
+ */
+export const canCloseDispute = (
+  disputeId: string,
+  actorRole: string
+): { allowed: boolean; reason?: string } => {
+  if (actorRole === 'ADMIN' || actorRole === 'SUPER_ADMIN') {
+    return { allowed: true };
+  }
+  return {
+    allowed: false,
+    reason:
+      'Do not allow one party to silently close a dispute raised by another party. Disputes can only be resolved and audited by BuildGhar Admin Desk.',
+  };
+};
+
+/**
+ * Close or settle a dispute with strict audit permission check.
+ */
+export const closeDisputeWithAudit = (
+  disputeId: string,
+  params: {
+    actorRole: string;
+    actorName: string;
+    resolutionNotes: string;
+    decision: ResolutionDecisionType;
+  }
+): ComplaintDisputeItem => {
+  const perm = canCloseDispute(disputeId, params.actorRole);
+  if (!perm.allowed) {
+    throw new Error(perm.reason || 'Unauthorized dispute closure attempt');
+  }
+
+  const res = resolveDispute(disputeId, {
+    decision: params.decision,
+    resolutionNotes: params.resolutionNotes,
+    resolvedBy: params.actorName,
+    releaseHold: true,
+  });
+
+  if (!res) {
+    throw new Error(`Dispute not found: ${disputeId}`);
+  }
+  return res;
 };

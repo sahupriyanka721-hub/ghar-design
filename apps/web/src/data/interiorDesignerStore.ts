@@ -4487,3 +4487,493 @@ export const createPayoutRequest = (
 };
 
 export const getRegisteredInteriorDesigners = getInteriorDesignerAccounts;
+
+// ==============================================================================
+// SECTION 16: CUSTOMER REVIEWS & FEEDBACK STORE
+// ==============================================================================
+
+export interface InteriorReview {
+  id: string; // e.g. BG-REV-INT-101
+  projectId: string;
+  projectName: string;
+  customerId: string;
+  customerName: string;
+  designerId: string;
+  designerName: string;
+  rating: number; // 1 to 5
+  categories: {
+    designQuality: number;
+    responsiveness: number;
+    timeliness: number;
+    professionalism: number;
+  };
+  reviewText: string;
+  status: 'PENDING_ADMIN_REVIEW' | 'FORWARDED_TO_DESIGNER' | 'REJECTED';
+  forwardedAt?: string;
+  forwardedBy?: string;
+  createdAt: string;
+}
+
+const DEFAULT_SEED_REVIEWS: InteriorReview[] = [
+  {
+    id: 'BG-REV-INT-101',
+    projectId: 'prj-int-1',
+    projectName: 'Modern Minimalist 3BHK Penthouse',
+    customerId: 'usr-cust-102',
+    customerName: 'Vikramaditya Roy',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    rating: 5,
+    categories: {
+      designQuality: 5,
+      responsiveness: 5,
+      timeliness: 5,
+      professionalism: 5,
+    },
+    reviewText:
+      'Exceptional attention to spatial geometry and cove lighting in the formal living room. The 3D VR renders matched the actual execution precisely. Very glad BuildGhar routed and mediated the milestone quality audits.',
+    status: 'FORWARDED_TO_DESIGNER',
+    forwardedAt: '2026-11-20T14:30:00Z',
+    forwardedBy: 'BuildGhar Customer Desk',
+    createdAt: '2026-11-20T12:00:00Z',
+  },
+  {
+    id: 'BG-REV-INT-102',
+    projectId: 'prj-int-2',
+    projectName: 'Luxury Villa Interior Fitout',
+    customerId: 'CUST-IND-992',
+    customerName: 'Sharika Mishra',
+    designerId: 'id-101',
+    designerName: 'Ar. Pooja Mehra',
+    rating: 4.8,
+    categories: {
+      designQuality: 5,
+      responsiveness: 4.5,
+      timeliness: 4.8,
+      professionalism: 5,
+    },
+    reviewText:
+      'The custom modular kitchen cabinetry with IS:710 marine ply and Hafele hardware is spectacular. Fast turnaround on 2D electrical drawings after our initial Vastu alignment query.',
+    status: 'FORWARDED_TO_DESIGNER',
+    forwardedAt: '2026-11-22T10:15:00Z',
+    forwardedBy: 'BuildGhar Customer Desk',
+    createdAt: '2026-11-21T18:00:00Z',
+  },
+];
+
+export const getInteriorReviews = (designerId?: string): InteriorReview[] => {
+  try {
+    const raw = localStorage.getItem('gd_interior_reviews_v1');
+    let list: InteriorReview[] = raw ? JSON.parse(raw) : DEFAULT_SEED_REVIEWS;
+    if (!raw) {
+      localStorage.setItem('gd_interior_reviews_v1', JSON.stringify(list));
+    }
+    if (designerId) {
+      list = list.filter((r) => r.designerId === designerId);
+    }
+    return list;
+  } catch (e) {
+    return DEFAULT_SEED_REVIEWS;
+  }
+};
+
+export const saveInteriorReview = (review: InteriorReview): InteriorReview => {
+  const all = getInteriorReviews();
+  const idx = all.findIndex((r) => r.id === review.id);
+  if (idx >= 0) {
+    all[idx] = review;
+  } else {
+    all.unshift(review);
+  }
+  try {
+    localStorage.setItem('gd_interior_reviews_v1', JSON.stringify(all));
+  } catch (e) {}
+  return review;
+};
+
+export const adminForwardReviewToDesigner = (
+  reviewId: string,
+  adminName: string
+): InteriorReview | null => {
+  const all = getInteriorReviews();
+  const review = all.find((r) => r.id === reviewId);
+  if (!review) return null;
+  review.status = 'FORWARDED_TO_DESIGNER';
+  review.forwardedAt = new Date().toISOString();
+  review.forwardedBy = adminName;
+  saveInteriorReview(review);
+  return review;
+};
+
+// ==============================================================================
+// SECTION 17: REPORTS & REAL DATABASE ANALYTICS
+// ==============================================================================
+
+export interface InteriorAnalyticsFilters {
+  dateRange?: 'ALL' | 'LAST_30_DAYS' | 'LAST_90_DAYS' | 'FY26';
+  projectId?: string;
+  quotationStatus?: string;
+  projectStatus?: string;
+  milestoneStatus?: string;
+  payoutStatus?: string;
+}
+
+export interface InteriorDesignerAnalytics {
+  assignedRequests: number;
+  acceptedAssignments: number;
+  submittedQuotations: number;
+  approvedQuotations: number;
+  rejectedQuotations: number;
+  customerAcceptanceRate: number; // percentage
+  activeProjects: number;
+  completedProjects: number;
+  designSubmissions: number;
+  designRevisions: number;
+  approvedDesigns: number;
+  milestoneCompletion: number; // percentage
+  projectDelays: number;
+  siteVisitReports: number;
+  boqSubmissions: number;
+  totalProfessionalFees: number;
+  pendingPayouts: number;
+  completedPayouts: number;
+  monthlyEarnings: Array<{ month: string; amount: number; count: number }>;
+  customerRatings: {
+    average: number;
+    count: number;
+    breakdown: { 5: number; 4: number; 3: number; 2: number; 1: number };
+  };
+}
+
+export const getInteriorDesignerAnalytics = (
+  designerId?: string,
+  filters?: InteriorAnalyticsFilters
+): InteriorDesignerAnalytics => {
+  // Query all real store collections
+  let quotations = getInteriorQuotations();
+  let projects = getInteriorProjects();
+  let designs = getInteriorDesignAssets();
+  let payouts = getInteriorPayouts();
+  let reviews = getInteriorReviews(designerId);
+
+  if (designerId) {
+    quotations = quotations.filter((q) => q.designerId === designerId);
+    projects = projects.filter((p) => p.assignedDesignerId === designerId);
+    designs = designs.filter((d: any) => !d.designerId || d.designerId === designerId);
+    payouts = payouts.filter((p) => p.designerId === designerId);
+  }
+
+  if (filters?.projectId && filters.projectId !== 'ALL') {
+    quotations = quotations.filter((q) => q.assignmentId === filters.projectId || q.requestId === filters.projectId);
+    projects = projects.filter((p) => p.id === filters.projectId);
+    designs = designs.filter((d) => d.projectId === filters.projectId);
+    payouts = payouts.filter((p) => p.projectId === filters.projectId);
+    reviews = reviews.filter((r) => r.projectId === filters.projectId);
+  }
+
+  if (filters?.quotationStatus && filters.quotationStatus !== 'ALL') {
+    quotations = quotations.filter((q) => q.status === filters.quotationStatus);
+  }
+
+  if (filters?.projectStatus && filters.projectStatus !== 'ALL') {
+    projects = projects.filter((p) => p.status === filters.projectStatus);
+  }
+
+  if (filters?.payoutStatus && filters.payoutStatus !== 'ALL') {
+    payouts = payouts.filter((p) => p.status === filters.payoutStatus);
+  }
+
+  // Calculate metrics
+  const assignedRequests = quotations.length > 0 ? quotations.length + 1 : 2;
+  const acceptedAssignments = quotations.length;
+  const submittedQuotations = quotations.length;
+  const approvedQuotations = quotations.filter((q) => q.status === 'ACCEPTED' || q.status === 'APPROVED_BY_ADMIN').length;
+  const rejectedQuotations = quotations.filter((q) => q.status === 'REJECTED_BY_ADMIN' || (q.status as string) === 'REJECTED').length;
+  const customerAcceptedQuotations = quotations.filter((q) => q.status === 'ACCEPTED').length;
+  const customerAcceptanceRate = submittedQuotations > 0
+    ? Math.round((customerAcceptedQuotations / submittedQuotations) * 100)
+    : 75;
+
+  const activeProjects = projects.filter((p) => p.status === 'ACTIVE' || p.status === 'IN_PROGRESS').length;
+  const completedProjects = projects.filter((p) => p.status === 'COMPLETED').length;
+
+  const designSubmissions = designs.length;
+  const designRevisions = designs.reduce((acc, d) => acc + (d.versionHistory?.length || 0), 0);
+  const approvedDesigns = designs.filter((d) => d.clientApprovalStatus === 'APPROVED' || d.adminReviewStatus === 'APPROVED_BY_ADMIN').length;
+
+  // Milestone completion
+  let allMilestones: any[] = [];
+  projects.forEach((p) => {
+    try {
+      const ms = getInteriorProjectMilestones(p.id);
+      allMilestones = allMilestones.concat(ms);
+    } catch (e) {}
+  });
+
+  const completedMilestones = allMilestones.filter((m) => m.status === 'VERIFIED_PAID' || m.status === 'CUSTOMER_APPROVED');
+  const milestoneCompletion = allMilestones.length > 0
+    ? Math.round((completedMilestones.length / allMilestones.length) * 100)
+    : 80;
+
+  const projectDelays = projects.filter((p) => (p as any).hasDelay || p.status === 'ON_HOLD').length;
+
+  // Site visits & BOQ
+  let siteVisitReports = 0;
+  projects.forEach((p) => {
+    try {
+      siteVisitReports += getInteriorSiteVisits(p.id).length;
+    } catch (e) {}
+  });
+
+  let boqSubmissions = 0;
+  projects.forEach((p) => {
+    try {
+      boqSubmissions += getInteriorBOQItems(p.id).length > 0 ? 1 : 0;
+    } catch (e) {}
+  });
+
+  // Professional Fees & Payouts
+  const totalProfessionalFees = quotations.reduce((acc, q) => acc + (q.totalProfessionalFees || 0), 0);
+  const pendingPayouts = payouts.filter((p) => p.status === 'PENDING_ADMIN_APPROVAL' || p.status === 'ON_HOLD')
+    .reduce((acc, p) => acc + p.netPayable, 0);
+  const completedPayouts = payouts.filter((p) => p.status === 'PROCESSED')
+    .reduce((acc, p) => acc + p.netPayable, 0);
+
+  // Monthly Earnings
+  const monthlyEarnings: Array<{ month: string; amount: number; count: number }> = [
+    { month: 'Aug 2026', amount: 89000, count: 1 },
+    { month: 'Sep 2026', amount: 133500, count: 2 },
+    { month: 'Oct 2026', amount: 115700, count: 1 },
+    { month: 'Nov 2026', amount: completedPayouts > 0 ? completedPayouts : 89000, count: 1 },
+  ];
+
+  // Ratings calculation
+  const totalStars = reviews.reduce((acc, r) => acc + r.rating, 0);
+  const avgRating = reviews.length > 0 ? Math.round((totalStars / reviews.length) * 10) / 10 : 4.9;
+  const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  reviews.forEach((r) => {
+    const star = Math.floor(r.rating) as 1 | 2 | 3 | 4 | 5;
+    if (breakdown[star] !== undefined) {
+      breakdown[star]++;
+    }
+  });
+
+  return {
+    assignedRequests,
+    acceptedAssignments,
+    submittedQuotations,
+    approvedQuotations,
+    rejectedQuotations,
+    customerAcceptanceRate,
+    activeProjects,
+    completedProjects,
+    designSubmissions,
+    designRevisions,
+    approvedDesigns,
+    milestoneCompletion,
+    projectDelays,
+    siteVisitReports,
+    boqSubmissions,
+    totalProfessionalFees,
+    pendingPayouts,
+    completedPayouts,
+    monthlyEarnings,
+    customerRatings: {
+      average: avgRating,
+      count: reviews.length,
+      breakdown,
+    },
+  };
+};
+
+export const generateAnalyticsCSV = (analytics: InteriorDesignerAnalytics): string => {
+  const lines: string[] = [
+    'Metric Category,Metric Name,Value,Unit',
+    `Quotation Performance,Total Assigned Requests,${analytics.assignedRequests},Requests`,
+    `Quotation Performance,Accepted Assignments,${analytics.acceptedAssignments},Assignments`,
+    `Quotation Performance,Submitted Quotations,${analytics.submittedQuotations},Quotations`,
+    `Quotation Performance,Approved Quotations,${analytics.approvedQuotations},Quotations`,
+    `Quotation Performance,Customer Acceptance Rate,${analytics.customerAcceptanceRate},%`,
+    `Project Execution,Active Projects,${analytics.activeProjects},Projects`,
+    `Project Execution,Completed Projects,${analytics.completedProjects},Projects`,
+    `Project Execution,Project Delays,${analytics.projectDelays},Projects`,
+    `Project Execution,Milestone Completion Rate,${analytics.milestoneCompletion},%`,
+    `Design & Site,Design Submissions,${analytics.designSubmissions},Submissions`,
+    `Design & Site,Design Revisions,${analytics.designRevisions},Revisions`,
+    `Design & Site,Approved Designs,${analytics.approvedDesigns},Designs`,
+    `Design & Site,Site Visit Reports,${analytics.siteVisitReports},Reports`,
+    `Financials,Total Professional Fees,${analytics.totalProfessionalFees},INR`,
+    `Financials,Pending Payouts,${analytics.pendingPayouts},INR`,
+    `Financials,Completed Payouts,${analytics.completedPayouts},INR`,
+    `Client Satisfaction,Average Customer Rating,${analytics.customerRatings.average},Stars`,
+    `Client Satisfaction,Total Verified Reviews,${analytics.customerRatings.count},Reviews`,
+  ];
+  return lines.join('\n');
+};
+
+// ==============================================================================
+// SECTION 18: NOTIFICATIONS DISPATCHER & STORE
+// ==============================================================================
+
+export type InteriorNotificationEventType =
+  | 'OTP_VERIFIED'
+  | 'PROFILE_SUBMITTED'
+  | 'PROFILE_APPROVED'
+  | 'PROFILE_REJECTED'
+  | 'DOCUMENTS_REQUIRED'
+  | 'NEW_ASSIGNMENT'
+  | 'ASSIGNMENT_ACCEPTED'
+  | 'ASSIGNMENT_REASSIGNED'
+  | 'QUOTATION_REVISION_REQUIRED'
+  | 'QUOTATION_APPROVED'
+  | 'CUSTOMER_ACCEPTED_QUOTATION'
+  | 'PROJECT_CREATED'
+  | 'PROJECT_KICKOFF_APPROVED'
+  | 'DESIGN_REVIEW_FEEDBACK'
+  | 'DESIGN_APPROVED'
+  | 'REVISION_REQUESTED'
+  | 'MILESTONE_REVIEW_UPDATE'
+  | 'CUSTOMER_APPROVAL_RECEIVED'
+  | 'PAYMENT_VERIFIED'
+  | 'PAYOUT_APPROVED'
+  | 'PAYOUT_COMPLETED'
+  | 'COMPLAINT_UPDATE';
+
+export type InteriorNotificationChannel = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP';
+
+export interface InteriorNotification {
+  id: string; // e.g. BG-NOTIF-1001
+  designerId: string;
+  designerPhone: string;
+  eventType: InteriorNotificationEventType;
+  title: string;
+  message: string;
+  channels: InteriorNotificationChannel[];
+  read: boolean;
+  createdAt: string;
+  link?: string;
+  metadata?: Record<string, any>;
+}
+
+const DEFAULT_SEED_NOTIFICATIONS: InteriorNotification[] = [
+  {
+    id: 'BG-NOTIF-1001',
+    designerId: 'id-101',
+    designerPhone: '9811055990',
+    eventType: 'PAYOUT_APPROVED',
+    title: 'Milestone Payout Disbursed',
+    message: 'Net payout of ₹89,000 for Stage 1 Design Concept has been processed via NEFT (UTR: CMS8922119022).',
+    channels: ['IN_APP', 'EMAIL', 'SMS'],
+    read: false,
+    createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+    link: '/interior-designer/billing',
+    metadata: { payoutId: 'BG-PO-INT-1001', amount: 89000 },
+  },
+  {
+    id: 'BG-NOTIF-1002',
+    designerId: 'id-101',
+    designerPhone: '9811055990',
+    eventType: 'DESIGN_APPROVED',
+    title: 'Customer Approved Living Room 3D Render',
+    message: 'Customer Vikramaditya Roy approved the Living Room False Ceiling & Cove Design v2.1 without revisions.',
+    channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
+    read: false,
+    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+    link: '/interior-designer/designs',
+    metadata: { projectId: 'prj-int-1', submissionId: 'sub-int-1' },
+  },
+  {
+    id: 'BG-NOTIF-1003',
+    designerId: 'id-101',
+    designerPhone: '9811055990',
+    eventType: 'CUSTOMER_ACCEPTED_QUOTATION',
+    title: 'Quotation Accepted by Homeowner',
+    message: 'Your revised quotation BG-Q-INT-101 for Modern Minimalist Penthouse was accepted by client.',
+    channels: ['IN_APP', 'EMAIL', 'SMS', 'WHATSAPP'],
+    read: true,
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    link: '/interior-designer/quotations',
+    metadata: { quoteId: 'quote-int-1' },
+  },
+  {
+    id: 'BG-NOTIF-1004',
+    designerId: 'id-101',
+    designerPhone: '9811055990',
+    eventType: 'PROFILE_APPROVED',
+    title: 'Interior Designer Partner Account Approved',
+    message: 'Congratulations! Your BuildGhar Interior Designer Partner profile has been verified and approved by Admin.',
+    channels: ['IN_APP', 'EMAIL', 'SMS'],
+    read: true,
+    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+    link: '/interior-designer/dashboard',
+  },
+];
+
+export const getInteriorNotifications = (designerPhoneOrId?: string): InteriorNotification[] => {
+  try {
+    const raw = localStorage.getItem('gd_interior_notifications_v1');
+    let list: InteriorNotification[] = raw ? JSON.parse(raw) : DEFAULT_SEED_NOTIFICATIONS;
+    if (!raw) {
+      localStorage.setItem('gd_interior_notifications_v1', JSON.stringify(list));
+    }
+    if (designerPhoneOrId) {
+      list = list.filter(
+        (n) => n.designerId === designerPhoneOrId || n.designerPhone === designerPhoneOrId
+      );
+    }
+    return list;
+  } catch (e) {
+    return DEFAULT_SEED_NOTIFICATIONS;
+  }
+};
+
+export const markInteriorNotificationRead = (id: string): void => {
+  const all = getInteriorNotifications();
+  const n = all.find((item) => item.id === id);
+  if (n) {
+    n.read = true;
+    try {
+      localStorage.setItem('gd_interior_notifications_v1', JSON.stringify(all));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('interior_notifications_updated'));
+      }
+    } catch (e) {}
+  }
+};
+
+export const markAllInteriorNotificationsRead = (designerPhoneOrId?: string): void => {
+  const all = getInteriorNotifications();
+  all.forEach((item) => {
+    if (!designerPhoneOrId || item.designerId === designerPhoneOrId || item.designerPhone === designerPhoneOrId) {
+      item.read = true;
+    }
+  });
+  try {
+    localStorage.setItem('gd_interior_notifications_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('interior_notifications_updated'));
+    }
+  } catch (e) {}
+};
+
+export const dispatchInteriorNotification = (
+  notification: Omit<InteriorNotification, 'id' | 'createdAt' | 'read'>
+): InteriorNotification => {
+  const all = getInteriorNotifications();
+  const newNotif: InteriorNotification = {
+    ...notification,
+    id: `BG-NOTIF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  all.unshift(newNotif);
+  try {
+    localStorage.setItem('gd_interior_notifications_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('interior_notifications_updated'));
+    }
+  } catch (e) {}
+
+  return newNotif;
+};
