@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LifeBuoy,
@@ -15,6 +16,7 @@ import {
   MessageSquare,
   ShieldAlert,
   ChevronRight,
+  ChevronDown,
   Phone,
   User,
   Calendar,
@@ -33,6 +35,8 @@ import {
   DollarSign,
   Gavel,
   Flame,
+  Milestone,
+  Layers,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import { Badge } from '../../components/common/Badge.js';
@@ -54,8 +58,75 @@ import {
   ResolutionDecisionType,
 } from '../../data/communicationDisputeStore.js';
 
+export type DisputeSubView =
+  | 'CUSTOMER_COMPLAINTS'
+  | 'ARCHITECT_COMPLAINTS'
+  | 'PAYMENT_DISPUTES'
+  | 'PROJECT_DISPUTES'
+  | 'MILESTONE_DISPUTES'
+  | 'RESOLUTION_MANAGEMENT'
+  | 'ESCALATION_MANAGEMENT';
+
+export const SUB_VIEWS: Record<
+  DisputeSubView,
+  { label: string; icon: any; badgeColor: string; description: string }
+> = {
+  CUSTOMER_COMPLAINTS: {
+    label: 'Customer Complaints',
+    icon: User,
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    description: 'Direct complaints submitted by clients regarding drawing delays, layout errors, scope deviations, or communication issues.',
+  },
+  ARCHITECT_COMPLAINTS: {
+    label: 'Architect Complaints',
+    icon: Building,
+    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    description: 'Grievances raised by architects, interior designers, or contractors regarding scope creep, site delays, or delayed approvals.',
+  },
+  PAYMENT_DISPUTES: {
+    label: 'Payment Disputes',
+    icon: DollarSign,
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    description: 'Payment reconciliation disputes, double deductions, GST calculations, fee adjustments, and escrow payout holds.',
+  },
+  PROJECT_DISPUTES: {
+    label: 'Project Disputes',
+    icon: Layers,
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+    description: 'Cross-functional site delays, municipal setback compliance, site access problems, and contract cancellations.',
+  },
+  MILESTONE_DISPUTES: {
+    label: 'Milestone Disputes',
+    icon: Milestone,
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    description: 'Disputes on milestone delivery sign-offs, drawing completion checklists, invert levels, and design rendering quality.',
+  },
+  RESOLUTION_MANAGEMENT: {
+    label: 'Resolution Management',
+    icon: Gavel,
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    description: 'Formal contractual resolutions, correction orders, mutual settlements, partial/full refunds, and closed disputes.',
+  },
+  ESCALATION_MANAGEMENT: {
+    label: 'Escalation Management',
+    icon: Flame,
+    badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+    description: 'Critical high-priority disputes escalated directly to the Super Admin console for immediate tribunal intervention.',
+  },
+};
+
 export const AdminSupportTickets: React.FC = () => {
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawView = searchParams.get('view');
+  const selectedView: DisputeSubView =
+    rawView && Object.keys(SUB_VIEWS).includes(rawView)
+      ? (rawView as DisputeSubView)
+      : 'CUSTOMER_COMPLAINTS';
+
+  const handleSelectView = (newView: DisputeSubView) => {
+    setSearchParams({ view: newView });
+  };
 
   const [disputes, setDisputes] = useState<ComplaintDisputeItem[]>([]);
   const [activeTab, setActiveTab] = useState<'ALL' | DisputeStatus>('ALL');
@@ -119,13 +190,100 @@ export const AdminSupportTickets: React.FC = () => {
     };
   }, []);
 
+  // Sub-view item counts
+  const subCounts = useMemo(() => {
+    return {
+      CUSTOMER_COMPLAINTS: disputes.filter((d) => d.complainantRole === 'CUSTOMER').length,
+      ARCHITECT_COMPLAINTS: disputes.filter(
+        (d) =>
+          d.complainantRole === 'ARCHITECT' ||
+          d.complainantRole === 'INTERIOR_DESIGNER' ||
+          d.complainantRole === 'CONTRACTOR'
+      ).length,
+      PAYMENT_DISPUTES: disputes.filter(
+        (d) =>
+          d.disputeType === 'PAYMENT_DISPUTE' ||
+          d.disputeType === 'PAYOUT_DISPUTE' ||
+          d.disputeType === 'PAYMENT_COMPLAINTS' ||
+          d.holdAssociatedPayout
+      ).length,
+      PROJECT_DISPUTES: disputes.filter((d) =>
+        [
+          'PROJECT_CANCELLATION',
+          'SCOPE_DISPUTES',
+          'SITE_ACCESS_PROBLEMS',
+          'PROJECT_DELAY_ISSUES',
+          'DELAYED_DELIVERABLES',
+        ].includes(d.disputeType)
+      ).length,
+      MILESTONE_DISPUTES: disputes.filter((d) =>
+        [
+          'MILESTONE_COMPLETION_DISPUTE',
+          'DESIGN_QUALITY_COMPLAINT',
+          'MATERIAL_QUALITY_ISSUES',
+        ].includes(d.disputeType)
+      ).length,
+      RESOLUTION_MANAGEMENT: disputes.filter(
+        (d) => d.status === 'RESOLVED' || d.status === 'CORRECTION_IN_PROGRESS' || !!d.resolutionDecision
+      ).length,
+      ESCALATION_MANAGEMENT: disputes.filter(
+        (d) => d.status === 'ESCALATED_SUPER_ADMIN' || d.priority === 'CRITICAL_URGENT'
+      ).length,
+    };
+  }, [disputes]);
+
   // Filtered Disputes
   const filteredDisputes = useMemo(() => {
     return disputes.filter((d) => {
+      // 1. Sub-feature View Matching
+      if (selectedView === 'CUSTOMER_COMPLAINTS') {
+        if (d.complainantRole !== 'CUSTOMER') return false;
+      } else if (selectedView === 'ARCHITECT_COMPLAINTS') {
+        if (
+          d.complainantRole !== 'ARCHITECT' &&
+          d.complainantRole !== 'INTERIOR_DESIGNER' &&
+          d.complainantRole !== 'CONTRACTOR'
+        )
+          return false;
+      } else if (selectedView === 'PAYMENT_DISPUTES') {
+        if (
+          !['PAYMENT_DISPUTE', 'PAYOUT_DISPUTE', 'PAYMENT_COMPLAINTS'].includes(d.disputeType) &&
+          !d.holdAssociatedPayout
+        )
+          return false;
+      } else if (selectedView === 'PROJECT_DISPUTES') {
+        if (
+          ![
+            'PROJECT_CANCELLATION',
+            'SCOPE_DISPUTES',
+            'SITE_ACCESS_PROBLEMS',
+            'PROJECT_DELAY_ISSUES',
+            'DELAYED_DELIVERABLES',
+          ].includes(d.disputeType)
+        )
+          return false;
+      } else if (selectedView === 'MILESTONE_DISPUTES') {
+        if (
+          ![
+            'MILESTONE_COMPLETION_DISPUTE',
+            'DESIGN_QUALITY_COMPLAINT',
+            'MATERIAL_QUALITY_ISSUES',
+          ].includes(d.disputeType)
+        )
+          return false;
+      } else if (selectedView === 'RESOLUTION_MANAGEMENT') {
+        if (d.status !== 'RESOLVED' && d.status !== 'CORRECTION_IN_PROGRESS' && !d.resolutionDecision)
+          return false;
+      } else if (selectedView === 'ESCALATION_MANAGEMENT') {
+        if (d.status !== 'ESCALATED_SUPER_ADMIN' && d.priority !== 'CRITICAL_URGENT') return false;
+      }
+
+      // 2. Status / Tab Matching
       if (activeTab !== 'ALL' && d.status !== activeTab) return false;
       if (typeFilter !== 'ALL' && d.disputeType !== typeFilter) return false;
       if (priorityFilter !== 'ALL' && d.priority !== priorityFilter) return false;
 
+      // 3. Search Matching
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchCode = d.disputeCode.toLowerCase().includes(q);
@@ -137,7 +295,7 @@ export const AdminSupportTickets: React.FC = () => {
       }
       return true;
     });
-  }, [disputes, activeTab, typeFilter, priorityFilter, searchQuery]);
+  }, [disputes, selectedView, activeTab, typeFilter, priorityFilter, searchQuery]);
 
   // Aggregate Metrics
   const stats = useMemo(() => {
@@ -308,12 +466,12 @@ export const AdminSupportTickets: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold font-display text-navy-950">
-              Complaint & Dispute Resolution Management
+              Complaint & Dispute Management
             </h1>
             <Badge variant="blue" className="text-[10px] uppercase font-bold tracking-wider">
-              Section 15 Compliant
+              Module 14 Compliant
             </Badge>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -321,13 +479,96 @@ export const AdminSupportTickets: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsNewDisputeModalOpen(true)}
-          className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 self-start sm:self-auto shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Register New Grievance / Dispute</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Top Dropdown View Switcher */}
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-2xs">
+            <label htmlFor="view-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              View:
+            </label>
+            <div className="relative">
+              <select
+                id="view-select"
+                value={selectedView}
+                onChange={(e) => handleSelectView(e.target.value as DisputeSubView)}
+                className="text-xs font-bold bg-transparent text-navy-950 pr-6 py-0.5 focus:outline-hidden cursor-pointer"
+              >
+                {(Object.keys(SUB_VIEWS) as DisputeSubView[]).map((v) => (
+                  <option key={v} value={v}>
+                    {SUB_VIEWS[v].label} ({subCounts[v]})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsNewDisputeModalOpen(true)}
+            className="btn-gold px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 self-start sm:self-auto shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register New Grievance</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 7-Pill Action Strip */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-2 px-2 scrollbar-none">
+        {(Object.keys(SUB_VIEWS) as DisputeSubView[]).map((v) => {
+          const info = SUB_VIEWS[v];
+          const IconComp = info.icon;
+          const count = subCounts[v];
+          const isSelected = selectedView === v;
+          return (
+            <button
+              key={v}
+              onClick={() => handleSelectView(v)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-2xs ${
+                isSelected
+                  ? 'bg-blue-600 text-white shadow-blue-200 shadow-md ring-2 ring-blue-500 ring-offset-1'
+                  : 'bg-white hover:bg-blue-50/80 text-slate-700 border border-slate-200/80'
+              }`}
+            >
+              <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-blue-600'}`} />
+              <span>{info.label}</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Contextual Feature Header Banner */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-white/90 backdrop-blur-md rounded-2xl border border-blue-100 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-100/70 text-blue-700">
+            {React.createElement(SUB_VIEWS[selectedView].icon, { className: 'w-5 h-5' })}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-navy-950 font-display">
+                {SUB_VIEWS[selectedView].label}
+              </h2>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${SUB_VIEWS[selectedView].badgeColor}`}>
+                {filteredDisputes.length} {filteredDisputes.length === 1 ? 'Record' : 'Records'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {SUB_VIEWS[selectedView].description}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">Active View:</span>
+          <span className="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 font-mono text-[11px] font-bold">
+            {selectedView}
+          </span>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -528,7 +769,12 @@ export const AdminSupportTickets: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <LifeBuoy className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                    <p className="font-semibold text-sm">No complaints or disputes found</p>
+                    <p className="font-semibold text-sm">
+                      No records found in {SUB_VIEWS[selectedView]?.label || 'Disputes'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Try selecting another filter status, clearing search query, or registering a new grievance.
+                    </p>
                   </td>
                 </tr>
               ) : (

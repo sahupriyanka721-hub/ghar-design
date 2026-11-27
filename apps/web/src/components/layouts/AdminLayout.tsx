@@ -359,6 +359,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/payouts': true,
     '/admin/invoices': true,
     '/admin/communications': true,
+    '/admin/support': true,
   });
   const { success } = useToast();
 
@@ -395,6 +396,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/communications')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/communications': true }));
+    }
+    if (location.pathname.startsWith('/admin/support')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/support': true }));
     }
   }, [location.pathname]);
 
@@ -725,7 +729,20 @@ export const AdminLayout: React.FC = () => {
             { label: 'Communication History', path: '/admin/communications?view=COMMUNICATION_HISTORY', view: 'COMMUNICATION_HISTORY' },
           ],
         },
-        { label: 'Complaint & Dispute Resolution', path: '/admin/support', icon: LifeBuoy },
+        {
+          label: 'Complaint & Dispute Management',
+          path: '/admin/support',
+          icon: LifeBuoy,
+          subItems: [
+            { label: 'Customer Complaints', path: '/admin/support?view=CUSTOMER_COMPLAINTS', view: 'CUSTOMER_COMPLAINTS' },
+            { label: 'Architect Complaints', path: '/admin/support?view=ARCHITECT_COMPLAINTS', view: 'ARCHITECT_COMPLAINTS' },
+            { label: 'Payment Disputes', path: '/admin/support?view=PAYMENT_DISPUTES', view: 'PAYMENT_DISPUTES' },
+            { label: 'Project Disputes', path: '/admin/support?view=PROJECT_DISPUTES', view: 'PROJECT_DISPUTES' },
+            { label: 'Milestone Disputes', path: '/admin/support?view=MILESTONE_DISPUTES', view: 'MILESTONE_DISPUTES' },
+            { label: 'Resolution Management', path: '/admin/support?view=RESOLUTION_MANAGEMENT', view: 'RESOLUTION_MANAGEMENT' },
+            { label: 'Escalation Management', path: '/admin/support?view=ESCALATION_MANAGEMENT', view: 'ESCALATION_MANAGEMENT' },
+          ],
+        },
         { label: 'Reports & Analytics (GMV & SLA)', path: '/admin/reports', icon: BarChart3 },
         { label: 'Notification Broadcast Center', path: '/admin/notifications', icon: Bell },
         { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
@@ -967,7 +984,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS')));
 
                               return (
                                 <Link
