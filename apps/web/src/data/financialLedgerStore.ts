@@ -83,6 +83,8 @@ export interface ArchitectPayoutItem {
   ifscCode?: string;
   transferProofUrl?: string;
   holdReason?: string;
+  failureReason?: string;
+  reconciliationStatus?: 'MATCHED' | 'UNMATCHED' | 'PENDING_RECONCILIATION';
   notes?: string;
   associatedInvoiceId?: string;
 }
@@ -477,6 +479,7 @@ export const getDefaultSeedPayouts = (): ArchitectPayoutItem[] => [
     bankName: 'HDFC Bank',
     accountNumberMasked: '•••• •••• 4912',
     ifscCode: 'HDFC0001248',
+    reconciliationStatus: 'MATCHED',
     notes: 'NEFT transfer confirmed by bank gateway. Payout statement issued.',
     associatedInvoiceId: 'PAYOUT-INV-2026-001',
   },
@@ -502,8 +505,237 @@ export const getDefaultSeedPayouts = (): ArchitectPayoutItem[] => [
     otherDeductionsPaise: 0,
     netPayablePaise: 22250000, // ₹2,22,500
     status: 'ELIGIBLE',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     notes: 'Milestone verified by Admin. Customer signoff received. Eligible for bank transfer.',
+  },
+  {
+    id: 'PAYOUT-2026-003',
+    payoutCode: 'DISB-2026-1003',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Kulkarni Atelier & Associates',
+    architectPhone: '+91 98230 44556',
+    milestoneId: 'ms-gur-2',
+    milestoneTitle: '2D Architectural Drawings & Structural Calculation',
+    customerPaymentId: 'PAY-2026-0009',
+    customerPaymentRef: 'GHR-PAY-2026-1009',
+    customerName: 'Vikramaditya Roy',
+    grossCollectedPaise: 15000000, // ₹1,50,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1500000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 150000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 13350000,
+    status: 'PENDING_APPROVAL',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    notes: 'Drawings approved by customer. Pending finance manager authorization gate.',
+  },
+  {
+    id: 'PAYOUT-2026-004',
+    payoutCode: 'DISB-2026-1004',
+    projectId: 'BG-2026-0003',
+    projectTitle: 'Contemporary 3BHK Duplex - Bodakdev, Ahmedabad',
+    architectId: 'ARC-2026-002',
+    architectName: 'Ar. Meera Sengupta',
+    architectFirm: 'Studio Vistara Architecture',
+    architectPhone: '+91 98450 12345',
+    milestoneId: 'ms-ahmed-2',
+    milestoneTitle: '3D Elevation & Photorealistic Renderings',
+    customerPaymentId: 'PAY-2026-0010',
+    customerPaymentRef: 'GHR-PAY-2026-1010',
+    customerName: 'Amit Patel',
+    grossCollectedPaise: 20000000, // ₹2,00,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 2000000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 200000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 17800000, // ₹1,78,000
+    status: 'PROCESSING',
+    approvedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    approvedBy: 'Finance Lead (P. Nambiar)',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    notes: 'Admin authorization complete. Batch queue ready for bank NEFT disburse.',
+  },
+  {
+    id: 'PAYOUT-2026-005',
+    payoutCode: 'DISB-2026-1005',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Kulkarni Atelier & Associates',
+    architectPhone: '+91 98230 44556',
+    milestoneId: 'ms-gur-1',
+    milestoneTitle: 'Site Survey & Concept Layout',
+    customerPaymentId: 'PAY-2026-0003',
+    customerPaymentRef: 'GHR-PAY-2026-1003',
+    customerName: 'Vikramaditya Roy',
+    grossCollectedPaise: 10000000, // ₹1,00,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1000000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 100000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 8900000, // ₹89,000
+    status: 'PAID',
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+    approvedAt: new Date(Date.now() - 86400000 * 11).toISOString(),
+    approvedBy: 'Super Admin',
+    paidAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    utrNumber: 'HDFCR520261122007812',
+    bankName: 'ICICI Bank Corporate',
+    accountNumberMasked: '•••• •••• 8821',
+    ifscCode: 'ICIC0000104',
+    reconciliationStatus: 'MATCHED',
+    notes: 'Escrow payment cleared. Partner acknowledged receipt on portal.',
+  },
+  {
+    id: 'PAYOUT-2026-006',
+    payoutCode: 'DISB-2026-1006',
+    projectId: 'BG-2026-0003',
+    projectTitle: 'Contemporary 3BHK Duplex - Bodakdev, Ahmedabad',
+    architectId: 'ARC-2026-002',
+    architectName: 'Ar. Meera Sengupta',
+    architectFirm: 'Studio Vistara Architecture',
+    architectPhone: '+91 98450 12345',
+    milestoneId: 'ms-ahmed-1',
+    milestoneTitle: 'Concept Master Plan & Zoning Approval',
+    customerPaymentId: 'PAY-2026-0004',
+    customerPaymentRef: 'GHR-PAY-2026-1004',
+    customerName: 'Amit Patel',
+    grossCollectedPaise: 12000000, // ₹1,20,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1200000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 120000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 10680000, // ₹1,06,800
+    status: 'PAID',
+    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+    approvedAt: new Date(Date.now() - 86400000 * 13).toISOString(),
+    approvedBy: 'Super Admin',
+    paidAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+    utrNumber: 'HDFCR520261123005544',
+    bankName: 'Axis Bank Escrow Settlement',
+    accountNumberMasked: '•••• •••• 3341',
+    ifscCode: 'UTIB0000256',
+    reconciliationStatus: 'MATCHED',
+    notes: 'Disbursement completed with e-voucher delivery.',
+  },
+  {
+    id: 'PAYOUT-2026-007',
+    payoutCode: 'DISB-2026-1007',
+    projectId: 'BG-2026-0005',
+    projectTitle: 'Eco-Smart Residential Rowhouse - Sector 8, Chandigarh',
+    architectId: 'ARC-2026-004',
+    architectName: 'Ar. Vikram Rathore',
+    architectFirm: 'Rathore Heritage Studio',
+    architectPhone: '+91 98720 77889',
+    milestoneId: 'ms-chd-1',
+    milestoneTitle: 'MEP Engineering & Plumbing Schematics',
+    customerPaymentId: 'PAY-2026-0006',
+    customerPaymentRef: 'GHR-PAY-2026-1006',
+    customerName: 'Manish Aggarwal',
+    grossCollectedPaise: 13500000, // ₹1,35,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1350000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 135000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 12015000, // ₹1,20,150
+    status: 'ELIGIBLE',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    notes: 'Milestone verified by Structural auditor. Escrow receipt confirmed.',
+  },
+  {
+    id: 'PAYOUT-2026-008',
+    payoutCode: 'DISB-2026-1008',
+    projectId: 'BG-2026-0005',
+    projectTitle: 'Eco-Smart Residential Rowhouse - Sector 8, Chandigarh',
+    architectId: 'ARC-2026-004',
+    architectName: 'Ar. Vikram Rathore',
+    architectFirm: 'Rathore Heritage Studio',
+    architectPhone: '+91 98720 77889',
+    milestoneId: 'ms-chd-2',
+    milestoneTitle: 'Working Drawing Set & Municipal Sanction',
+    customerPaymentId: 'PAY-2026-0007',
+    customerPaymentRef: 'GHR-PAY-2026-1007',
+    customerName: 'Manish Aggarwal',
+    grossCollectedPaise: 18000000, // ₹1,80,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1800000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 180000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 16020000, // ₹1,60,200
+    status: 'HELD',
+    holdReason: 'Partner bank IFSC code (PUNB0024800) invalidated due to Punjab National Bank branch merger. Awaiting updated bank details.',
+    failureReason: 'BANK_ACCOUNT_IFSC_INVALID: Escrow transfer bounced. Partner bank branch changed IFSC post merger.',
+    reconciliationStatus: 'UNMATCHED',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    notes: 'NEFT returned with error: INVALID_IFSC. Architect contacted to upload new cancelled cheque.',
+  },
+  {
+    id: 'PAYOUT-2026-009',
+    payoutCode: 'DISB-2026-1009',
+    projectId: 'BG-2026-0001',
+    projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+    architectId: 'ARC-2026-001',
+    architectName: 'Ar. Rajesh Verma',
+    architectFirm: 'Verma & Associates Architects',
+    architectPhone: '+91 98112 34567',
+    milestoneId: 'ms-3',
+    milestoneTitle: 'Structural Reinforcement Schedule (IS 456 / IS 13920)',
+    customerPaymentId: 'PAY-2026-0008',
+    customerPaymentRef: 'GHR-PAY-2026-1008',
+    customerName: 'Sharika Mishra',
+    grossCollectedPaise: 20000000, // ₹2,00,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 2000000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 200000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 17800000, // ₹1,78,000
+    status: 'PENDING_APPROVAL',
+    reconciliationStatus: 'PENDING_RECONCILIATION',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    notes: 'Milestone verified by Structural auditor. Escrow receipt confirmed.',
+  },
+  {
+    id: 'PAYOUT-2026-010',
+    payoutCode: 'DISB-2026-1010',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Kulkarni Atelier & Associates',
+    architectPhone: '+91 98230 44556',
+    milestoneId: 'ms-gur-3',
+    milestoneTitle: 'HVAC & Electrical Ducting Plan',
+    customerPaymentId: 'PAY-2026-0011',
+    customerPaymentRef: 'GHR-PAY-2026-1011',
+    customerName: 'Vikramaditya Roy',
+    grossCollectedPaise: 11000000, // ₹1,10,000
+    platformCommissionPercent: 10,
+    platformCommissionPaise: 1100000,
+    tdsDeductionPercent: 1,
+    tdsDeductionPaise: 110000,
+    otherDeductionsPaise: 0,
+    netPayablePaise: 9790000, // ₹97,900
+    status: 'REJECTED',
+    holdReason: 'Client reported revision required on ceiling duct clearance before final payment release.',
+    failureReason: 'AUDIT_HOLD: Quality inspection flagged clearance snag in ducting heights.',
+    reconciliationStatus: 'UNMATCHED',
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+    notes: 'Payout rejected pending architectural sheet revision v2.0.',
   },
 ];
 
@@ -890,6 +1122,52 @@ export const holdArchitectPayout = (payoutId: string, reason: string): Architect
     ...current,
     status: 'HELD',
     holdReason: reason,
+  };
+
+  all[idx] = updated;
+  safeJsonSave(STORAGE_KEYS.PAYOUTS, all, 'FINANCIAL_PAYOUTS_UPDATED');
+  return updated;
+};
+
+/**
+ * Reconciles architect payout with bank escrow disbursement account
+ */
+export const reconcileArchitectPayout = (
+  payoutId: string,
+  bankUtr?: string
+): ArchitectPayoutItem | null => {
+  const all = getArchitectPayouts();
+  const idx = all.findIndex((p) => p.id === payoutId);
+  if (idx < 0) return null;
+
+  const current = all[idx];
+  const updated: ArchitectPayoutItem = {
+    ...current,
+    reconciliationStatus: 'MATCHED',
+    utrNumber: bankUtr || current.utrNumber || `HDFC-REC-${Date.now().toString().slice(-6)}`,
+  };
+
+  all[idx] = updated;
+  safeJsonSave(STORAGE_KEYS.PAYOUTS, all, 'FINANCIAL_PAYOUTS_UPDATED');
+  return updated;
+};
+
+/**
+ * Resets failed or held payout back to eligible state
+ */
+export const retryFailedArchitectPayout = (
+  payoutId: string
+): ArchitectPayoutItem | null => {
+  const all = getArchitectPayouts();
+  const idx = all.findIndex((p) => p.id === payoutId);
+  if (idx < 0) return null;
+
+  const current = all[idx];
+  const updated: ArchitectPayoutItem = {
+    ...current,
+    status: 'ELIGIBLE',
+    holdReason: undefined,
+    failureReason: undefined,
   };
 
   all[idx] = updated;

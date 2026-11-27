@@ -356,6 +356,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/documents': true,
     '/admin/timeline': true,
     '/admin/payments': true,
+    '/admin/payouts': true,
   });
   const { success } = useToast();
 
@@ -383,6 +384,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/payments')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/payments': true }));
+    }
+    if (location.pathname.startsWith('/admin/payouts')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/payouts': true }));
     }
   }, [location.pathname]);
 
@@ -666,7 +670,23 @@ export const AdminLayout: React.FC = () => {
             { label: 'Payment Gateway Transactions', path: '/admin/payments?view=GATEWAY_TRANSACTIONS', view: 'GATEWAY_TRANSACTIONS' },
           ],
         },
-        { label: 'Architect Payout Management', path: '/admin/payouts', icon: CreditCard },
+        {
+          label: 'Architect Payout Management',
+          path: '/admin/payouts',
+          icon: Briefcase,
+          subItems: [
+            { label: 'Pending Architect Payouts', path: '/admin/payouts?view=PENDING_PAYOUTS', view: 'PENDING_PAYOUTS' },
+            { label: 'Eligible for Payout', path: '/admin/payouts?view=ELIGIBLE', view: 'ELIGIBLE' },
+            { label: 'Payout Approval', path: '/admin/payouts?view=APPROVAL_QUEUE', view: 'APPROVAL_QUEUE' },
+            { label: 'Process Architect Payment', path: '/admin/payouts?view=PROCESS_PAYMENT', view: 'PROCESS_PAYMENT' },
+            { label: 'Successful Payouts', path: '/admin/payouts?view=SUCCESSFUL_PAYOUTS', view: 'SUCCESSFUL_PAYOUTS' },
+            { label: 'Failed Payouts', path: '/admin/payouts?view=FAILED_PAYOUTS', view: 'FAILED_PAYOUTS' },
+            { label: 'Payout History', path: '/admin/payouts?view=PAYOUT_HISTORY', view: 'PAYOUT_HISTORY' },
+            { label: 'Architect Earnings', path: '/admin/payouts?view=ARCHITECT_EARNINGS', view: 'ARCHITECT_EARNINGS' },
+            { label: 'Commission & Platform Fees', path: '/admin/payouts?view=COMMISSION_FEES', view: 'COMMISSION_FEES' },
+            { label: 'Payout Reconciliation', path: '/admin/payouts?view=PAYOUT_RECONCILIATION', view: 'PAYOUT_RECONCILIATION' },
+          ],
+        },
         { label: 'Invoice & Billing Management', path: '/admin/invoices', icon: FileText },
         { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
         { label: 'Communication Router (Inbox)', path: '/admin/communications', icon: Megaphone },
@@ -912,7 +932,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS')));
 
                               return (
                                 <Link
