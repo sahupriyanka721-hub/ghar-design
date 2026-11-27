@@ -36,6 +36,7 @@ import {
   ADMIN_ROLES_V2,
   logAdminAuditAction,
 } from '../../data/adminRbacStore.js';
+import { getCustomerPayments, getArchitectPayouts } from '../../data/financialLedgerStore.js';
 import { pullFromCloud, clearCloudData, pushToCloud } from '../../data/cloudSync.js';
 import { ensureDemoDataInitialized } from '../../data/seedDemoData.js';
 import { useToast } from '../../context/ToastContext.js';
@@ -211,8 +212,33 @@ export const AdminOverview: React.FC = () => {
       }
     });
 
+    // 4. Financial Ledger Customer Escrow Inflows (Section 12)
+    try {
+      const finPayments = getCustomerPayments();
+      finPayments.forEach((fp) => {
+        list.push({
+          id: `pay-fin-${fp.id}`,
+          code: fp.paymentCode,
+          payerName: fp.customerName,
+          payerPhone: fp.customerPhone || '',
+          purpose: `${fp.purpose.replace(/_/g, ' ')} (${fp.projectTitle})`,
+          amountPaise: fp.grossAmountPaise,
+          status:
+            fp.status === 'VERIFIED_SUCCESSFUL'
+              ? 'PAYMENT_SUCCESSFUL'
+              : fp.status === 'REFUNDED'
+              ? 'REFUNDED'
+              : 'PENDING_COLLECTION',
+          date: fp.createdAt,
+          method: fp.paymentMethod.replace(/_/g, ' '),
+        });
+      });
+    } catch (e) {
+      // ignore
+    }
+
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [vendorOrders, requests, projects]);
+  }, [vendorOrders, requests, projects, refreshKey]);
 
   // All 15 Master KPIs calculated directly from actual state
   const metrics = useMemo(() => {
@@ -321,6 +347,21 @@ export const AdminOverview: React.FC = () => {
       (sum, vp) => sum + (vp.netAmountPaise || 0),
       0
     );
+
+    // Add pending financial ledger architect payouts (Section 13)
+    try {
+      const finPayouts = getArchitectPayouts();
+      const pendingFinPayouts = finPayouts.filter(
+        (fp) => fp.status === 'ELIGIBLE' || fp.status === 'PROCESSING'
+      );
+      architectPayoutsPendingCount += pendingFinPayouts.length;
+      architectPayoutsPendingPaise += pendingFinPayouts.reduce(
+        (sum, fp) => sum + (fp.netPayablePaise || 0),
+        0
+      );
+    } catch {
+      // ignore
+    }
 
     // 14. Total Platform Revenue / Commission (Paise)
     // 10% on project milestones + 5% on material orders + 100% on consultation fees

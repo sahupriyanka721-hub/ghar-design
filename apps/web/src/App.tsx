@@ -108,6 +108,8 @@ import { AdminLocations } from './pages/admin/AdminLocations.js';
 import { AdminStaff } from './pages/admin/AdminStaff.js';
 import { AdminAssignments } from './pages/admin/AdminAssignments.js';
 import { AdminDocuments } from './pages/admin/AdminDocuments.js';
+import { AdminPayouts } from './pages/admin/AdminPayouts.js';
+import { AdminInvoices } from './pages/admin/AdminInvoices.js';
 
 // Architect Partner Portal Pages (Master Development Prompt)
 import { ArchitectLandingPage } from './pages/public/ArchitectLandingPage.js';
@@ -449,8 +451,8 @@ export const App: React.FC = () => {
           <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="assignments" element={<AdminAssignments />} />
           <Route path="documents" element={<AdminDocuments />} />
-          <Route path="payouts" element={<AdminPayments />} />
-          <Route path="invoices" element={<AdminPayments />} />
+          <Route path="payouts" element={<AdminPayouts />} />
+          <Route path="invoices" element={<AdminInvoices />} />
           <Route path="notifications" element={<AdminCommunications />} />
         </Route>
 
