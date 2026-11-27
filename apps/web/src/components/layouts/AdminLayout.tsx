@@ -352,6 +352,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/requests': true,
     '/admin/assignments': true,
     '/admin/quotations': true,
+    '/admin/projects': true,
   });
   const { success } = useToast();
 
@@ -367,6 +368,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/quotations')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/quotations': true }));
+    }
+    if (location.pathname.startsWith('/admin/projects')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/projects': true }));
     }
   }, [location.pathname]);
 
@@ -573,7 +577,23 @@ export const AdminLayout: React.FC = () => {
     {
       title: '4. Project Management & Delivery',
       items: [
-        { label: 'Central Project Management', path: '/admin/projects', icon: FolderGit2 },
+        {
+          label: 'Project Management',
+          path: '/admin/projects',
+          icon: FolderGit2,
+          subItems: [
+            { label: 'All Projects', path: '/admin/projects?view=ALL', view: 'ALL' },
+            { label: 'New Projects', path: '/admin/projects?view=NEW', view: 'NEW' },
+            { label: 'Project Kickoff', path: '/admin/projects?view=KICKOFF', view: 'KICKOFF' },
+            { label: 'Active Projects', path: '/admin/projects?view=ACTIVE', view: 'ACTIVE' },
+            { label: 'On-Hold Projects', path: '/admin/projects?view=ON_HOLD', view: 'ON_HOLD' },
+            { label: 'Delayed Projects', path: '/admin/projects?view=DELAYED', view: 'DELAYED' },
+            { label: 'Completed Projects', path: '/admin/projects?view=COMPLETED', view: 'COMPLETED' },
+            { label: 'Cancelled Projects', path: '/admin/projects?view=CANCELLED', view: 'CANCELLED' },
+            { label: 'Project Documents', path: '/admin/projects?view=DOCUMENTS', view: 'DOCUMENTS' },
+            { label: 'Project Activity Timeline', path: '/admin/projects?view=TIMELINE', view: 'TIMELINE' },
+          ],
+        },
         { label: 'Design & Document Management', path: '/admin/documents', icon: FileCheck2 },
         { label: 'Milestone & Progress Verification', path: '/admin/timeline', icon: HardHat },
         { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
