@@ -9,12 +9,17 @@ import {
   addCustomerInternalNote,
   suspendCustomerAccount,
   restoreCustomerAccount,
+  verifyCustomer,
+  blockCustomerAccount,
+  getCustomerActivityTimeline,
+  CustomerActivityEvent,
   registerNewCustomer,
   getPlatformRequests,
   syncChannel,
 } from '../../data/customerStore.js';
 import { getExecutionProjects, ExecutionProject } from '../../data/projectExecutionStore.js';
 import { getPlatformSupportTickets, PlatformSupportTicket } from '../../data/adminStore.js';
+import { getComplaintDisputes, ComplaintDisputeItem } from '../../data/communicationDisputeStore.js';
 import { logAdminAuditAction, getActiveAdminRole } from '../../data/adminRbacStore.js';
 import { pullFromCloud, pushToCloud } from '../../data/cloudSync.js';
 import {
@@ -25,6 +30,7 @@ import {
   User,
   CheckCircle2,
   ShieldCheck,
+  ShieldX,
   Eye,
   X,
   Building,
@@ -34,6 +40,7 @@ import {
   Package,
   CalendarCheck,
   FileText,
+  FileCheck,
   ShoppingBag,
   CreditCard,
   Truck,
@@ -52,6 +59,9 @@ import {
   History,
   DollarSign,
   Plus,
+  Activity,
+  ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
 
 export const AdminCustomers: React.FC = () => {
@@ -61,7 +71,7 @@ export const AdminCustomers: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'VERIFIED' | 'SUSPENDED' | 'BLOCKED'>('ALL');
   const [selectedCustomer, setSelectedCustomer] = useState<RegisteredCustomer | null>(null);
   const [activeProfileTab, setActiveProfileTab] = useState<
-    'OVERVIEW' | 'REQUESTS' | 'PROJECTS' | 'ORDERS' | 'PAYMENTS' | 'COMPLAINTS' | 'NOTES'
+    'OVERVIEW' | 'ACTIVITY' | 'REQUESTS' | 'PROJECTS' | 'ORDERS' | 'PAYMENTS' | 'COMPLAINTS' | 'NOTES'
   >('OVERVIEW');
 
   // Modals state
@@ -70,6 +80,20 @@ export const AdminCustomers: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState('Compliance verification pending / suspicious inquiry pattern');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyForm, setVerifyForm] = useState<{
+    verificationType: 'ADMIN_KYC' | 'MOBILE_OTP' | 'MANUAL_VERIFIED';
+    notes: string;
+    documentType: string;
+    documentRefNumber: string;
+  }>({
+    verificationType: 'ADMIN_KYC',
+    notes: '',
+    documentType: '',
+    documentRefNumber: '',
+  });
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockReason, setBlockReason] = useState('Security risk / Policy violation');
   const [newNoteText, setNewNoteText] = useState('');
 
   // Edit Customer Form State
@@ -200,6 +224,14 @@ export const AdminCustomers: React.FC = () => {
     }
   }, [customers]);
 
+  const allDisputes = useMemo(() => {
+    try {
+      return getComplaintDisputes();
+    } catch {
+      return [];
+    }
+  }, [customers]);
+
   // Selected Customer Relationships
   const customerOrders = useMemo(() => {
     if (!selectedCustomer) return [];
@@ -269,6 +301,25 @@ export const AdminCustomers: React.FC = () => {
       );
     });
   }, [selectedCustomer, allTickets]);
+
+  const customerDisputes = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const rawTargetPhone = (selectedCustomer.phone || '').replace(/\D/g, '').slice(-10);
+    return allDisputes.filter((d: any) => {
+      const dPhone = (d.userPhone || d.complainantPhone || '').replace(/\D/g, '').slice(-10);
+      return (
+        d.customerId === selectedCustomer.id ||
+        d.userId === selectedCustomer.id ||
+        (rawTargetPhone && dPhone && dPhone === rawTargetPhone) ||
+        (d.customerName && selectedCustomer.name && String(d.customerName).toLowerCase() === String(selectedCustomer.name).toLowerCase())
+      );
+    });
+  }, [selectedCustomer, allDisputes]);
+
+  const customerActivity = useMemo(() => {
+    if (!selectedCustomer) return [];
+    return getCustomerActivityTimeline(selectedCustomer.id, selectedCustomer.phone);
+  }, [selectedCustomer, customers, allRequests, allProjects, allOrders, allTickets, allDisputes]);
 
   // Aggregate customer financial figures
   const customerFinancials = useMemo(() => {
@@ -452,6 +503,56 @@ export const AdminCustomers: React.FC = () => {
     }
   };
 
+  // Confirm Block Customer Account
+  const handleConfirmBlock = () => {
+    if (!selectedCustomer) return;
+    if (!blockReason.trim()) {
+      error('Please provide a mandatory reason for blocking this customer');
+      return;
+    }
+    const updated = blockCustomerAccount(selectedCustomer.id, blockReason.trim(), activeAdminRole);
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'BLOCK_CUSTOMER_ACCOUNT',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: selectedCustomer.name,
+        details: { reason: blockReason.trim() },
+      });
+      pushToCloud().catch(() => {});
+      setShowBlockModal(false);
+      success(`Customer account BLOCKED. All access revoked.`);
+    }
+  };
+
+  // Confirm Verify Customer KYC
+  const handleConfirmVerifyModal = () => {
+    if (!selectedCustomer) return;
+    const updated = verifyCustomer(selectedCustomer.id, {
+      verifiedBy: activeAdminRole,
+      verificationType: verifyForm.verificationType,
+      notes: verifyForm.notes.trim() || undefined,
+      documentType: verifyForm.documentType.trim() || undefined,
+      documentRefNumber: verifyForm.documentRefNumber.trim() || undefined,
+    });
+    if (updated) {
+      setSelectedCustomer(updated);
+      refreshCustomers();
+      logAdminAuditAction({
+        action: 'VERIFY_CUSTOMER_KYC',
+        module: 'CUSTOMER_MANAGEMENT',
+        targetId: selectedCustomer.id,
+        targetName: selectedCustomer.name,
+        details: verifyForm,
+      });
+      pushToCloud().catch(() => {});
+      setShowVerifyModal(false);
+      success(`Customer ${updated.name} successfully verified!`);
+    }
+  };
+
   // Restore Suspended Customer
   const handleRestoreCustomer = () => {
     if (!selectedCustomer) return;
@@ -590,6 +691,8 @@ export const AdminCustomers: React.FC = () => {
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                         : selectedCustomer.status === 'ACTIVE'
                         ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        : selectedCustomer.status === 'BLOCKED'
+                        ? 'bg-rose-900/60 text-rose-300 border border-rose-500/50'
                         : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                     }`}
                   >
@@ -611,38 +714,49 @@ export const AdminCustomers: React.FC = () => {
               className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
             >
               <Edit className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden sm:inline">Edit Profile</span>
+              <span className="hidden sm:inline">Edit</span>
             </button>
 
-            {selectedCustomer.status !== 'VERIFIED' && (
-              <button
-                type="button"
-                onClick={() => handleVerifyCustomer(selectedCustomer)}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Verify Account</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowVerifyModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Verify KYC & Identity Documents"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{selectedCustomer.status === 'VERIFIED' ? 'Re-verify' : 'Verify KYC'}</span>
+            </button>
 
-            {selectedCustomer.status === 'SUSPENDED' ? (
+            {selectedCustomer.status === 'SUSPENDED' || selectedCustomer.status === 'BLOCKED' ? (
               <button
                 type="button"
                 onClick={handleRestoreCustomer}
-                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Restore Account</span>
+                <span>Restore</span>
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setShowSuspendModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <AlertOctagon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Suspend</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowSuspendModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600/80 hover:bg-amber-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  title="Temporarily suspend account"
+                >
+                  <AlertOctagon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Suspend</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBlockModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Permanently block account access"
+                >
+                  <ShieldX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Block</span>
+                </button>
+              </>
             )}
 
             <button
@@ -672,6 +786,8 @@ export const AdminCustomers: React.FC = () => {
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                         : selectedCustomer.status === 'ACTIVE'
                         ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                        : selectedCustomer.status === 'BLOCKED'
+                        ? 'bg-rose-900/60 text-rose-300 border-rose-500/50'
                         : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                     }`}
                   >
@@ -685,11 +801,28 @@ export const AdminCustomers: React.FC = () => {
                   <span>Customer ID: {selectedCustomer.id}</span>
                   <span>•</span>
                   <span>Onboarded: {formatDate(selectedCustomer.registeredAt)}</span>
+                  {selectedCustomer.verificationDetails?.isVerified && (
+                    <>
+                      <span>•</span>
+                      <span className="text-emerald-400 font-sans font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        KYC Verified ({selectedCustomer.verificationDetails.verificationType || 'ADMIN_KYC'})
+                      </span>
+                    </>
+                  )}
                   {selectedCustomer.suspensionReason && (
                     <>
                       <span>•</span>
-                      <span className="text-rose-400 font-sans">
+                      <span className="text-amber-400 font-sans">
                         Suspended: {selectedCustomer.suspensionReason}
+                      </span>
+                    </>
+                  )}
+                  {selectedCustomer.blockedReason && (
+                    <>
+                      <span>•</span>
+                      <span className="text-rose-400 font-sans font-bold">
+                        Blocked: {selectedCustomer.blockedReason}
                       </span>
                     </>
                   )}
@@ -704,6 +837,15 @@ export const AdminCustomers: React.FC = () => {
               >
                 <Phone className="w-4 h-4" />
                 <span>Call {selectedCustomer.phone}</span>
+              </a>
+              <a
+                href={`https://wa.me/${selectedCustomer.phone.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>WhatsApp</span>
               </a>
               {selectedCustomer.email && (
                 <a
@@ -766,10 +908,11 @@ export const AdminCustomers: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
             {[
               { id: 'OVERVIEW', label: 'Customer Overview', count: null },
+              { id: 'ACTIVITY', label: 'Activity Timeline', count: customerActivity.length },
               { id: 'REQUESTS', label: 'Quotation RFQs', count: customerRequests.length },
               { id: 'PROJECTS', label: 'Active Projects', count: customerProjects.length },
               { id: 'ORDERS', label: 'Material Orders', count: customerOrders.length },
-              { id: 'COMPLAINTS', label: 'Complaints & Support', count: customerTickets.length },
+              { id: 'COMPLAINTS', label: 'Complaints & Disputes', count: customerTickets.length + customerDisputes.length },
               { id: 'NOTES', label: 'Internal Notes', count: selectedCustomer.internalNotes?.length || 0 },
             ].map((tab) => (
               <button
@@ -890,6 +1033,76 @@ export const AdminCustomers: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Verification & KYC Status Card */}
+                <div className="bg-white p-6 rounded-3xl border border-blue-200/80 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-extrabold text-navy-950 text-sm font-display flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      <span>KYC & Verification Status</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowVerifyModal(true)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{selectedCustomer.status === 'VERIFIED' ? 'Update KYC' : 'Verify KYC'}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Verification State</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {selectedCustomer.status === 'VERIFIED' ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="font-bold text-emerald-700">KYC Verified Customer</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-4 h-4 text-amber-600" />
+                              <span className="font-bold text-amber-700">Verification Pending</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                        selectedCustomer.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {selectedCustomer.verificationDetails?.verificationType || (selectedCustomer.status === 'VERIFIED' ? 'ADMIN_KYC' : 'UNVERIFIED')}
+                      </span>
+                    </div>
+
+                    {selectedCustomer.verificationDetails?.verifiedAt && (
+                      <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-slate-700 space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400 font-semibold">Verified On:</span>
+                          <span className="font-mono font-bold">{formatDate(selectedCustomer.verificationDetails.verifiedAt)}</span>
+                        </div>
+                        {selectedCustomer.verificationDetails.verifiedBy && (
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-400 font-semibold">Verified By:</span>
+                            <span className="font-bold text-navy-950">{selectedCustomer.verificationDetails.verifiedBy}</span>
+                          </div>
+                        )}
+                        {selectedCustomer.verificationDetails.documentType && (
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-400 font-semibold">Document:</span>
+                            <span className="font-bold text-slate-900">{selectedCustomer.verificationDetails.documentType} {selectedCustomer.verificationDetails.documentRefNumber ? `(${selectedCustomer.verificationDetails.documentRefNumber})` : ''}</span>
+                          </div>
+                        )}
+                        {selectedCustomer.verificationDetails.verificationNotes && (
+                          <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 italic">
+                            "{selectedCustomer.verificationDetails.verificationNotes}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Right Column (7 Cols) - Quick Summaries */}
@@ -981,10 +1194,120 @@ export const AdminCustomers: React.FC = () => {
             </div>
           )}
 
+          {/* Tab: ACTIVITY TIMELINE (Section 6 Specification) */}
+          {activeProfileTab === 'ACTIVITY' && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="font-extrabold text-navy-950 text-base font-display flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-blue-600" />
+                    <span>Customer Activity & Operational Audit Timeline</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Unified chronological stream tracking registration, RFQ inquiries, escrow payments, site milestones, and disputes.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
+                  {customerActivity.length} Events Logged
+                </span>
+              </div>
+
+              {customerActivity.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  No activity events recorded yet for this customer.
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  {customerActivity.map((ev) => {
+                    let badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                    let dotColor = 'bg-blue-600 ring-blue-100';
+                    let IconComponent = FileText;
+
+                    if (ev.category === 'REGISTRATION') {
+                      badgeColor = 'bg-sky-50 text-sky-700 border-sky-200';
+                      dotColor = 'bg-sky-600 ring-sky-100';
+                      IconComponent = UserPlus;
+                    } else if (ev.category === 'PAYMENT') {
+                      badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      dotColor = 'bg-emerald-600 ring-emerald-100';
+                      IconComponent = DollarSign;
+                    } else if (ev.category === 'PROJECT') {
+                      badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                      dotColor = 'bg-indigo-600 ring-indigo-100';
+                      IconComponent = Building;
+                    } else if (ev.category === 'BOOKING') {
+                      badgeColor = 'bg-purple-50 text-purple-700 border-purple-200';
+                      dotColor = 'bg-purple-600 ring-purple-100';
+                      IconComponent = CalendarCheck;
+                    } else if (ev.category === 'ORDER') {
+                      badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                      dotColor = 'bg-amber-600 ring-amber-100';
+                      IconComponent = Package;
+                    } else if (ev.category === 'COMPLAINT') {
+                      badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                      dotColor = 'bg-rose-600 ring-rose-100';
+                      IconComponent = AlertTriangle;
+                    } else if (ev.category === 'STATUS_CHANGE') {
+                      badgeColor = 'bg-slate-100 text-slate-800 border-slate-300';
+                      dotColor = 'bg-slate-600 ring-slate-100';
+                      IconComponent = ShieldAlert;
+                    } else if (ev.category === 'ADMIN_NOTE') {
+                      badgeColor = 'bg-slate-50 text-slate-700 border-slate-200';
+                      dotColor = 'bg-slate-500 ring-slate-100';
+                      IconComponent = StickyNote;
+                    }
+
+                    return (
+                      <div key={ev.id} className="relative group">
+                        <div className={`absolute -left-[30px] top-1.5 w-6 h-6 rounded-full flex items-center justify-center ${dotColor} text-white shadow-xs ring-4`}>
+                          <IconComponent className="w-3.5 h-3.5" />
+                        </div>
+
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:border-blue-300 transition-all text-xs space-y-1.5 shadow-2xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <div className="flex items-center gap-2">
+                              <strong className="text-slate-900 font-bold text-sm">{ev.title}</strong>
+                              {ev.badge && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}`}>
+                                  {ev.badge}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-[11px] text-slate-500">
+                              {formatDate(ev.timestamp)}
+                            </span>
+                          </div>
+
+                          <p className="text-slate-600 leading-relaxed font-medium">{ev.description}</p>
+
+                          {(ev.amountPaise || ev.referenceCode) && (
+                            <div className="flex items-center gap-3 pt-1 border-t border-slate-200/60 font-mono text-[11px]">
+                              {ev.referenceCode && (
+                                <span className="text-blue-700 font-bold">Ref: {ev.referenceCode}</span>
+                              )}
+                              {ev.amountPaise && (
+                                <span className="text-emerald-700 font-bold">Amount: {formatINR(ev.amountPaise)}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tab 2: REQUESTS */}
           {activeProfileTab === 'REQUESTS' && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-              <h3 className="font-bold text-sm text-navy-950">Submitted Quotation Requests</h3>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-sm text-navy-950">Submitted Quotation Requests ({customerRequests.length})</h3>
+                <a href="/admin/requests" className="text-xs font-bold text-blue-600 hover:text-blue-800">
+                  Open RFQ Desk →
+                </a>
+              </div>
               {customerRequests.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-400">
                   No quotation requests on record for this customer.
@@ -994,30 +1317,72 @@ export const AdminCustomers: React.FC = () => {
                   {customerRequests.map((req: any) => (
                     <div
                       key={req.id}
-                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      className="p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-3 shadow-2xs"
                     >
-                      <div>
-                        <span className="font-mono font-bold text-blue-700 block text-sm">
-                          {req.requestCode || req.id}
-                        </span>
-                        <strong className="text-slate-900 block mt-0.5">
-                          {req.categorySlug || 'Architecture & Design'}
-                        </strong>
-                        <div className="text-slate-500 text-[11px] mt-0.5">
-                          {req.plotArea ? `${req.plotArea} sq ft` : 'Plot dimensions'} • {req.city}, {req.state}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-blue-700 text-sm">
+                              {req.requestCode || req.id}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                              {req.categorySlug || 'Architecture & Design'}
+                            </span>
+                          </div>
+                          <span className="text-slate-500 text-[11px] font-mono mt-0.5 block">
+                            Submitted on {formatDate(req.createdAt)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            req.status === 'APPROVED' || req.status === 'ASSIGNED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {req.status}
+                          </span>
+                          <a
+                            href={`/admin/assignments?requestId=${req.id}`}
+                            className="px-3 py-1 bg-navy-900 hover:bg-navy-800 text-white rounded-lg text-xs font-bold transition shadow-2xs inline-flex items-center gap-1"
+                          >
+                            <span>Assign Partner</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </a>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800">
-                          {req.status}
-                        </span>
-                        <a
-                          href={`/admin/requests`}
-                          className="px-3 py-1.5 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs"
-                        >
-                          View RFQ Desk
-                        </a>
+
+                      {/* Property & RFQ Specifications Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Location / City</span>
+                          <strong className="text-slate-900">{req.city || req.locality || 'Delhi NCR'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Plot Dimensions</span>
+                          <strong className="text-slate-900">
+                            {req.plotWidth && req.plotLength
+                              ? `${req.plotWidth} × ${req.plotLength} ${req.measurementUnit || 'ft'}`
+                              : (req.plotArea ? `${req.plotArea} sq ft` : 'Custom Plot')}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Budget Range</span>
+                          <strong className="text-blue-700 font-bold">{req.budgetRange || 'Standard Tier'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Design Consultation Fee</span>
+                          <span className={`font-bold ${req.isFeePaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {req.isFeePaid ? `Paid (${formatINR(req.quoteFeePaise || 99900)})` : 'Pending Collection'}
+                          </span>
+                        </div>
                       </div>
+
+                      {req.description && (
+                        <p className="text-slate-600 text-[11px] leading-relaxed">
+                          <span className="font-bold text-slate-700">Project Brief: </span>
+                          {req.description}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1093,17 +1458,32 @@ export const AdminCustomers: React.FC = () => {
             </div>
           )}
 
-          {/* Tab 5: COMPLAINTS */}
+          {/* Tab 5: COMPLAINTS & DISPUTES (Section 6 Specification) */}
           {activeProfileTab === 'COMPLAINTS' && (
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-              <h3 className="font-bold text-sm text-navy-950">Customer Support Tickets & Complaints</h3>
-              {customerTickets.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  No complaints or support tickets raised by this customer.
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-sm text-navy-950">Customer Support Tickets & Centralized Disputes</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Aggregated grievance feed combining support tickets and active project milestone disputes.
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {customerTickets.map((tkt) => (
+                <a href="/admin/support" className="text-xs font-bold text-rose-600 hover:text-rose-800">
+                  Open Support Hub →
+                </a>
+              </div>
+
+              {/* Sub-section A: Support Tickets */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  Support Desk Tickets ({customerTickets.length})
+                </span>
+                {customerTickets.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl">
+                    No support tickets logged.
+                  </div>
+                ) : (
+                  customerTickets.map((tkt) => (
                     <div
                       key={tkt.id}
                       className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
@@ -1122,9 +1502,44 @@ export const AdminCustomers: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
+
+              {/* Sub-section B: Project & Milestone Disputes */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  Project Execution Disputes ({customerDisputes.length})
+                </span>
+                {customerDisputes.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl">
+                    No project execution disputes logged.
+                  </div>
+                ) : (
+                  customerDisputes.map((d: any) => (
+                    <div
+                      key={d.id}
+                      className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-amber-800">{d.disputeCode || d.id}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                            {d.category || 'Quality Issue'}
+                          </span>
+                        </div>
+                        <strong className="text-slate-900 block mt-0.5">{d.title || d.subject}</strong>
+                        <p className="text-slate-600 text-[11px] mt-0.5 line-clamp-1">{d.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                          {d.status || 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -1347,9 +1762,156 @@ export const AdminCustomers: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Modal: Block Customer Account (Section 6 Specification) */}
+        {showBlockModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                <ShieldX className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-navy-950 font-display">
+                  Block Customer Account?
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Blocking permanently locks this customer out of BuildGhar. All active requests and quotations will be frozen.
+                </p>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 text-xs block mb-1">
+                  Mandatory Audit Reason for Account Block
+                </label>
+                <textarea
+                  rows={3}
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-600 focus:outline-none"
+                  placeholder="Enter specific fraud/policy violation reason..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBlockModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBlock}
+                  className="px-5 py-2 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-xl shadow-md transition cursor-pointer"
+                >
+                  Confirm Block Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Verify Customer Identity & KYC (Section 6 Specification) */}
+        {showVerifyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-navy-950 font-display">Verify Customer Identity & KYC</h3>
+                    <p className="text-xs text-slate-500">Confirm homeowner identity for verified status</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVerifyModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Verification Method</label>
+                  <select
+                    value={verifyForm.verificationType}
+                    onChange={(e) => setVerifyForm({ ...verifyForm, verificationType: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 font-semibold text-slate-800"
+                  >
+                    <option value="ADMIN_KYC">Admin KYC Audit (Official Documents Inspected)</option>
+                    <option value="MOBILE_OTP">Mobile OTP Verified (Two-Factor Authentication)</option>
+                    <option value="MANUAL_VERIFIED">Manual Homeowner Verification (Direct Consultation)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Supporting Document Type (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Aadhaar Card, Electricity Bill, Plot Registry, Property Tax Receipt"
+                    value={verifyForm.documentType}
+                    onChange={(e) => setVerifyForm({ ...verifyForm, documentType: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Document Reference / ID # (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. •••• 9821 or REG/2026/0991"
+                    value={verifyForm.documentRefNumber}
+                    onChange={(e) => setVerifyForm({ ...verifyForm, documentRefNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Administrative Verification Notes</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Identity matched phone & site ownership. Homeowner verified by Admin."
+                    value={verifyForm.notes}
+                    onChange={(e) => setVerifyForm({ ...verifyForm, notes: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowVerifyModal(false)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmVerifyModal}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Confirm & Mark Verified</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
+
+  // Counts for quick filter pills
+  const activeCount = useMemo(() => customers.filter((c) => c.status === 'ACTIVE').length, [customers]);
+  const verifiedCount = useMemo(() => customers.filter((c) => c.status === 'VERIFIED').length, [customers]);
+  const suspendedCount = useMemo(() => customers.filter((c) => c.status === 'SUSPENDED').length, [customers]);
+  const blockedCount = useMemo(() => customers.filter((c) => c.status === 'BLOCKED').length, [customers]);
 
   // =========================================================================
   // 2. MAIN CUSTOMER DIRECTORY TABLE (Section 6 Specification)
@@ -1393,10 +1955,11 @@ export const AdminCustomers: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="ALL">All Statuses ({customers.length})</option>
+              <option value="ACTIVE">Active ({activeCount})</option>
+              <option value="VERIFIED">Verified ({verifiedCount})</option>
+              <option value="SUSPENDED">Suspended ({suspendedCount})</option>
+              <option value="BLOCKED">Blocked ({blockedCount})</option>
             </select>
           </div>
 
@@ -1423,6 +1986,37 @@ export const AdminCustomers: React.FC = () => {
         </div>
       </div>
 
+      {/* Quick Status Filter Tabs Strip */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { label: 'All Customers', value: 'ALL', count: customers.length },
+          { label: 'Active', value: 'ACTIVE', count: activeCount },
+          { label: 'Verified KYC', value: 'VERIFIED', count: verifiedCount },
+          { label: 'Suspended', value: 'SUSPENDED', count: suspendedCount },
+          { label: 'Blocked', value: 'BLOCKED', count: blockedCount },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setStatusFilter(tab.value as any)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === tab.value
+                ? 'bg-navy-950 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={`px-2 py-0.2 rounded-full text-[10px] font-mono ${
+                statusFilter === tab.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Customer Directory Table */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -1430,11 +2024,13 @@ export const AdminCustomers: React.FC = () => {
             <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider font-display">
               <tr>
                 <th className="p-4">Customer Details & ID</th>
-                <th className="p-4">Complete Location</th>
-                <th className="p-4 text-center">OTP Status</th>
+                <th className="p-4">Location</th>
+                <th className="p-4">Registered Date</th>
+                <th className="p-4 text-center">OTP / KYC</th>
                 <th className="p-4 text-center">Quotation RFQs</th>
                 <th className="p-4 text-center">Active Projects</th>
                 <th className="p-4 text-right">Total Payments</th>
+                <th className="p-4 text-right">Outstanding</th>
                 <th className="p-4 text-center">Account Status</th>
                 <th className="p-4 text-right">Admin Actions</th>
               </tr>
@@ -1442,7 +2038,7 @@ export const AdminCustomers: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                  <td colSpan={10} className="p-8 text-center text-slate-400">
                     <User className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                     <p className="font-semibold text-xs">No registered customers match your search criteria.</p>
                   </td>
@@ -1463,10 +2059,11 @@ export const AdminCustomers: React.FC = () => {
                     return false;
                   }).length;
 
-                  const projCount = allProjects.filter((p: ExecutionProject) => {
+                  const custProjects = allProjects.filter((p: ExecutionProject) => {
                     const pPhone = (p.customerPhone || '').replace(/\D/g, '').slice(-10);
                     return p.customerId === c.id || (rawPhone && pPhone && pPhone === rawPhone);
-                  }).length;
+                  });
+                  const projCount = custProjects.length;
 
                   // Order payments
                   const custOrders = allOrders.filter((o: any) => {
@@ -1476,6 +2073,18 @@ export const AdminCustomers: React.FC = () => {
                   const paidPaise = custOrders.reduce((sum: number, o: any) => {
                     return sum + (o.paymentStatus === 'PAID' || o.paymentStatus === 'PAYMENT_SUCCESSFUL' ? o.totalAmountPaise || 0 : 0);
                   }, 0);
+
+                  // Calculate Outstanding Milestone Balance
+                  let outstandingPaise = 0;
+                  custProjects.forEach((prj) => {
+                    if (Array.isArray(prj.milestones)) {
+                      prj.milestones.forEach((m) => {
+                        if (m.status === 'SUBMITTED_FOR_REVIEW' || m.status === 'PAYMENT_DUE' || (m.status === 'IN_PROGRESS' && !m.paidAt)) {
+                          outstandingPaise += m.amountPaise || 0;
+                        }
+                      });
+                    }
+                  });
 
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/80 transition">
@@ -1515,6 +2124,11 @@ export const AdminCustomers: React.FC = () => {
                         <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[180px]">
                           {c.housePlotNumber}, {c.streetLocality} ({c.pinCode})
                         </div>
+                      </td>
+
+                      {/* Registration Date */}
+                      <td className="p-4 text-slate-600 font-mono text-[11px]">
+                        {formatDate(c.registeredAt)}
                       </td>
 
                       {/* OTP Status */}
@@ -1561,6 +2175,13 @@ export const AdminCustomers: React.FC = () => {
                         {paidPaise > 0 ? formatINR(paidPaise) : '₹0'}
                       </td>
 
+                      {/* Outstanding Balance */}
+                      <td className="p-4 text-right font-mono font-bold">
+                        <span className={outstandingPaise > 0 ? 'text-amber-700' : 'text-slate-400'}>
+                          {outstandingPaise > 0 ? formatINR(outstandingPaise) : '₹0'}
+                        </span>
+                      </td>
+
                       {/* Account Status */}
                       <td className="p-4 text-center">
                         {c.status === 'VERIFIED' ? (
@@ -1571,9 +2192,13 @@ export const AdminCustomers: React.FC = () => {
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
                             <ShieldCheck className="w-3 h-3 text-blue-600" /> Active
                           </span>
+                        ) : c.status === 'BLOCKED' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-900 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-300">
+                            <ShieldX className="w-3 h-3 text-rose-700" /> Blocked
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                            Suspended
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                            <AlertOctagon className="w-3 h-3 text-amber-600" /> Suspended
                           </span>
                         )}
                       </td>

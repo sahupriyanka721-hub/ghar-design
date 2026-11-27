@@ -82,7 +82,7 @@ export const AdminOverview: React.FC = () => {
   const [showClearModal, setShowClearModal] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [activeTabTable, setActiveTabTable] = useState<
-    'REQUESTS' | 'ARCHITECTS' | 'QUOTATIONS' | 'MILESTONES' | 'PAYMENTS' | 'COMPLAINTS'
+    'REQUESTS' | 'ARCHITECTS' | 'QUOTATIONS' | 'PROJECTS' | 'MILESTONES' | 'PAYMENTS' | 'PAYOUTS' | 'COMPLAINTS'
   >('REQUESTS');
 
   const { success, error: toastError } = useToast();
@@ -107,6 +107,7 @@ export const AdminOverview: React.FC = () => {
   // Live Database Stores
   const customers = useMemo(() => getRegisteredCustomers(), [refreshKey]);
   const architects = useMemo(() => getArchitectAccounts(), [refreshKey]);
+  const interiorDesigners = useMemo(() => getInteriorDesignerAccounts(), [refreshKey]);
   const requests = useMemo(() => getPlatformRequests(), [refreshKey]);
   const bookings = useMemo(() => getPlatformBookings(), [refreshKey]);
   const projects = useMemo(() => getExecutionProjects(), [refreshKey]);
@@ -241,20 +242,77 @@ export const AdminOverview: React.FC = () => {
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [vendorOrders, requests, projects, refreshKey]);
 
+  // Load Payouts for Disbursements Review Table
+  const payoutsList = useMemo(() => {
+    const list: Array<{
+      id: string;
+      code: string;
+      payeeName: string;
+      payeeRole: string;
+      purpose: string;
+      amountPaise: number;
+      status: string;
+      date: string;
+      bankAccount?: string;
+    }> = [];
+
+    try {
+      const archPayouts = getArchitectPayouts();
+      archPayouts.forEach((p) => {
+        list.push({
+          id: p.id,
+          code: p.payoutCode,
+          payeeName: p.architectName,
+          payeeRole: 'Architect Partner',
+          purpose: `${p.projectTitle} - ${p.milestoneTitle}`,
+          amountPaise: p.payoutAmountPaise,
+          status: p.status,
+          date: p.requestedAt || p.createdAt || new Date().toISOString(),
+          bankAccount: p.bankDetails?.accountNumber,
+        });
+      });
+    } catch {}
+
+    try {
+      vendorPayouts.forEach((vp) => {
+        list.push({
+          id: vp.id,
+          code: vp.payoutCode || `VP-${vp.id.slice(0, 6)}`,
+          payeeName: vp.vendorName || 'Building Materials Vendor',
+          payeeRole: 'Material Vendor',
+          purpose: vp.notes || 'Vendor Material Fulfillment',
+          amountPaise: vp.amountPaise || 0,
+          status: vp.status || 'PENDING_APPROVAL',
+          date: vp.createdAt || new Date().toISOString(),
+          bankAccount: vp.bankAccountNumber,
+        });
+      });
+    } catch {}
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [vendorPayouts, refreshKey]);
+
   // All 15 Master KPIs calculated directly from actual state
   const metrics = useMemo(() => {
     // 1. Total Customers
     const totalCustomers = customers.length;
 
-    // 2. Total Registered Architects
+    // 2. Total Registered Partners (Architects + Interior Designers)
     const totalArchitects = architects.length;
+    const totalInteriorDesigners = interiorDesigners.length;
 
-    // 3. Pending Architect Approvals
+    // 3. Pending Partner Approvals (Architects + Interior Designers)
     const pendingArchitectApprovals = architects.filter(
       (a) =>
         a.accountStatus === 'PENDING_APPROVAL' ||
         (a as any).verificationStatus === 'PENDING' ||
         a.accountStatus === 'KYC_SUBMITTED'
+    ).length;
+
+    const pendingInteriorDesignerApprovals = interiorDesigners.filter(
+      (d) =>
+        d.accountStatus === 'PENDING_APPROVAL' ||
+        d.accountStatus === 'KYC_SUBMITTED'
     ).length;
 
     // 4. Total Quotation Requests
@@ -404,7 +462,9 @@ export const AdminOverview: React.FC = () => {
     return {
       totalCustomers,
       totalArchitects,
+      totalInteriorDesigners,
       pendingArchitectApprovals,
+      pendingInteriorDesignerApprovals,
       totalQuotationRequests,
       pendingAssignments,
       quotesUnderReview,
@@ -423,6 +483,7 @@ export const AdminOverview: React.FC = () => {
   }, [
     customers,
     architects,
+    interiorDesigners,
     requests,
     quotations,
     projects,
@@ -664,50 +725,50 @@ export const AdminOverview: React.FC = () => {
             </div>
           </Link>
 
-          {/* KPI 2: Total Registered Architects */}
+          {/* KPI 2: Total Registered Partners (Architects + Interior Designers) */}
           <Link
             to="/admin/architects"
             className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-purple-400 shadow-2xs hover:shadow-md transition space-y-2 group"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                2. Registered Architects
+                2. Design Partners
               </span>
               <div className="p-2 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition">
                 <Compass className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-black font-display text-navy-950">
-              {metrics.totalArchitects}
+              {metrics.totalArchitects + metrics.totalInteriorDesigners}
             </div>
             <div className="text-[11px] text-purple-700 font-semibold flex items-center gap-1">
-              <span>Architect Network Hub →</span>
+              <span>{metrics.totalArchitects} Architects • {metrics.totalInteriorDesigners} Interior</span>
             </div>
           </Link>
 
-          {/* KPI 3: Pending Architect Approvals */}
+          {/* KPI 3: Pending Partner Approvals */}
           <Link
             to="/admin/architects"
             className={`p-4 bg-white rounded-2xl border shadow-2xs hover:shadow-md transition space-y-2 group ${
-              metrics.pendingArchitectApprovals > 0
+              (metrics.pendingArchitectApprovals + metrics.pendingInteriorDesignerApprovals) > 0
                 ? 'border-amber-300 bg-amber-50/20'
                 : 'border-slate-200 hover:border-amber-400'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
-                3. Pending Arch. Approvals
+                3. Pending Partner KYC
               </span>
               <div className="p-2 rounded-xl bg-amber-100 text-amber-800 group-hover:bg-amber-600 group-hover:text-white transition">
                 <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-black font-display text-amber-900">
-              {metrics.pendingArchitectApprovals}
+              {metrics.pendingArchitectApprovals + metrics.pendingInteriorDesignerApprovals}
             </div>
             <div className="text-[11px] text-amber-800 font-semibold flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5" />
-              <span>COA & KYC Verification Required</span>
+              <span>{metrics.pendingArchitectApprovals} Arch • {metrics.pendingInteriorDesignerApprovals} Interior Pending</span>
             </div>
           </Link>
 
@@ -1216,6 +1277,17 @@ export const AdminOverview: React.FC = () => {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTabTable('PROJECTS')}
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                activeTabTable === 'PROJECTS'
+                  ? 'bg-white text-navy-950 shadow-xs'
+                  : 'text-slate-600 hover:text-navy-950'
+              }`}
+            >
+              Projects ({projects.length})
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTabTable('MILESTONES')}
               className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                 activeTabTable === 'MILESTONES'
@@ -1235,6 +1307,17 @@ export const AdminOverview: React.FC = () => {
               }`}
             >
               Payments ({paymentsList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTabTable('PAYOUTS')}
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                activeTabTable === 'PAYOUTS'
+                  ? 'bg-white text-navy-950 shadow-xs'
+                  : 'text-slate-600 hover:text-navy-950'
+              }`}
+            >
+              Disbursements ({payoutsList.length})
             </button>
             <button
               type="button"
@@ -1468,6 +1551,88 @@ export const AdminOverview: React.FC = () => {
           </div>
         )}
 
+        {/* Tab: Latest Project Updates Table */}
+        {activeTabTable === 'PROJECTS' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-100 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
+                <tr>
+                  <th className="py-3 px-4">Project Code & Name</th>
+                  <th className="py-3 px-3">Customer Details</th>
+                  <th className="py-3 px-3">Assigned Lead Partner</th>
+                  <th className="py-3 px-3">Progress & Active Milestone</th>
+                  <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-4 text-right">Project Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {projects.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No active execution projects recorded yet. Click "Load Demo Data" above to review sample sites.
+                    </td>
+                  </tr>
+                ) : (
+                  projects.slice(0, 6).map((prj) => {
+                    const activeMilestone = prj.milestones?.find((m: any) => m.status === 'IN_PROGRESS' || m.status === 'SUBMITTED_FOR_REVIEW') || prj.milestones?.[0];
+                    return (
+                      <tr key={prj.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-3.5 px-4">
+                          <span className="font-mono font-bold text-navy-950 block">{prj.name}</span>
+                          <span className="font-mono text-[10px] text-blue-700 font-semibold">{prj.projectCode || prj.id}</span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <strong className="text-slate-900 block">{prj.customerName}</strong>
+                          <span className="text-[11px] text-slate-500">{prj.customerPhone}</span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <span className="text-slate-800 font-medium block">{prj.architectName || 'Assigned Lead'}</span>
+                          <span className="text-[10px] text-slate-400">{prj.siteLocation?.city || 'Delhi NCR'}</span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden max-w-[120px]">
+                              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${prj.progressPercentage || prj.progress || 0}%` }} />
+                            </div>
+                            <span className="font-bold text-slate-800 font-mono text-[11px]">{prj.progressPercentage || prj.progress || 0}%</span>
+                          </div>
+                          {activeMilestone && (
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[180px]">
+                              M{activeMilestone.milestoneNumber}: {activeMilestone.title}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              prj.status === 'COMPLETED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : prj.status === 'ACTIVE' || prj.status === 'IN_PROGRESS'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {prj.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <Link
+                            to="/admin/projects"
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-navy-900 hover:bg-navy-800 text-white rounded-lg text-xs font-bold transition shadow-2xs"
+                          >
+                            <span>View Project</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Tab 4: Milestones Waiting for Verification Table */}
         {activeTabTable === 'MILESTONES' && (
           <div className="overflow-x-auto">
@@ -1575,6 +1740,74 @@ export const AdminOverview: React.FC = () => {
                           className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
                         >
                           <span>Audit Ledger</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab: Architect & Interior Designer Disbursements Waiting Approval Table */}
+        {activeTabTable === 'PAYOUTS' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-100 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
+                <tr>
+                  <th className="py-3 px-4">Payout Code</th>
+                  <th className="py-3 px-3">Payee Partner</th>
+                  <th className="py-3 px-3">Partner Role & Purpose</th>
+                  <th className="py-3 px-3 text-right">Disbursement Amount</th>
+                  <th className="py-3 px-3 text-center">Escrow Status</th>
+                  <th className="py-3 px-4 text-right">Admin Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {payoutsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No partner payouts pending approval. Escrow disbursements up to date.
+                    </td>
+                  </tr>
+                ) : (
+                  payoutsList.slice(0, 6).map((pay) => (
+                    <tr key={pay.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3.5 px-4 font-mono font-bold text-indigo-700">{pay.code}</td>
+                      <td className="py-3.5 px-3">
+                        <strong className="text-slate-900 block">{pay.payeeName}</strong>
+                        {pay.bankAccount && (
+                          <span className="font-mono text-[10px] text-slate-500">A/C: ••••{pay.bankAccount.slice(-4)}</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          {pay.payeeRole}
+                        </span>
+                        <span className="text-[11px] text-slate-600 block mt-0.5 line-clamp-1">{pay.purpose}</span>
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-900">
+                        {formatINR(pay.amountPaise)}
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            pay.status === 'PAID'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {pay.status === 'PAID' ? 'DISBURSED' : 'PENDING_APPROVAL'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <Link
+                          to="/admin/payouts"
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
+                        >
+                          <span>Approve UTR</span>
                           <ArrowRight className="w-3 h-3" />
                         </Link>
                       </td>

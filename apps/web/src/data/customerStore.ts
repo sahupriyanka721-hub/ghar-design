@@ -3,6 +3,16 @@ export const SEED_CUSTOMERS: RegisteredCustomer[] = [];
 import { pushToCloud } from './cloudSync.js';
 import { safeSetStorage } from '../lib/safeStorage.js';
 
+export interface CustomerVerificationDetails {
+  isVerified: boolean;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  verificationNotes?: string;
+  verificationType?: 'MOBILE_OTP' | 'ADMIN_KYC' | 'MANUAL_VERIFIED';
+  documentType?: string;
+  documentRefNumber?: string;
+}
+
 export interface RegisteredCustomer {
   id: string;
   name: string;
@@ -20,6 +30,9 @@ export interface RegisteredCustomer {
   status: 'ACTIVE' | 'VERIFIED' | 'SUSPENDED' | 'BLOCKED';
   otpStatus?: 'VERIFIED' | 'PENDING';
   suspensionReason?: string;
+  blockedReason?: string;
+  verificationDetails?: CustomerVerificationDetails;
+  lastActiveAt?: string;
   internalNotes?: Array<{
     id: string;
     adminName: string;
@@ -282,6 +295,56 @@ export const addCustomerInternalNote = (
   return current[idx];
 };
 
+export const verifyCustomer = (
+  customerId: string,
+  params: {
+    verifiedBy: string;
+    notes?: string;
+    verificationType?: 'MOBILE_OTP' | 'ADMIN_KYC' | 'MANUAL_VERIFIED';
+    documentType?: string;
+    documentRefNumber?: string;
+  }
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === customerId);
+  if (idx === -1) return null;
+  const now = new Date().toISOString();
+  current[idx] = {
+    ...current[idx],
+    status: 'VERIFIED',
+    otpStatus: 'VERIFIED',
+    verificationDetails: {
+      isVerified: true,
+      verifiedAt: now,
+      verifiedBy: params.verifiedBy,
+      verificationNotes: params.notes,
+      verificationType: params.verificationType || 'ADMIN_KYC',
+      documentType: params.documentType,
+      documentRefNumber: params.documentRefNumber,
+    },
+    lastActiveAt: now,
+  };
+  saveRegisteredCustomers(current);
+  return current[idx];
+};
+
+export const blockCustomerAccount = (
+  customerId: string,
+  reason: string,
+  adminName: string
+): RegisteredCustomer | null => {
+  const current = getRegisteredCustomers();
+  const idx = current.findIndex((c) => c.id === customerId);
+  if (idx === -1) return null;
+  current[idx] = {
+    ...current[idx],
+    status: 'BLOCKED',
+    blockedReason: reason,
+  };
+  saveRegisteredCustomers(current);
+  return current[idx];
+};
+
 export const suspendCustomerAccount = (
   customerId: string,
   reason: string,
@@ -310,9 +373,250 @@ export const restoreCustomerAccount = (
     ...current[idx],
     status: 'ACTIVE',
     suspensionReason: undefined,
+    blockedReason: undefined,
   };
   saveRegisteredCustomers(current);
   return current[idx];
+};
+
+export interface CustomerActivityEvent {
+  id: string;
+  timestamp: string;
+  title: string;
+  category: 'REGISTRATION' | 'REQUEST' | 'BOOKING' | 'PROJECT' | 'PAYMENT' | 'ORDER' | 'COMPLAINT' | 'ADMIN_NOTE' | 'STATUS_CHANGE';
+  description: string;
+  badge?: string;
+  status?: string;
+  amountPaise?: number;
+  referenceCode?: string;
+}
+
+export const getCustomerActivityTimeline = (customerId: string, phone: string): CustomerActivityEvent[] => {
+  const events: CustomerActivityEvent[] = [];
+  const rawTargetPhone = (phone || '').replace(/\D/g, '').slice(-10);
+
+  // 1. Customer registration & notes
+  const customers = getRegisteredCustomers();
+  const customer = customers.find((c) => c.id === customerId || (rawTargetPhone && c.phone.replace(/\D/g, '').slice(-10) === rawTargetPhone));
+  if (customer) {
+    events.push({
+      id: `act-reg-${customer.id}`,
+      timestamp: customer.registeredAt || new Date().toISOString(),
+      title: 'Homeowner Account Created',
+      category: 'REGISTRATION',
+      description: `Registered with mobile number ${customer.phone} from ${customer.city || 'Delhi NCR'}, ${customer.state || 'India'}.`,
+      badge: customer.status === 'VERIFIED' ? 'Verified Account' : 'Active Account',
+    });
+
+    if (customer.verificationDetails?.isVerified) {
+      events.push({
+        id: `act-ver-${customer.id}`,
+        timestamp: customer.verificationDetails.verifiedAt || customer.registeredAt,
+        title: 'Customer Identity Verified',
+        category: 'STATUS_CHANGE',
+        description: `Identity verified by Admin (${customer.verificationDetails.verifiedBy || 'Platform Admin'}) via ${customer.verificationDetails.verificationType || 'ADMIN_KYC'}.${customer.verificationDetails.verificationNotes ? ` Note: ${customer.verificationDetails.verificationNotes}` : ''}`,
+        badge: 'KYC Verified',
+      });
+    }
+
+    if (customer.suspensionReason) {
+      events.push({
+        id: `act-susp-${customer.id}`,
+        timestamp: customer.lastActiveAt || new Date().toISOString(),
+        title: 'Account Suspended',
+        category: 'STATUS_CHANGE',
+        description: `Account was suspended. Reason: ${customer.suspensionReason}`,
+        badge: 'Suspended',
+      });
+    }
+
+    if (customer.blockedReason) {
+      events.push({
+        id: `act-block-${customer.id}`,
+        timestamp: customer.lastActiveAt || new Date().toISOString(),
+        title: 'Account Blocked',
+        category: 'STATUS_CHANGE',
+        description: `Account was blocked by security audit. Reason: ${customer.blockedReason}`,
+        badge: 'Blocked',
+      });
+    }
+
+    if (Array.isArray(customer.internalNotes)) {
+      customer.internalNotes.forEach((n) => {
+        events.push({
+          id: `act-note-${n.id}`,
+          timestamp: n.createdAt,
+          title: `Internal Note by ${n.adminName}`,
+          category: 'ADMIN_NOTE',
+          description: n.note,
+          badge: 'Confidential Staff Note',
+        });
+      });
+    }
+  }
+
+  // 2. Project Requests
+  try {
+    const requests = getPlatformRequests();
+    requests.forEach((req) => {
+      const reqPhone = (req.customerPhone || '').replace(/\D/g, '').slice(-10);
+      if (req.customerId === customerId || (rawTargetPhone && reqPhone === rawTargetPhone)) {
+        events.push({
+          id: `act-req-${req.id}`,
+          timestamp: req.createdAt,
+          title: `Quotation RFQ Submitted: ${req.requestCode || req.id.slice(0, 8)}`,
+          category: 'REQUEST',
+          description: `${req.categorySlug || 'Architecture & Design'} request for ${req.city || 'Site'}, ${req.plotArea ? `${req.plotArea} sq ft` : 'custom plot'}. Budget: ${req.budgetRange || 'Standard'}.`,
+          badge: req.status,
+          referenceCode: req.requestCode || req.id,
+        });
+
+        if (req.isFeePaid) {
+          events.push({
+            id: `act-fee-${req.id}`,
+            timestamp: req.createdAt,
+            title: `Design Consultation Fee Paid`,
+            category: 'PAYMENT',
+            description: `Paid consultation fee of ₹${((req.quoteFeePaise || 99900) / 100).toLocaleString('en-IN')} for RFQ ${req.requestCode || req.id.slice(0, 8)}.`,
+            badge: 'Payment Captured',
+            amountPaise: req.quoteFeePaise || 99900,
+          });
+        }
+      }
+    });
+  } catch {}
+
+  // 3. Bookings
+  try {
+    const bookings = getPlatformBookings();
+    bookings.forEach((b) => {
+      const bPhone = (b.customerPhone || '').replace(/\D/g, '').slice(-10);
+      if (b.customerId === customerId || (rawTargetPhone && bPhone === rawTargetPhone)) {
+        events.push({
+          id: `act-bk-${b.id}`,
+          timestamp: b.confirmedAt || new Date().toISOString(),
+          title: `Site Consultation Booked: ${b.bookingCode || b.id.slice(0, 8)}`,
+          category: 'BOOKING',
+          description: `${b.serviceTitle || 'Site Visit'} booked with ${b.professionalName || 'Architect Partner'}.`,
+          badge: b.status,
+          referenceCode: b.bookingCode || b.id,
+        });
+      }
+    });
+  } catch {}
+
+  // 4. Projects & Milestones
+  try {
+    const prjData = localStorage.getItem('execution_projects');
+    if (prjData) {
+      const projects = JSON.parse(prjData);
+      if (Array.isArray(projects)) {
+        projects.forEach((p: any) => {
+          const pPhone = (p.customerPhone || '').replace(/\D/g, '').slice(-10);
+          if (p.customerId === customerId || (rawTargetPhone && pPhone === rawTargetPhone)) {
+            events.push({
+              id: `act-prj-${p.id}`,
+              timestamp: p.startDate || p.createdAt || new Date().toISOString(),
+              title: `Turnkey Project Active: ${p.name || p.projectCode || p.id.slice(0, 8)}`,
+              category: 'PROJECT',
+              description: `Project initialized under Architect ${p.architectName || 'Lead'}. Overall progress: ${p.progress || 0}%.`,
+              badge: p.status || 'IN_PROGRESS',
+              referenceCode: p.projectCode || p.id,
+            });
+
+            if (Array.isArray(p.milestones)) {
+              p.milestones.forEach((m: any) => {
+                if (m.paidAt || m.status === 'PAID') {
+                  events.push({
+                    id: `act-mil-pay-${m.id || m.milestoneNumber}`,
+                    timestamp: m.paidAt || m.completedAt || new Date().toISOString(),
+                    title: `Milestone #${m.milestoneNumber} Escrow Paid: ${m.title}`,
+                    category: 'PAYMENT',
+                    description: `Customer deposited ₹${((m.amountPaise || 0) / 100).toLocaleString('en-IN')} into escrow ledger.`,
+                    badge: 'Escrow Paid',
+                    amountPaise: m.amountPaise,
+                  });
+                }
+              });
+            }
+          }
+        });
+      }
+    }
+  } catch {}
+
+  // 5. Material Orders
+  try {
+    const ordData = localStorage.getItem('material_orders');
+    if (ordData) {
+      const orders = JSON.parse(ordData);
+      if (Array.isArray(orders)) {
+        orders.forEach((o: any) => {
+          const oPhone = (o.customerPhone || o.deliveryAddress?.phone || '').replace(/\D/g, '').slice(-10);
+          if (o.customerId === customerId || (rawTargetPhone && oPhone === rawTargetPhone)) {
+            events.push({
+              id: `act-ord-${o.id}`,
+              timestamp: o.createdAt || new Date().toISOString(),
+              title: `Material Order Placed: ${o.orderCode || o.id.slice(0, 8)}`,
+              category: 'ORDER',
+              description: `Ordered materials totaling ₹${((o.totalAmountPaise || 0) / 100).toLocaleString('en-IN')} with delivery to ${o.deliveryAddress?.city || 'site'}.`,
+              badge: o.status || 'CONFIRMED',
+              referenceCode: o.orderCode || o.id,
+              amountPaise: o.totalAmountPaise,
+            });
+          }
+        });
+      }
+    }
+  } catch {}
+
+  // 6. Support Tickets & Disputes
+  try {
+    const tktData = localStorage.getItem('platform_support_tickets');
+    if (tktData) {
+      const tickets = JSON.parse(tktData);
+      if (Array.isArray(tickets)) {
+        tickets.forEach((t: any) => {
+          const tPhone = (t.userPhone || '').replace(/\D/g, '').slice(-10);
+          if (t.userId === customerId || (rawTargetPhone && tPhone === rawTargetPhone)) {
+            events.push({
+              id: `act-tkt-${t.id}`,
+              timestamp: t.createdAt || new Date().toISOString(),
+              title: `Support Ticket Raised: ${t.ticketCode || t.id.slice(0, 8)}`,
+              category: 'COMPLAINT',
+              description: `${t.subject} - Priority: ${t.priority}. Status: ${t.status}.`,
+              badge: t.status,
+              referenceCode: t.ticketCode || t.id,
+            });
+          }
+        });
+      }
+    }
+
+    const dispData = localStorage.getItem('platform_complaint_disputes');
+    if (dispData) {
+      const disputes = JSON.parse(dispData);
+      if (Array.isArray(disputes)) {
+        disputes.forEach((d: any) => {
+          const dPhone = (d.userPhone || d.complainantPhone || '').replace(/\D/g, '').slice(-10);
+          if (d.customerId === customerId || d.userId === customerId || (rawTargetPhone && dPhone === rawTargetPhone)) {
+            events.push({
+              id: `act-disp-${d.id}`,
+              timestamp: d.createdAt || new Date().toISOString(),
+              title: `Project Dispute Logged: ${d.disputeCode || d.id.slice(0, 8)}`,
+              category: 'COMPLAINT',
+              description: `${d.title || d.subject} (${d.category || 'Quality Issue'}). Status: ${d.status}.`,
+              badge: d.priority || 'DISPUTE',
+              referenceCode: d.disputeCode || d.id,
+            });
+          }
+        });
+      }
+    }
+  } catch {}
+
+  // Sort descending by timestamp
+  return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 };
 
 export const incrementCustomerActivity = (
