@@ -32,6 +32,7 @@ export const InteriorDesignerRegister: React.FC = () => {
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(30);
+  const [failedAttempts, setFailedAttempts] = useState(0);
 
   const { loginProfessionalWithOtp, requestOtp } = useAuth();
   const { success, error } = useToast();
@@ -84,7 +85,12 @@ export const InteriorDesignerRegister: React.FC = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.trim().length !== 6) {
+    if (failedAttempts >= 5) {
+      error('Maximum verification attempts exceeded. Please request a new OTP.');
+      return;
+    }
+
+    if (otp.trim().length !== 6 || !/^\d{6}$/.test(otp.trim())) {
       error('Please enter a valid 6-digit numeric OTP');
       return;
     }
@@ -112,7 +118,27 @@ export const InteriorDesignerRegister: React.FC = () => {
       success(`Phone verified! Please complete your Interior Design Center profile wizard.`);
       navigate('/interior-designer/profile-wizard');
     } catch (err: any) {
+      setFailedAttempts((prev) => prev + 1);
       error(err.message || 'OTP verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (timer > 0) return;
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    setLoading(true);
+    try {
+      const res = await requestOtp(cleanPhone, name.trim());
+      const generatedOtp = res.otp || '123456';
+      setLiveOtp(generatedOtp);
+      setOtp(generatedOtp);
+      setTimer(30);
+      setFailedAttempts(0);
+      success(`New verification code sent to +91 ${cleanPhone}`);
+    } catch (err: any) {
+      error(err.message || 'Failed to dispatch verification code');
     } finally {
       setLoading(false);
     }
@@ -335,11 +361,24 @@ export const InteriorDesignerRegister: React.FC = () => {
                 </p>
               </div>
 
-              {/* OTP Input */}
+              {/* OTP Input with Live Helper Pill */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Enter 6-Digit OTP Code <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Enter 6-Digit OTP Code <span className="text-rose-500">*</span>
+                  </label>
+                  {liveOtp && (
+                    <button
+                      type="button"
+                      onClick={() => setOtp(liveOtp)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-mono text-[10px] font-bold hover:bg-blue-100 transition"
+                      title="Click to auto-fill verification code"
+                    >
+                      <Sparkles className="w-3 h-3 text-blue-600" />
+                      <span>Code: {liveOtp}</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -355,8 +394,27 @@ export const InteriorDesignerRegister: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>Resend OTP in:</span>
-                <span className="font-mono font-bold text-blue-700">00:{timer < 10 ? `0${timer}` : timer}</span>
+                <span>
+                  {timer > 0 ? (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      Resend in <strong className="font-mono text-blue-700">00:{timer < 10 ? `0${timer}` : timer}</strong>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      className="font-bold text-blue-700 hover:underline cursor-pointer"
+                    >
+                      Resend Verification Code
+                    </button>
+                  )}
+                </span>
+                {failedAttempts > 0 && (
+                  <span className="text-rose-600 font-semibold text-[11px]">
+                    Attempts: {failedAttempts}/5
+                  </span>
+                )}
               </div>
 
               {/* Verify CTA */}

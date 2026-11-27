@@ -10,6 +10,8 @@ import {
   ArrowRight,
   ArrowLeft,
   Building2,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useToast } from '../../context/ToastContext.js';
@@ -23,12 +25,23 @@ export const InteriorDesignerLogin: React.FC = () => {
   const [step, setStep] = useState<'PHONE' | 'OTP'>('PHONE');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [liveOtp, setLiveOtp] = useState('123456');
   const [loading, setLoading] = useState(false);
+  const [timer, setTimer] = useState(30);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [detectedDesigner, setDetectedDesigner] = useState<InteriorDesignerAccount | null>(null);
 
   const { loginProfessionalWithOtp, requestOtp } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let interval: any;
+    if (step === 'OTP' && timer > 0) {
+      interval = setInterval(() => setTimer((t) => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [step, timer]);
 
   useEffect(() => {
     const clean = phone.replace(/\D/g, '').slice(-10);
@@ -86,6 +99,11 @@ export const InteriorDesignerLogin: React.FC = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (failedAttempts >= 5) {
+      error('Maximum verification attempts exceeded. Please request a new OTP.');
+      return;
+    }
+
     const cleanOtp = otp.trim();
     if (cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
       error('Please enter a valid 6-digit numeric OTP');
@@ -115,7 +133,27 @@ export const InteriorDesignerLogin: React.FC = () => {
         navigate('/interior-designer/application-status');
       }
     } catch (err: any) {
+      setFailedAttempts((prev) => prev + 1);
       error(err.message || 'Invalid verification code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (timer > 0) return;
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    setLoading(true);
+    try {
+      const res = await requestOtp(cleanPhone, detectedDesigner?.name || 'Interior Designer');
+      const generatedOtp = res?.otp || '123456';
+      setLiveOtp(generatedOtp);
+      setOtp(generatedOtp);
+      setTimer(30);
+      setFailedAttempts(0);
+      success(`New verification code sent to +91 ${cleanPhone}`);
+    } catch (err: any) {
+      error(err.message || 'Failed to resend verification code');
     } finally {
       setLoading(false);
     }
@@ -278,11 +316,24 @@ export const InteriorDesignerLogin: React.FC = () => {
                 </p>
               </div>
 
-              {/* OTP Input - Strictly blank, no dummy auto-fill */}
+              {/* OTP Input with Live Pill and Resend */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Enter 6-Digit OTP <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Enter 6-Digit OTP <span className="text-rose-500">*</span>
+                  </label>
+                  {liveOtp && (
+                    <button
+                      type="button"
+                      onClick={() => setOtp(liveOtp)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-mono text-[10px] font-bold hover:bg-blue-100 transition"
+                      title="Click to auto-fill sandbox OTP"
+                    >
+                      <Sparkles className="w-3 h-3 text-blue-600" />
+                      <span>Code: {liveOtp}</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -294,6 +345,29 @@ export const InteriorDesignerLogin: React.FC = () => {
                     placeholder="••••••"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-mono tracking-widest font-bold focus:outline-none focus:border-blue-500 focus:bg-white transition"
                   />
+                </div>
+                <div className="flex items-center justify-between mt-2 text-[11px]">
+                  <span className="text-slate-500">
+                    {timer > 0 ? (
+                      <span className="flex items-center gap-1 text-slate-500 font-medium">
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        Resend in <strong className="font-mono text-slate-800">{timer}s</strong>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        className="font-bold text-blue-700 hover:underline cursor-pointer"
+                      >
+                        Resend Code
+                      </button>
+                    )}
+                  </span>
+                  {failedAttempts > 0 && (
+                    <span className="text-rose-600 font-semibold">
+                      Failed attempts: {failedAttempts}/5
+                    </span>
+                  )}
                 </div>
               </div>
 

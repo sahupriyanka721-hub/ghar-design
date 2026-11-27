@@ -18,9 +18,11 @@ export type InteriorDesignerAccountStatus =
 
 export type InteriorDesignerBusinessType =
   | 'Individual Interior Designer'
-  | 'Freelance Interior Designer'
-  | 'Interior Design Center'
+  | 'Interior Design Studio'
+  | 'Interior Design Company'
+  | 'Interior Design Contractor'
   | 'Interior Design Firm'
+  | 'Freelance Interior Designer'
   | 'Partnership Firm'
   | 'Private Limited Company'
   | 'LLP'
@@ -44,6 +46,13 @@ export interface InteriorPortfolioProject {
   beforeImageUrl?: string;
   afterImageUrl?: string;
   renderImageUrl?: string;
+  twoDLayoutUrl?: string;
+  threeDRenderUrl?: string;
+  beforePhotos?: string[];
+  afterPhotos?: string[];
+  twoDLayouts?: string[];
+  threeDRenders?: string[];
+  galleryPhotos?: string[];
   videoLink?: string;
 }
 
@@ -57,7 +66,8 @@ export interface InteriorKycDocument {
     | 'ADDRESS_PROOF'
     | 'QUALIFICATION_CERTIFICATE'
     | 'PORTFOLIO_PDF'
-    | 'BANK_PROOF';
+    | 'BANK_PROOF'
+    | 'OTHER_DOCUMENT';
   title: string;
   fileUrl: string;
   fileSize?: string;
@@ -81,25 +91,48 @@ export interface InteriorDesignerAccount {
   city: string;
   district?: string;
   pincode: string;
+  country?: string;
 
-  // Step 2: Business Details
+  // Step B: Business Details
   businessName: string;
   businessType: InteriorDesignerBusinessType;
+  businessRegistrationType?: string;
   businessRegistrationDate?: string;
   businessAddress: string;
   officeContact?: string;
   businessEmail: string;
   website?: string;
   businessLogo?: string;
+  gstNumber?: string;
+  businessRegistrationNumber?: string;
+  yearOfEstablishment?: number;
   yearsOfExperience: number;
   teamSize: number;
   completedProjectsCount: number;
   businessDescription: string;
   serviceAreas: string[];
   serviceCities: string[];
+  servicePincodes?: string[];
+  serviceRadiusKm?: number;
+  onSiteServiceAvailable?: boolean;
+  onlineConsultationAvailable?: boolean;
   availableForNewProjects: boolean;
 
-  // Step 3: Specializations & Pricing
+  // Step C: Qualification & Experience
+  highestQualification: string;
+  degreeName: string;
+  institutionName: string;
+  completionYear: number;
+  specialization?: string;
+  professionalRegistration?: string;
+  certifications?: string;
+  certificationsList?: string[];
+  memberships?: string;
+  previousFirms?: string;
+  previousProjectsDescription?: string;
+
+  // Step D: Services Offered (23 Services from Master Prompt)
+  servicesOffered?: string[];
   specializations: string[];
   preferredProjectTypes: string[];
   minProjectBudget: number;
@@ -111,27 +144,20 @@ export interface InteriorDesignerAccount {
   providesExecution: boolean;
   worksWithContractors: boolean;
 
-  // Step 4: Professional Qualifications
-  highestQualification: string;
-  degreeName: string;
-  institutionName: string;
-  completionYear: number;
-  certifications?: string;
-  memberships?: string;
-  previousFirms?: string;
-
-  // Step 5: KYC Documents
-  documents: InteriorKycDocument[];
-
-  // Step 6: Portfolio
+  // Step E: Portfolio
   portfolioProjects: InteriorPortfolioProject[];
 
-  // Step 7: Bank & Payout Details
+  // Step F: KYC Documents
+  documents: InteriorKycDocument[];
+
+  // Step H: Bank & Payout Details
   bankDetails?: {
     accountHolderName: string;
     bankName: string;
     accountNumber: string;
     ifscCode: string;
+    branch?: string;
+    accountType?: 'Current' | 'Savings' | string;
     upiId?: string;
     isVerified: boolean;
   };
@@ -147,39 +173,64 @@ export interface InteriorDesignerAccount {
   updatedAt: string;
 }
 
-// 19 Master Interior Design Specializations from Prompt Section 3
-export const ALL_INTERIOR_SPECIALIZATIONS = [
-  { name: 'Residential Interior Design', category: 'Residential', desc: 'Bespoke end-to-end luxury apartments, duplexes, villas, and independent floors.' },
-  { name: 'Living Room Design', category: 'Rooms', desc: 'Sofa seating ergonomics, TV unit paneling, accent walls, and ambient cove lighting.' },
-  { name: 'Bedroom Design', category: 'Rooms', desc: 'Master suites, acoustic headboards, walk-in closets, and biophilic lighting design.' },
-  { name: 'Modular Kitchen', category: 'Kitchen', desc: 'Ergonomic L-shaped, U-shaped, and island kitchens with German soft-close tandem hardware.' },
-  { name: 'Bathroom Design', category: 'Bath', desc: 'Wet-dry zoning, concealed vanity plumbing, frameless glass cubicles, and anti-skid tiles.' },
-  { name: 'False Ceiling and Lighting', category: 'Architectural', desc: 'Multi-tier Gyproc ceiling layouts, magnetic track lights, and architectural profile channels.' },
-  { name: 'Wardrobe and Storage Design', category: 'Storage', desc: 'Floor-to-ceiling sliding wardrobes, lacquer glass shutters, and pull-out organizers.' },
-  { name: 'Furniture Planning', category: 'Furniture', desc: 'Custom dining tables, accent armchairs, ergonomics, and space circulation clearances.' },
-  { name: 'Space Planning', category: 'Planning', desc: 'Optimal furniture layouts, circulation paths, and natural light daylighting analysis.' },
-  { name: '2D Interior Layouts', category: 'Technical', desc: 'Dimensioned floor plans, partition details, door-window schedules, and electrical points.' },
-  { name: '3D Interior Visualization', category: '3D Render', desc: 'Ultra-photorealistic 4K daytime and evening 3ds Max/V-Ray renders with material textures.' },
-  { name: 'Office and Commercial Interiors', category: 'Commercial', desc: 'Acoustic conference rooms, executive suites, ergonomic workstations, and breakout zones.' },
-  { name: 'Retail and Showroom Interiors', category: 'Commercial', desc: 'Brand display fixtures, track spotlights, customer flow aisles, and billing counters.' },
-  { name: 'Hospitality Interiors', category: 'Hospitality', desc: 'Boutique hotels, fine dining restaurants, ambient cafes, and luxury reception lounges.' },
-  { name: 'Renovation and Remodeling', category: 'Renovation', desc: 'Demolition, civil structural remodeling, rewiring, replumbing, and modern retrofitting.' },
-  { name: 'Complete Interior Projects', category: 'Full Scope', desc: 'End-to-end single-contract design, procurement, carpentry, civil execution, and styling.' },
-  { name: 'Custom Furniture Design', category: 'Furniture', desc: 'Handcrafted teak wood joinery, custom brass inlay tables, and luxury upholstery.' },
-  { name: 'DÃ©cor and Styling', category: 'Styling', desc: 'Curated wall art, artifacts, custom rugs, curtains, cushions, and indoor planters.' },
-  { name: 'Other', category: 'Custom', desc: 'Bespoke niche interior solutions tailored to specific homeowner requirements.' },
+// 23 Master Services from Master Prompt Section 3 Step D
+export interface InteriorServiceItem {
+  id: string;
+  name: string;
+  category: 'Residential' | 'Living & Spaces' | 'Kitchen & Wardrobe' | 'Ceiling & Lighting' | 'Commercial & Hospitality' | 'Design & Renders' | 'Execution & Advisory';
+  desc: string;
+}
+
+export const MASTER_INTERIOR_SERVICES: InteriorServiceItem[] = [
+  { id: 'srv-1', name: 'Residential Interior Design', category: 'Residential', desc: 'Bespoke end-to-end luxury apartments, duplexes, villas, and builder floors.' },
+  { id: 'srv-2', name: 'Living Room Design', category: 'Living & Spaces', desc: 'Ergonomic seating layouts, TV console paneling, accent walls, and ambient cove lighting.' },
+  { id: 'srv-3', name: 'Bedroom Design', category: 'Living & Spaces', desc: 'Master bedroom suites, acoustic headboards, walk-in closets, and biophilic circadian lighting.' },
+  { id: 'srv-4', name: 'Modular Kitchen Design', category: 'Kitchen & Wardrobe', desc: 'Ergonomic L-shaped, U-shaped & Island layouts with Blum/Hettich soft-close tandem hardware.' },
+  { id: 'srv-5', name: 'Bathroom Design', category: 'Living & Spaces', desc: 'Wet-dry zone planning, floating vanity counters, concealed plumbing, and frameless cubicles.' },
+  { id: 'srv-6', name: 'Dining Room Design', category: 'Living & Spaces', desc: 'Custom dining tables, crockery display buffets, designer chandeliers, and accent mirrors.' },
+  { id: 'srv-7', name: 'Kids Room Design', category: 'Living & Spaces', desc: 'Ergonomic study desks, child-safe rounded furniture, vibrant colors, and built-in toy storage.' },
+  { id: 'srv-8', name: 'Wardrobe Design', category: 'Kitchen & Wardrobe', desc: 'Floor-to-ceiling sliding wardrobes, lacquer glass shutters, and motorized pull-out organizers.' },
+  { id: 'srv-9', name: 'False Ceiling Design', category: 'Ceiling & Lighting', desc: 'Multi-tier Gyproc plasterboard ceilings, perimeter cove troughs, and acoustic wood rafters.' },
+  { id: 'srv-10', name: 'Lighting Design', category: 'Ceiling & Lighting', desc: 'Architectural magnetic tracks, surface cob downlights, wall washers, and 3000K warm luminaires.' },
+  { id: 'srv-11', name: 'Furniture Layout', category: 'Living & Spaces', desc: 'Spatial zoning, clearances, anthropometric ergonomics, and custom loose furniture.' },
+  { id: 'srv-12', name: 'Office Interior Design', category: 'Commercial & Hospitality', desc: 'Acoustic conference rooms, executive suites, ergonomic hot-desks, and cafeteria breakout zones.' },
+  { id: 'srv-13', name: 'Commercial Interior Design', category: 'Commercial & Hospitality', desc: 'Corporate hubs, clinics, beauty salons, banks, and boutique commercial environments.' },
+  { id: 'srv-14', name: 'Retail Store Interior Design', category: 'Commercial & Hospitality', desc: 'Visual merchandising bays, track spotlights, display mannequins, and checkout counters.' },
+  { id: 'srv-15', name: 'Hotel Interior Design', category: 'Commercial & Hospitality', desc: 'Boutique hotel suites, grand reception lobbies, all-day dining lounges, and banquet halls.' },
+  { id: 'srv-16', name: 'Restaurant Interior Design', category: 'Commercial & Hospitality', desc: 'Fine dining seating layout, ambient acoustic wall paneling, bar counters, and open kitchens.' },
+  { id: 'srv-17', name: 'Complete Home Interior Design', category: 'Residential', desc: 'Turnkey single-contract architectural interior planning, civil, carpentry, and styling.' },
+  { id: 'srv-18', name: 'Home Renovation Interior Design', category: 'Residential', desc: 'Demolition, structural partition remodeling, electrical rewiring, and modern retrofitting.' },
+  { id: 'srv-19', name: '2D Interior Design', category: 'Design & Technical', desc: 'Dimensioned working CAD floor plans, false ceiling schedules, and electrical switch layouts.' },
+  { id: 'srv-20', name: '3D Interior Design', category: 'Design & Technical', desc: 'Photorealistic 4K daytime and evening 3ds Max/V-Ray/Lumion perspective visual renders.' },
+  { id: 'srv-21', name: 'Interior Execution and Implementation', category: 'Execution & Advisory', desc: 'Civil masonry, modular assembly, PU polishing, wallpapering, and turnkey on-site contracting.' },
+  { id: 'srv-22', name: 'Material Selection and Consultation', category: 'Execution & Advisory', desc: 'Designer-assisted showroom visits for Italian marble, veneers, laminates, fabrics, and sanitaryware.' },
+  { id: 'srv-23', name: 'Site Supervision', category: 'Execution & Advisory', desc: 'Periodic technical site audits, alignment verification, snag-list resolution, and quality sign-offs.' },
 ];
 
 export const ALL_INTERIOR_BUSINESS_TYPES: InteriorDesignerBusinessType[] = [
   'Individual Interior Designer',
-  'Freelance Interior Designer',
-  'Interior Design Center',
+  'Interior Design Studio',
+  'Interior Design Company',
+  'Interior Design Contractor',
   'Interior Design Firm',
+  'Freelance Interior Designer',
   'Partnership Firm',
   'Private Limited Company',
   'LLP',
   'Other',
 ];
+
+export const ALL_INTERIOR_REGISTRATION_TYPES = [
+  'Sole Proprietorship',
+  'Partnership Firm',
+  'Private Limited Company',
+  'Limited Liability Partnership (LLP)',
+  'One Person Company (OPC)',
+  'Unregistered / Individual',
+];
+
+// Backward compatible export for existing components
+export const ALL_INTERIOR_SPECIALIZATIONS = MASTER_INTERIOR_SERVICES;
 
 
 
@@ -325,28 +376,67 @@ export const saveInteriorDesignerAccount = (acc: Partial<InteriorDesignerAccount
     current.splice(existingIdx, 1);
     current.unshift(updated);
   } else {
+    const designerIndex = current.length + 1;
+    const formattedId = `BG-ID-${String(designerIndex).padStart(4, '0')}`;
     updated = {
       id: acc.id || `id-${Date.now()}`,
-      applicationId: acc.applicationId || `BG-ID-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+      applicationId: acc.applicationId || formattedId,
       userId: acc.userId || `usr-id-${Date.now()}`,
       name: acc.name || '',
       phone: cleanPhone || '',
       email: acc.email || '',
+      alternatePhone: acc.alternatePhone || '',
+      profilePhoto: acc.profilePhoto || '',
+      dob: acc.dob || '',
+      gender: acc.gender || '',
+      residentialAddress: acc.residentialAddress || '',
       state: acc.state || '',
       city: acc.city || '',
+      district: acc.district || '',
       pincode: acc.pincode || '',
+      country: acc.country || 'India',
+
+      // Step B: Business Details
       businessName: acc.businessName || '',
       businessType: acc.businessType || 'Interior Design Firm',
+      businessRegistrationType: acc.businessRegistrationType || 'Private Limited Company',
+      businessRegistrationDate: acc.businessRegistrationDate || '',
       businessAddress: acc.businessAddress || '',
+      officeContact: acc.officeContact || '',
       businessEmail: acc.businessEmail || acc.email || '',
+      website: acc.website || '',
+      businessLogo: acc.businessLogo || '',
+      gstNumber: acc.gstNumber || '',
+      businessRegistrationNumber: acc.businessRegistrationNumber || '',
+      yearOfEstablishment: acc.yearOfEstablishment || 2020,
       yearsOfExperience: acc.yearsOfExperience || 0,
       teamSize: acc.teamSize || 1,
       completedProjectsCount: acc.completedProjectsCount || 0,
       businessDescription: acc.businessDescription || '',
       serviceAreas: acc.serviceAreas || [],
       serviceCities: acc.serviceCities || [],
+      servicePincodes: acc.servicePincodes || [],
+      serviceRadiusKm: acc.serviceRadiusKm || 50,
+      onSiteServiceAvailable: acc.onSiteServiceAvailable ?? true,
+      onlineConsultationAvailable: acc.onlineConsultationAvailable ?? true,
       availableForNewProjects: acc.availableForNewProjects ?? true,
-      specializations: acc.specializations || [],
+
+      // Step C: Qualification & Experience
+      highestQualification: acc.highestQualification || '',
+      degreeName: acc.degreeName || '',
+      institutionName: acc.institutionName || '',
+      completionYear: acc.completionYear || 0,
+      specialization: acc.specialization || '',
+      professionalRegistration: acc.professionalRegistration || '',
+      certifications: acc.certifications || '',
+      certificationsList: acc.certificationsList || [],
+      memberships: acc.memberships || '',
+      previousFirms: acc.previousFirms || '',
+      previousProjectsDescription: acc.previousProjectsDescription || '',
+
+      // Step D: Services Offered
+      servicesOffered: acc.servicesOffered || acc.specializations || [],
+      specializations: acc.specializations || acc.servicesOffered || [],
       preferredProjectTypes: acc.preferredProjectTypes || [],
       minProjectBudget: acc.minProjectBudget || 0,
       maxProjectBudget: acc.maxProjectBudget || 0,
@@ -356,12 +446,15 @@ export const saveInteriorDesignerAccount = (acc: Partial<InteriorDesignerAccount
       providesMaterials: acc.providesMaterials ?? true,
       providesExecution: acc.providesExecution ?? true,
       worksWithContractors: acc.worksWithContractors ?? true,
-      highestQualification: acc.highestQualification || '',
-      degreeName: acc.degreeName || '',
-      institutionName: acc.institutionName || '',
-      completionYear: acc.completionYear || 0,
-      documents: acc.documents || [],
+
+      // Step E & F: Portfolio & Documents
       portfolioProjects: acc.portfolioProjects || [],
+      documents: acc.documents || [],
+
+      // Step H: Bank & Payout Details
+      bankDetails: acc.bankDetails,
+
+      // Status
       accountStatus: acc.accountStatus || 'PROFILE_INCOMPLETE',
       isVerified: acc.isVerified ?? false,
       registeredAt: acc.registeredAt || now,
