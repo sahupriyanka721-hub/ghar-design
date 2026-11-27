@@ -367,6 +367,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/services-config': true,
     '/admin/staff': true,
     '/admin/settings': true,
+    '/admin/audit-logs': true,
   });
   const { success } = useToast();
 
@@ -424,6 +425,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/settings')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/settings': true }));
+    }
+    if (location.pathname.startsWith('/admin/audit-logs')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/audit-logs': true }));
     }
   }, [location.pathname]);
 
@@ -557,7 +561,20 @@ export const AdminLayout: React.FC = () => {
             { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
           ],
         },
-        { label: 'Security Audit Trail', path: '/admin/audit-logs', icon: ShieldCheck },
+        {
+          label: 'Security Audit Trail',
+          path: '/admin/audit-logs',
+          icon: ShieldCheck,
+          subItems: [
+            { label: 'Admin Activity', path: '/admin/audit-logs?view=ADMIN_ACTIVITY', view: 'ADMIN_ACTIVITY' },
+            { label: 'Customer Activity', path: '/admin/audit-logs?view=CUSTOMER_ACTIVITY', view: 'CUSTOMER_ACTIVITY' },
+            { label: 'Architect Activity', path: '/admin/audit-logs?view=ARCHITECT_ACTIVITY', view: 'ARCHITECT_ACTIVITY' },
+            { label: 'Payment Activity', path: '/admin/audit-logs?view=PAYMENT_ACTIVITY', view: 'PAYMENT_ACTIVITY' },
+            { label: 'Project Activity', path: '/admin/audit-logs?view=PROJECT_ACTIVITY', view: 'PROJECT_ACTIVITY' },
+            { label: 'Status Change History', path: '/admin/audit-logs?view=STATUS_HISTORY', view: 'STATUS_HISTORY' },
+            { label: 'Login History', path: '/admin/audit-logs?view=LOGIN_HISTORY', view: 'LOGIN_HISTORY' },
+          ],
+        },
         {
           label: 'Platform Settings',
           path: '/admin/settings',
@@ -881,6 +898,20 @@ export const AdminLayout: React.FC = () => {
             { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
           ],
         },
+        {
+          label: 'Security Audit Trail',
+          path: '/admin/audit-logs',
+          icon: ShieldCheck,
+          subItems: [
+            { label: 'Admin Activity', path: '/admin/audit-logs?view=ADMIN_ACTIVITY', view: 'ADMIN_ACTIVITY' },
+            { label: 'Customer Activity', path: '/admin/audit-logs?view=CUSTOMER_ACTIVITY', view: 'CUSTOMER_ACTIVITY' },
+            { label: 'Architect Activity', path: '/admin/audit-logs?view=ARCHITECT_ACTIVITY', view: 'ARCHITECT_ACTIVITY' },
+            { label: 'Payment Activity', path: '/admin/audit-logs?view=PAYMENT_ACTIVITY', view: 'PAYMENT_ACTIVITY' },
+            { label: 'Project Activity', path: '/admin/audit-logs?view=PROJECT_ACTIVITY', view: 'PROJECT_ACTIVITY' },
+            { label: 'Status Change History', path: '/admin/audit-logs?view=STATUS_HISTORY', view: 'STATUS_HISTORY' },
+            { label: 'Login History', path: '/admin/audit-logs?view=LOGIN_HISTORY', view: 'LOGIN_HISTORY' },
+          ],
+        },
       ],
     },
   ];
@@ -1118,7 +1149,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
 
                               return (
                                 <Link

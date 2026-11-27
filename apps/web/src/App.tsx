@@ -472,6 +472,8 @@ export const App: React.FC = () => {
           <Route path="cms" element={<AdminCMSContent />} />
           <Route path="content" element={<AdminCMSContent />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
+          <Route path="audit-trail" element={<AdminAuditLogs />} />
+          <Route path="activity-logs" element={<AdminAuditLogs />} />
           <Route path="assignments" element={<AdminAssignments />} />
           <Route path="documents" element={<AdminDocuments />} />
           <Route path="payouts" element={<AdminPayouts />} />
