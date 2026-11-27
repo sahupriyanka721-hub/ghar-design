@@ -361,6 +361,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/communications': true,
     '/admin/support': true,
     '/admin/reports': true,
+    '/admin/notifications': true,
   });
   const { success } = useToast();
 
@@ -403,6 +404,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/reports')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/reports': true }));
+    }
+    if (location.pathname.startsWith('/admin/notifications')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/notifications': true }));
     }
   }, [location.pathname]);
 
@@ -764,7 +768,19 @@ export const AdminLayout: React.FC = () => {
             { label: 'Performance Reports', path: '/admin/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
           ],
         },
-        { label: 'Notification Broadcast Center', path: '/admin/notifications', icon: Bell },
+        {
+          label: 'Notification Management',
+          path: '/admin/notifications',
+          icon: Bell,
+          subItems: [
+            { label: 'Customer Notifications', path: '/admin/notifications?view=CUSTOMER_NOTIFICATIONS', view: 'CUSTOMER_NOTIFICATIONS' },
+            { label: 'Architect Notifications', path: '/admin/notifications?view=ARCHITECT_NOTIFICATIONS', view: 'ARCHITECT_NOTIFICATIONS' },
+            { label: 'Admin Notifications', path: '/admin/notifications?view=ADMIN_NOTIFICATIONS', view: 'ADMIN_NOTIFICATIONS' },
+            { label: 'Email Templates', path: '/admin/notifications?view=EMAIL_TEMPLATES', view: 'EMAIL_TEMPLATES' },
+            { label: 'SMS Templates', path: '/admin/notifications?view=SMS_TEMPLATES', view: 'SMS_TEMPLATES' },
+            { label: 'Notification History', path: '/admin/notifications?view=NOTIFICATION_HISTORY', view: 'NOTIFICATION_HISTORY' },
+          ],
+        },
         { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
         { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
       ],
@@ -1004,7 +1020,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS')));
 
                               return (
                                 <Link
