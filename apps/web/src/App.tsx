@@ -106,6 +106,7 @@ import { AdminCommunications } from './pages/admin/AdminCommunications.js';
 import { AdminCoupons } from './pages/admin/AdminCoupons.js';
 import { AdminLocations } from './pages/admin/AdminLocations.js';
 import { AdminStaff } from './pages/admin/AdminStaff.js';
+import { AdminAssignments } from './pages/admin/AdminAssignments.js';
 
 // Architect Partner Portal Pages (Master Development Prompt)
 import { ArchitectLandingPage } from './pages/public/ArchitectLandingPage.js';
@@ -445,7 +446,7 @@ export const App: React.FC = () => {
           <Route path="settings" element={<AdminPlatformSettings />} />
           <Route path="cms" element={<AdminPlatformSettings />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
-          <Route path="assignments" element={<AdminRequests />} />
+          <Route path="assignments" element={<AdminAssignments />} />
           <Route path="documents" element={<AdminProjects />} />
           <Route path="payouts" element={<AdminPayments />} />
           <Route path="invoices" element={<AdminPayments />} />

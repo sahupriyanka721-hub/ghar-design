@@ -8,6 +8,7 @@ import { FileText, Users, ChevronRight, Search, Plus, X,
 import { getPlatformRequests, savePlatformRequest, syncChannel, PlatformProjectRequest } from '../../data/customerStore.js';
 import { getVendorMaterialRequests, VendorMaterialRequest } from '../../data/vendorStore.js';
 import { getArchitectAccounts } from '../../data/architectStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminRequests: React.FC = () => {
   const { success, error } = useToast();
@@ -213,6 +214,17 @@ export const AdminRequests: React.FC = () => {
     };
 
     savePlatformRequest(created);
+    logAdminAuditAction({
+      action: 'CREATE_QUOTATION_REQUEST_MANUAL',
+      module: 'QUOTATION_REQUEST_MANAGEMENT',
+      targetId: created.id,
+      targetName: created.requestCode,
+      details: {
+        customerName: created.customerName,
+        city: created.city,
+        plotArea: created.plotArea,
+      },
+    });
     loadRequests();
     setShowAddModal(false);
     setNewReq({
@@ -409,13 +421,23 @@ export const AdminRequests: React.FC = () => {
 
                       {/* 7. Actions */}
                       <td className="p-4 text-right">
-                        <Link
-                          to={`/admin/requests/${req.id}`}
-                          className="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1"
-                        >
-                          <span>Inspect &amp; Assign</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/admin/assignments?requestId=${req.id}`}
+                            className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs inline-flex items-center gap-1 transition shadow-2xs"
+                            title="Open in Multi-Architect Assignment Dispatch Console"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Assign</span>
+                          </Link>
+                          <Link
+                            to={`/admin/requests/${req.id}`}
+                            className="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1"
+                          >
+                            <span>Inspect</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

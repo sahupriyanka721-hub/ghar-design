@@ -47,6 +47,7 @@ import { pushToCloud, cleanRecords } from '../../data/cloudSync.js';
 import { purgeDummyData } from '../../data/customerStore.js';
 import { safeSetStorage, safeGetStorage } from '../../lib/safeStorage.js';
 import { getArchitectById, getArchitectByPhone } from '../../data/architectStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminQuotationsReview: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -434,6 +435,21 @@ export const AdminQuotationsReview: React.FC = () => {
         }
       }
 
+      logAdminAuditAction({
+        action:
+          action === 'APPROVE'
+            ? 'APPROVE_ARCHITECT_QUOTATION'
+            : action === 'PUBLISH'
+            ? 'FORWARD_QUOTATION_TO_CUSTOMER'
+            : action === 'REQUEST_CHANGES'
+            ? 'REQUEST_QUOTATION_REVISION'
+            : 'REJECT_ARCHITECT_QUOTATION',
+        module: 'QUOTATION_MANAGEMENT',
+        targetId: quoteId,
+        targetName: `Quotation ${quoteId}`,
+        details: { action, feedback: reviewNote },
+      });
+
       success(`Quotation ${action.toLowerCase()}ed successfully.`);
       setActiveQuoteId(null);
       setReviewNote('');
@@ -468,6 +484,13 @@ export const AdminQuotationsReview: React.FC = () => {
         quotationsCount: targetQuotes.length,
       });
     }
+    logAdminAuditAction({
+      action: 'FORWARD_ALL_QUOTATIONS_TO_CUSTOMER',
+      module: 'QUOTATION_MANAGEMENT',
+      targetId: reqKey,
+      targetName: `Request ${reqKey}`,
+      details: { quotesCount: targetQuotes.length },
+    });
     success(`Published ${targetQuotes.length} quotations to homeowner for request ${reqKey}.`);
   };
 

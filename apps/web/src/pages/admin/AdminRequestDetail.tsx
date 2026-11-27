@@ -42,6 +42,7 @@ import { pushToCloud } from '../../data/cloudSync.js';
 import { getPlatformContractors } from '../../data/adminStore.js';
 import { getRegisteredArchitects, getArchitectById, getArchitectByPhone } from '../../data/architectStore.js';
 import { getRegisteredInteriorDesigners, saveInteriorQuotation } from '../../data/interiorDesignerStore.js';
+import { logAdminAuditAction } from '../../data/adminRbacStore.js';
 
 export const AdminRequestDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -320,6 +321,13 @@ export const AdminRequestDetail: React.FC = () => {
     const updated = updatePlatformRequestStatus(request.id, newStatus, extra);
     if (updated) {
       setRequest(updated);
+      logAdminAuditAction({
+        action: 'UPDATE_REQUEST_STATUS',
+        module: 'QUOTATION_REQUEST_MANAGEMENT',
+        targetId: request.id,
+        targetName: request.requestCode || request.id,
+        details: { previousStatus: request.status, newStatus, notes: internalNotes },
+      });
       success(`Project request status successfully changed to "${newStatus.replace(/_/g, ' ')}"`);
     }
   };
@@ -446,6 +454,18 @@ export const AdminRequestDetail: React.FC = () => {
       if (updated) {
         setRequest(updated);
       }
+      logAdminAuditAction({
+        action: 'ASSIGN_ARCHITECTS_TO_REQUEST',
+        module: 'ARCHITECT_ASSIGNMENT_MANAGEMENT',
+        targetId: request.id,
+        targetName: request.requestCode || request.id,
+        details: {
+          assignedCount: selectedProIds.length,
+          professionalIds: selectedProIds,
+          responseDeadline,
+          notes: internalNotes,
+        },
+      });
       success(`Assigned ${selectedProIds.length} certified ${selectedProIds.length === 1 ? 'professional firm' : 'professional firms'}. They will be notified to review the scope and submit itemized BOQ quotations.`);
     } catch (err: any) {
       error(err.message || 'Assignment failed');
