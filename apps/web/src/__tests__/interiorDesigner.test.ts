@@ -78,6 +78,13 @@ import {
   markInteriorNotificationRead,
   markAllInteriorNotificationsRead,
   dispatchInteriorNotification,
+  validateInteriorDesignerAccess,
+  enforceResourceAccess,
+  checkDesignerActionPermission,
+  enforceDesignerActionPermission,
+  canReceiveAssignment,
+  getSecurityAuditLogs,
+  SecurityAccessDeniedError,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
 import {
@@ -1213,5 +1220,88 @@ describe('Interior Designer Panel & Store Tests', () => {
     const allReadList = getInteriorNotifications('9811055990');
     const hasUnread = allReadList.some((n) => !n.read);
     expect(hasUnread).toBe(false);
+  });
+
+  it('implements Mandatory Section 23 Test 8: Security workflow (Role-based access denial, customer payment & note protection)', () => {
+    const designerActor = {
+      id: 'id-101',
+      role: 'INTERIOR_DESIGNER',
+      name: 'Ar. Pooja Mehra',
+    };
+
+    // 1. Interior Designer tries to access another designer's project -> System DENIES access
+    const otherProjectAccess = validateInteriorDesignerAccess(designerActor, {
+      type: 'PROJECT',
+      ownerDesignerId: 'id-other-999',
+      projectId: 'BG-PRJ-OTHER',
+    });
+    expect(otherProjectAccess.allowed).toBe(false);
+    expect(otherProjectAccess.reason).toContain("another designer's project");
+
+    expect(() => {
+      enforceResourceAccess(designerActor, {
+        type: 'PROJECT',
+        ownerDesignerId: 'id-other-999',
+      });
+    }).toThrow(SecurityAccessDeniedError);
+
+    // 2. Interior Designer tries to access customer payment collections -> System DENIES access
+    const customerPaymentAccess = validateInteriorDesignerAccess(designerActor, {
+      type: 'PAYMENT_COLLECTION',
+      resourceId: 'GATEWAY-ORDER-101',
+    });
+    expect(customerPaymentAccess.allowed).toBe(false);
+    expect(customerPaymentAccess.reason).toContain('Customer gateway collection records are restricted');
+
+    expect(() => {
+      enforceResourceAccess(designerActor, {
+        type: 'PAYMENT_COLLECTION',
+      });
+    }).toThrow(SecurityAccessDeniedError);
+
+    // 3. Interior Designer tries to access internal Admin notes -> System DENIES access
+    const internalNoteAccess = validateInteriorDesignerAccess(designerActor, {
+      type: 'INTERNAL_ADMIN_NOTE',
+      resourceId: 'ADMIN-NOTE-SECRET',
+    });
+    expect(internalNoteAccess.allowed).toBe(false);
+    expect(internalNoteAccess.reason).toContain('Internal Admin Notes must never be visible');
+
+    expect(() => {
+      enforceResourceAccess(designerActor, {
+        type: 'INTERNAL_ADMIN_NOTE',
+      });
+    }).toThrow(SecurityAccessDeniedError);
+
+    // Action permission check for internal admin note
+    const noteActionCheck = checkDesignerActionPermission('INTERIOR_DESIGNER', 'ACCESS_INTERNAL_ADMIN_NOTES');
+    expect(noteActionCheck.allowed).toBe(false);
+
+    // 4. Interior Designer tries to execute unauthorized payout action (self-payout approval) -> System DENIES access
+    const payoutActionCheck = checkDesignerActionPermission('INTERIOR_DESIGNER', 'DISBURSE_OWN_PAYOUT');
+    expect(payoutActionCheck.allowed).toBe(false);
+    expect(payoutActionCheck.reason).toContain('Interior Designer cannot process or disburse their own payout');
+
+    expect(() => {
+      enforceDesignerActionPermission(designerActor, 'DISBURSE_OWN_PAYOUT');
+    }).toThrow(SecurityAccessDeniedError);
+
+    // 5. Interior Designer tries to self-approve quotations, designs, and milestones -> System DENIES access
+    expect(checkDesignerActionPermission('INTERIOR_DESIGNER', 'APPROVE_OWN_QUOTATION').allowed).toBe(false);
+    expect(checkDesignerActionPermission('INTERIOR_DESIGNER', 'APPROVE_OWN_DESIGN').allowed).toBe(false);
+    expect(checkDesignerActionPermission('INTERIOR_DESIGNER', 'APPROVE_OWN_MILESTONE').allowed).toBe(false);
+    expect(checkDesignerActionPermission('INTERIOR_DESIGNER', 'CHANGE_CUSTOMER_PAYMENT_STATUS').allowed).toBe(false);
+
+    // 6. Suspended or unapproved accounts cannot receive new assignments (Section 20 Rule 14)
+    expect(canReceiveAssignment('PENDING_APPROVAL').allowed).toBe(false);
+    expect(canReceiveAssignment('SUSPENDED').allowed).toBe(false);
+    expect(canReceiveAssignment('APPROVED').allowed).toBe(true);
+
+    // 7. Security audit logs verify recorded denials (Section 20 Rule 15)
+    const auditLogs = getSecurityAuditLogs();
+    expect(auditLogs.length).toBeGreaterThan(0);
+    const deniedLogs = auditLogs.filter((l) => l.outcome === 'DENIED');
+    expect(deniedLogs.length).toBeGreaterThan(0);
+    expect(deniedLogs.some((l) => l.actorId === 'id-101')).toBe(true);
   });
 });

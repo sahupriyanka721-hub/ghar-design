@@ -4977,3 +4977,6 @@ export const dispatchInteriorNotification = (
 
   return newNotif;
 };
+
+// Re-export Section 20 Security RBAC & Validation functions
+export * from './interiorDesignerSecurityStore.js';
