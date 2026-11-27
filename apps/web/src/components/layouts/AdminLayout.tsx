@@ -350,6 +350,7 @@ export const AdminLayout: React.FC = () => {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     '/admin/architects': true,
     '/admin/requests': true,
+    '/admin/assignments': true,
   });
   const { success } = useToast();
 
@@ -359,6 +360,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/requests')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/requests': true }));
+    }
+    if (location.pathname.startsWith('/admin/assignments')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/assignments': true }));
     }
   }, [location.pathname]);
 
@@ -528,7 +532,19 @@ export const AdminLayout: React.FC = () => {
             { label: 'Cancelled Requests', path: '/admin/requests?view=CANCELLED', view: 'CANCELLED' },
           ],
         },
-        { label: 'Architect Assignment Desk', path: '/admin/assignments', icon: Briefcase },
+        {
+          label: 'Architect Assignment Management',
+          path: '/admin/assignments',
+          icon: Briefcase,
+          subItems: [
+            { label: 'Assign Architect', path: '/admin/assignments?view=ASSIGN_ARCHITECT', view: 'ASSIGN_ARCHITECT' },
+            { label: 'Reassign Architect', path: '/admin/assignments?view=REASSIGN_ARCHITECT', view: 'REASSIGN_ARCHITECT' },
+            { label: 'Multiple Architect Assignment', path: '/admin/assignments?view=MULTI_ASSIGNMENT', view: 'MULTI_ASSIGNMENT' },
+            { label: 'Assignment History', path: '/admin/assignments?view=HISTORY', view: 'HISTORY' },
+            { label: 'Architect Availability', path: '/admin/assignments?view=AVAILABILITY', view: 'AVAILABILITY' },
+            { label: 'Assignment Performance', path: '/admin/assignments?view=PERFORMANCE', view: 'PERFORMANCE' },
+          ],
+        },
         { label: 'Quotation Review & Publish', path: '/admin/quotations', icon: FileCheck2 },
         { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
         { label: 'Service & Category Pricing', path: '/admin/categories', icon: Layers },
