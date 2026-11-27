@@ -463,6 +463,9 @@ export const App: React.FC = () => {
           <Route path="locations" element={<AdminLocations />} />
           <Route path="coverage" element={<AdminLocations />} />
           <Route path="staff" element={<AdminStaff />} />
+          <Route path="admin-users" element={<AdminStaff />} />
+          <Route path="roles" element={<AdminStaff />} />
+          <Route path="rbac" element={<AdminStaff />} />
           <Route path="settings" element={<AdminPlatformSettings />} />
           <Route path="cms" element={<AdminCMSContent />} />
           <Route path="content" element={<AdminCMSContent />} />

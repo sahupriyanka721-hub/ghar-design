@@ -365,6 +365,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/notifications': true,
     '/admin/cms': true,
     '/admin/services-config': true,
+    '/admin/staff': true,
   });
   const { success } = useToast();
 
@@ -416,6 +417,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/services-config') || location.pathname.startsWith('/admin/categories')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/services-config': true }));
+    }
+    if (location.pathname.startsWith('/admin/staff')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/staff': true }));
     }
   }, [location.pathname]);
 
@@ -538,7 +542,17 @@ export const AdminLayout: React.FC = () => {
       title: '1. Core Governance & RBAC',
       items: [
         { label: 'Dashboard / Overview', path: '/admin', icon: LayoutDashboard, exact: true },
-        { label: 'Admin Users & RBAC (8 Roles)', path: '/admin/staff', icon: Lock },
+        {
+          label: 'Admin User & Role Management',
+          path: '/admin/staff',
+          icon: Lock,
+          subItems: [
+            { label: 'Admin Users', path: '/admin/staff?view=ADMIN_USERS', view: 'ADMIN_USERS' },
+            { label: 'Create Admin', path: '/admin/staff?view=CREATE_ADMIN', view: 'CREATE_ADMIN' },
+            { label: 'Roles & Permissions', path: '/admin/staff?view=ROLES_PERMISSIONS', view: 'ROLES_PERMISSIONS' },
+            { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
+          ],
+        },
         { label: 'Security Audit Trail', path: '/admin/audit-logs', icon: ShieldCheck },
         { label: 'Platform Global Settings', path: '/admin/settings', icon: Sliders },
       ],
@@ -823,6 +837,17 @@ export const AdminLayout: React.FC = () => {
             { label: 'Project Status Settings', path: '/admin/services-config?view=PROJECT_STATUS_SETTINGS', view: 'PROJECT_STATUS_SETTINGS' },
           ],
         },
+        {
+          label: 'Admin User & Role Management',
+          path: '/admin/staff',
+          icon: Lock,
+          subItems: [
+            { label: 'Admin Users', path: '/admin/staff?view=ADMIN_USERS', view: 'ADMIN_USERS' },
+            { label: 'Create Admin', path: '/admin/staff?view=CREATE_ADMIN', view: 'CREATE_ADMIN' },
+            { label: 'Roles & Permissions', path: '/admin/staff?view=ROLES_PERMISSIONS', view: 'ROLES_PERMISSIONS' },
+            { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
+          ],
+        },
       ],
     },
   ];
@@ -1060,7 +1085,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES')));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS')));
 
                               return (
                                 <Link
