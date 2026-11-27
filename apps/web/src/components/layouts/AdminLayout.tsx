@@ -351,6 +351,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/architects': true,
     '/admin/requests': true,
     '/admin/assignments': true,
+    '/admin/quotations': true,
   });
   const { success } = useToast();
 
@@ -363,6 +364,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/assignments')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/assignments': true }));
+    }
+    if (location.pathname.startsWith('/admin/quotations')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/quotations': true }));
     }
   }, [location.pathname]);
 
@@ -545,7 +549,23 @@ export const AdminLayout: React.FC = () => {
             { label: 'Assignment Performance', path: '/admin/assignments?view=PERFORMANCE', view: 'PERFORMANCE' },
           ],
         },
-        { label: 'Quotation Review & Publish', path: '/admin/quotations', icon: FileCheck2 },
+        {
+          label: 'Quotation Management',
+          path: '/admin/quotations',
+          icon: FileCheck2,
+          subItems: [
+            { label: 'Pending Architect Quotations', path: '/admin/quotations?view=PENDING_ARCHITECT', view: 'PENDING_ARCHITECT' },
+            { label: 'Quotation Under Review', path: '/admin/quotations?view=UNDER_REVIEW', view: 'UNDER_REVIEW' },
+            { label: 'Approved Quotations', path: '/admin/quotations?view=APPROVED', view: 'APPROVED' },
+            { label: 'Rejected Quotations', path: '/admin/quotations?view=REJECTED', view: 'REJECTED' },
+            { label: 'Revision Required', path: '/admin/quotations?view=REVISION_REQUIRED', view: 'REVISION_REQUIRED' },
+            { label: 'Sent to Customer', path: '/admin/quotations?view=SENT_TO_CUSTOMER', view: 'SENT_TO_CUSTOMER' },
+            { label: 'Customer Accepted Quotations', path: '/admin/quotations?view=CUSTOMER_ACCEPTED', view: 'CUSTOMER_ACCEPTED' },
+            { label: 'Customer Rejected Quotations', path: '/admin/quotations?view=CUSTOMER_REJECTED', view: 'CUSTOMER_REJECTED' },
+            { label: 'Expired Quotations', path: '/admin/quotations?view=EXPIRED', view: 'EXPIRED' },
+            { label: 'Quotation History', path: '/admin/quotations?view=HISTORY', view: 'HISTORY' },
+          ],
+        },
         { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
         { label: 'Service & Category Pricing', path: '/admin/categories', icon: Layers },
       ],
