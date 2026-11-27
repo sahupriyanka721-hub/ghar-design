@@ -353,6 +353,7 @@ export const AdminLayout: React.FC = () => {
     '/admin/assignments': true,
     '/admin/quotations': true,
     '/admin/projects': true,
+    '/admin/documents': true,
   });
   const { success } = useToast();
 
@@ -371,6 +372,9 @@ export const AdminLayout: React.FC = () => {
     }
     if (location.pathname.startsWith('/admin/projects')) {
       setExpandedMenus((prev) => ({ ...prev, '/admin/projects': true }));
+    }
+    if (location.pathname.startsWith('/admin/documents')) {
+      setExpandedMenus((prev) => ({ ...prev, '/admin/documents': true }));
     }
   }, [location.pathname]);
 
@@ -460,8 +464,10 @@ export const AdminLayout: React.FC = () => {
       navigate('/admin/vendors');
     } else if (q.includes('mat') || q.includes('order') || q.includes('store') || q.includes('buy')) {
       navigate('/admin/materials');
-    } else if (q.includes('calc') || q.includes('cost') || q.includes('rate') || q.includes('boq')) {
+    } else if (q.includes('calc') || q.includes('cost') || q.includes('rate')) {
       navigate('/admin/calculator');
+    } else if (q.includes('doc') || q.includes('drawing') || q.includes('blueprint') || q.includes('elevation') || q.includes('cad') || q.includes('boq')) {
+      navigate('/admin/documents');
     } else if (q.includes('time') || q.includes('mile') || q.includes('stage') || q.includes('track') || q.includes('progress')) {
       navigate('/admin/timeline');
     } else if (q.includes('quote') || q.includes('quotation')) {
@@ -594,7 +600,26 @@ export const AdminLayout: React.FC = () => {
             { label: 'Project Activity Timeline', path: '/admin/projects?view=TIMELINE', view: 'TIMELINE' },
           ],
         },
-        { label: 'Design & Document Management', path: '/admin/documents', icon: FileCheck2 },
+        {
+          label: 'Design & Document Management',
+          path: '/admin/documents',
+          icon: FileCheck2,
+          subItems: [
+            { label: 'Architect Design Submissions', path: '/admin/documents?view=SUBMISSIONS', view: 'SUBMISSIONS' },
+            { label: 'Floor Plans', path: '/admin/documents?view=FLOOR_PLANS', view: 'FLOOR_PLANS' },
+            { label: 'House Maps', path: '/admin/documents?view=HOUSE_MAPS', view: 'HOUSE_MAPS' },
+            { label: '2D Drawings', path: '/admin/documents?view=2D_DRAWINGS', view: '2D_DRAWINGS' },
+            { label: '3D Designs', path: '/admin/documents?view=3D_DESIGNS', view: '3D_DESIGNS' },
+            { label: 'Elevation Designs', path: '/admin/documents?view=ELEVATIONS', view: 'ELEVATIONS' },
+            { label: 'Working Drawings', path: '/admin/documents?view=WORKING_DRAWINGS', view: 'WORKING_DRAWINGS' },
+            { label: 'BOQ Documents', path: '/admin/documents?view=BOQ', view: 'BOQ' },
+            { label: 'Design Approval Requests', path: '/admin/documents?view=APPROVAL_REQUESTS', view: 'APPROVAL_REQUESTS' },
+            { label: 'Revision Requests', path: '/admin/documents?view=REVISIONS', view: 'REVISIONS' },
+            { label: 'Approved Documents', path: '/admin/documents?view=APPROVED', view: 'APPROVED' },
+            { label: 'Rejected Documents', path: '/admin/documents?view=REJECTED', view: 'REJECTED' },
+            { label: 'Document Version History', path: '/admin/documents?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
+          ],
+        },
         { label: 'Milestone & Progress Verification', path: '/admin/timeline', icon: HardHat },
         { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
         { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
@@ -850,7 +875,7 @@ export const AdminLayout: React.FC = () => {
                               const currentViewParam = new URLSearchParams(location.search).get('view');
                               const isSubActive =
                                 location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && sub.view === 'ALL'));
+                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS')));
 
                               return (
                                 <Link

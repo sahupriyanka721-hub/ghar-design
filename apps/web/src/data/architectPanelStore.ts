@@ -562,6 +562,107 @@ export const getDefaultSeedDesigns = (): ArchitecturalDesign[] => [
       },
     ],
   },
+  {
+    id: 'DSG-BG-07',
+    projectId: 'BG-2026-0001',
+    projectTitle: 'Modern Luxury Villa (G+2) - Super Corridor, Indore',
+    customerId: 'CUST-IND-992',
+    customerName: 'Sharika Mishra',
+    architectId: 'ARC-2026-001',
+    architectName: 'Ar. Rajesh Verma',
+    architectFirm: 'Verma & Associates Architects',
+    category: 'DRAWING_2D',
+    title: '2D Architectural Detailed Cross-Sections & Fenestration Schedule',
+    description: 'Floor-to-ceiling heights, slab drop detailing, lintel levels, and door/window aluminum profile schedules.',
+    fileUrl: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80',
+    fileName: 'Architectural_2D_CrossSections_v1.0.dwg',
+    fileSize: '3.80 MB',
+    fileType: 'DWG',
+    currentVersion: 'v1.0',
+    status: 'FORWARDED_TO_CUSTOMER',
+    uploadedAt: '2026-11-23T10:00:00Z',
+    updatedAt: '2026-11-23T10:00:00Z',
+    revisionNotes: 'First draft of 2D cross-sectional profiles and joinery details.',
+    versions: [
+      {
+        versionNumber: 'v1.0',
+        fileUrl: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80',
+        fileName: 'Architectural_2D_CrossSections_v1.0.dwg',
+        fileSize: '3.80 MB',
+        uploadedAt: '2026-11-23T10:00:00Z',
+        revisionNotes: 'First draft release.',
+        status: 'FORWARDED_TO_CUSTOMER',
+      },
+    ],
+  },
+  {
+    id: 'DSG-BG-08',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    customerId: 'usr-cust-102',
+    customerName: 'Vikramaditya Roy',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Studio Kulkarni Architects',
+    category: 'HOUSE_MAP',
+    title: 'Master House Layout Map & Vaastu Orientation Site Plan',
+    description: 'Site layout with front 15-ft road setback, North-East pooja corner, and ground coverage 64.5%.',
+    fileUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+    fileName: 'Master_House_Map_Site_Plan_v1.0.pdf',
+    fileSize: '4.10 MB',
+    fileType: 'PDF',
+    currentVersion: 'v1.0',
+    status: 'APPROVED',
+    isLatestApproved: true,
+    uploadedAt: '2026-11-22T14:00:00Z',
+    updatedAt: '2026-11-22T14:00:00Z',
+    revisionNotes: 'Vastu orientation vetted and verified by platform design desk.',
+    versions: [
+      {
+        versionNumber: 'v1.0',
+        fileUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+        fileName: 'Master_House_Map_Site_Plan_v1.0.pdf',
+        fileSize: '4.10 MB',
+        uploadedAt: '2026-11-22T14:00:00Z',
+        revisionNotes: 'Official master house map release.',
+        status: 'APPROVED',
+      },
+    ],
+  },
+  {
+    id: 'DSG-BG-09',
+    projectId: 'BG-2026-0002',
+    projectTitle: 'Independent Residential House (G+1) - Gurugram Sector 57',
+    customerId: 'usr-cust-102',
+    customerName: 'Vikramaditya Roy',
+    architectId: 'ARC-2026-003',
+    architectName: 'Ar. Sneha Kulkarni',
+    architectFirm: 'Studio Kulkarni Architects',
+    category: 'ELEVATION_3D',
+    title: 'Modern Front Elevation Draft (Rejected - Setback Norm Violation)',
+    description: 'Proposed second-floor cantilever projection violates local DTCP 12-ft road setback guidelines.',
+    fileUrl: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
+    fileName: 'Elevation_Concept_Draft_v1.0.png',
+    fileSize: '6.70 MB',
+    fileType: 'PNG',
+    currentVersion: 'v1.0',
+    status: 'REJECTED',
+    uploadedAt: '2026-11-21T18:00:00Z',
+    updatedAt: '2026-11-22T09:30:00Z',
+    adminReviewNotes: 'Rejected: Front cantilever projection exceeds allowable municipal building envelope by 1.8 meters.',
+    revisionNotes: 'Initial draft rejected during municipal compliance audit.',
+    versions: [
+      {
+        versionNumber: 'v1.0',
+        fileUrl: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
+        fileName: 'Elevation_Concept_Draft_v1.0.png',
+        fileSize: '6.70 MB',
+        uploadedAt: '2026-11-21T18:00:00Z',
+        revisionNotes: 'Initial submission rejected during municipal compliance audit.',
+        status: 'REJECTED',
+      },
+    ],
+  },
 ];
 
 export const getArchitectDesigns = (projectId?: string): ArchitecturalDesign[] => {
@@ -569,6 +670,19 @@ export const getArchitectDesigns = (projectId?: string): ArchitecturalDesign[] =
   if (!designs || designs.length === 0) {
     designs = getDefaultSeedDesigns();
     safeJsonSave(STORAGE_KEYS.DESIGNS, designs);
+  } else {
+    // Ensure all seed items exist
+    const seeds = getDefaultSeedDesigns();
+    let updated = false;
+    seeds.forEach((seed) => {
+      if (!designs.some((d) => d.id === seed.id)) {
+        designs.push(seed);
+        updated = true;
+      }
+    });
+    if (updated) {
+      safeJsonSave(STORAGE_KEYS.DESIGNS, designs);
+    }
   }
   if (!projectId || projectId === 'ALL') return designs;
   return designs.filter((d) => d.projectId === projectId);

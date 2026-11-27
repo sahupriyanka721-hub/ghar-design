@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
@@ -37,6 +38,8 @@ import {
   MessageSquare,
   AlertCircle,
   FileCode,
+  History,
+  Upload,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.js';
 import { formatDate } from '../../lib/utils.js';
@@ -48,6 +51,8 @@ import {
   adminRejectDesign,
   adminForwardCustomerRevisionToArchitect,
   adminUploadOfficialDocument,
+  addDesignVersion,
+  updateArchitectDesignStatus,
   ArchitecturalDesign,
   DesignCategory,
   DesignStatus,
@@ -68,8 +73,54 @@ import { pushToCloud } from '../../data/cloudSync.js';
 
 type DocumentStatusFilter = 'ALL' | 'PENDING_REVIEW' | 'FORWARDED' | 'APPROVED' | 'REVISION' | 'REJECTED';
 
+export type DocumentSubView =
+  | 'SUBMISSIONS'
+  | 'FLOOR_PLANS'
+  | 'HOUSE_MAPS'
+  | '2D_DRAWINGS'
+  | '3D_DESIGNS'
+  | 'ELEVATIONS'
+  | 'WORKING_DRAWINGS'
+  | 'BOQ'
+  | 'APPROVAL_REQUESTS'
+  | 'REVISIONS'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'VERSION_HISTORY';
+
+export const SUB_VIEWS: Array<{ key: DocumentSubView; label: string; icon: any; countKey: string }> = [
+  { key: 'SUBMISSIONS', label: '1. Architect Design Submissions', icon: FileCheck2, countKey: 'submissions' },
+  { key: 'FLOOR_PLANS', label: '2. Floor Plans', icon: Compass, countKey: 'floorPlans' },
+  { key: 'HOUSE_MAPS', label: '3. House Maps', icon: MapPin, countKey: 'houseMaps' },
+  { key: '2D_DRAWINGS', label: '4. 2D Drawings', icon: Layers, countKey: 'drawings2D' },
+  { key: '3D_DESIGNS', label: '5. 3D Designs', icon: Sparkles, countKey: 'designs3D' },
+  { key: 'ELEVATIONS', label: '6. Elevation Designs', icon: Building, countKey: 'elevations' },
+  { key: 'WORKING_DRAWINGS', label: '7. Working Drawings', icon: FileCode, countKey: 'workingDrawings' },
+  { key: 'BOQ', label: '8. BOQ Documents', icon: Calculator, countKey: 'boq' },
+  { key: 'APPROVAL_REQUESTS', label: '9. Design Approval Requests', icon: Clock, countKey: 'approvalRequests' },
+  { key: 'REVISIONS', label: '10. Revision Requests', icon: RotateCcw, countKey: 'revisions' },
+  { key: 'APPROVED', label: '11. Approved Documents', icon: CheckCircle2, countKey: 'approved' },
+  { key: 'REJECTED', label: '12. Rejected Documents', icon: AlertTriangle, countKey: 'rejected' },
+  { key: 'VERSION_HISTORY', label: '13. Document Version History', icon: History, countKey: 'versions' },
+];
+
 export const AdminDocuments: React.FC = () => {
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView = (searchParams.get('view') as DocumentSubView) || 'SUBMISSIONS';
+  const [selectedView, setSelectedView] = useState<DocumentSubView>(urlView);
+
+  useEffect(() => {
+    const v = searchParams.get('view') as DocumentSubView;
+    if (v && v !== selectedView) {
+      setSelectedView(v);
+    }
+  }, [searchParams]);
+
+  const handleSelectView = (view: DocumentSubView) => {
+    setSelectedView(view);
+    setSearchParams({ view });
+  };
 
   const [activeStatusTab, setActiveStatusTab] = useState<DocumentStatusFilter>('ALL');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('ALL');
@@ -84,6 +135,17 @@ export const AdminDocuments: React.FC = () => {
   // Action Modals
   const [revisionModalDesign, setRevisionModalDesign] = useState<ArchitecturalDesign | null>(null);
   const [revisionNotes, setRevisionNotes] = useState('');
+
+  const [rejectModalDesign, setRejectModalDesign] = useState<ArchitecturalDesign | null>(null);
+  const [rejectReason, setRejectReason] = useState('Setback violation under NBC 2016 norms');
+  const [rejectCustomNotes, setRejectCustomNotes] = useState('');
+
+  // Upload New Version Modal
+  const [versionModalDesign, setVersionModalDesign] = useState<ArchitecturalDesign | null>(null);
+  const [newVersionNotes, setNewVersionNotes] = useState('');
+  const [newVersionFileUrl, setNewVersionFileUrl] = useState('');
+  const [newVersionFileName, setNewVersionFileName] = useState('');
+  const [newVersionFileSize, setNewVersionFileSize] = useState('4.2 MB');
 
   const [forwardCustomerRevisionDesign, setForwardCustomerRevisionDesign] = useState<ArchitecturalDesign | null>(null);
   const [adminForwardInstructions, setAdminForwardInstructions] = useState('');
@@ -116,6 +178,142 @@ export const AdminDocuments: React.FC = () => {
     };
   }, [designs]);
 
+  // Module 8 Sub-Views Live Counters
+  const subCounts = useMemo(() => {
+    const isFloorPlan = (d: ArchitecturalDesign) =>
+      ['HOUSE_MAP', 'FLOOR_PLAN_GROUND', 'FLOOR_PLAN_FIRST', 'FLOOR_PLAN_MULTI'].includes(d.category) ||
+      d.title.toLowerCase().includes('floor plan');
+    const isHouseMap = (d: ArchitecturalDesign) =>
+      ['HOUSE_MAP', 'MUNICIPAL_SANCTION', 'SITE_LAYOUT'].includes(d.category) ||
+      d.title.toLowerCase().includes('house map') ||
+      d.title.toLowerCase().includes('site plan');
+    const is2DDrawing = (d: ArchitecturalDesign) =>
+      ['DRAWING_2D', 'SECTION_DRAWINGS', 'RENOVATION_DRAWING'].includes(d.category) ||
+      d.title.toLowerCase().includes('2d') ||
+      d.title.toLowerCase().includes('section');
+    const is3DDesign = (d: ArchitecturalDesign) =>
+      d.category === 'ELEVATION_3D' ||
+      d.fileType === 'PNG' ||
+      d.fileType === 'JPG' ||
+      d.title.toLowerCase().includes('3d') ||
+      d.title.toLowerCase().includes('render');
+    const isElevation = (d: ArchitecturalDesign) =>
+      d.category === 'ELEVATION_3D' ||
+      d.title.toLowerCase().includes('elevation') ||
+      d.title.toLowerCase().includes('facade');
+    const isWorkingDrawing = (d: ArchitecturalDesign) =>
+      ['WORKING_DRAWINGS', 'STRUCTURAL_COORDINATION'].includes(d.category) ||
+      d.title.toLowerCase().includes('working') ||
+      d.title.toLowerCase().includes('mep') ||
+      d.title.toLowerCase().includes('structural') ||
+      d.title.toLowerCase().includes('column');
+    const isBOQ = (d: ArchitecturalDesign) =>
+      d.category === 'BOQ_SPEC' ||
+      d.title.toLowerCase().includes('boq') ||
+      d.title.toLowerCase().includes('finishes') ||
+      d.title.toLowerCase().includes('estimate') ||
+      d.title.toLowerCase().includes('quantity');
+    const isApprovalReq = (d: ArchitecturalDesign) =>
+      d.status === 'SUBMITTED_TO_ADMIN' ||
+      d.status === 'PENDING_CUSTOMER_APPROVAL' ||
+      d.status === 'FORWARDED_TO_CUSTOMER';
+    const isRevision = (d: ArchitecturalDesign) =>
+      d.status === 'REVISION_REQUESTED' ||
+      d.status === 'CUSTOMER_REVISION_REQUESTED';
+    const isApproved = (d: ArchitecturalDesign) =>
+      d.status === 'APPROVED' ||
+      d.status === 'CUSTOMER_APPROVED' ||
+      d.status === 'ADMIN_APPROVED' ||
+      d.isLatestApproved;
+    const isRejected = (d: ArchitecturalDesign) =>
+      d.status === 'REJECTED';
+
+    let totalVersions = 0;
+    designs.forEach((d) => {
+      totalVersions += d.versions && d.versions.length > 0 ? d.versions.length : 1;
+    });
+
+    return {
+      submissions: designs.length,
+      floorPlans: designs.filter(isFloorPlan).length,
+      houseMaps: designs.filter(isHouseMap).length,
+      drawings2D: designs.filter(is2DDrawing).length,
+      designs3D: designs.filter(is3DDesign).length,
+      elevations: designs.filter(isElevation).length,
+      workingDrawings: designs.filter(isWorkingDrawing).length,
+      boq: designs.filter(isBOQ).length,
+      approvalRequests: designs.filter(isApprovalReq).length,
+      revisions: designs.filter(isRevision).length,
+      approved: designs.filter(isApproved).length,
+      rejected: designs.filter(isRejected).length,
+      versions: totalVersions,
+    };
+  }, [designs]);
+
+  // Flattened Document Version History across all architectural designs
+  const allVersionHistory = useMemo(() => {
+    const list: Array<{
+      id: string;
+      versionNumber: string;
+      fileUrl: string;
+      fileName: string;
+      fileSize: string;
+      uploadedAt: string;
+      revisionNotes?: string;
+      status?: string;
+      customerComments?: string;
+      adminReviewNotes?: string;
+      parentDesign: ArchitecturalDesign;
+    }> = [];
+
+    designs.forEach((d) => {
+      if (d.versions && d.versions.length > 0) {
+        d.versions.forEach((v) => {
+          list.push({
+            id: `${d.id}-${v.versionNumber}`,
+            versionNumber: v.versionNumber,
+            fileUrl: v.fileUrl,
+            fileName: v.fileName,
+            fileSize: v.fileSize,
+            uploadedAt: v.uploadedAt,
+            revisionNotes: v.revisionNotes,
+            status: v.status || d.status,
+            customerComments: v.customerComments || d.customerComments,
+            adminReviewNotes: v.adminReviewNotes || d.adminReviewNotes,
+            parentDesign: d,
+          });
+        });
+      } else {
+        list.push({
+          id: `${d.id}-${d.currentVersion}`,
+          versionNumber: d.currentVersion,
+          fileUrl: d.fileUrl,
+          fileName: d.fileName,
+          fileSize: d.fileSize,
+          uploadedAt: d.uploadedAt,
+          revisionNotes: d.revisionNotes,
+          status: d.status,
+          customerComments: d.customerComments,
+          adminReviewNotes: d.adminReviewNotes,
+          parentDesign: d,
+        });
+      }
+    });
+
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter(
+      (item) =>
+        item.fileName.toLowerCase().includes(q) ||
+        item.parentDesign.title.toLowerCase().includes(q) ||
+        item.parentDesign.projectId.toLowerCase().includes(q) ||
+        item.parentDesign.customerName.toLowerCase().includes(q) ||
+        (item.parentDesign.architectName && item.parentDesign.architectName.toLowerCase().includes(q)) ||
+        item.versionNumber.toLowerCase().includes(q) ||
+        (item.revisionNotes && item.revisionNotes.toLowerCase().includes(q))
+    );
+  }, [designs, search]);
+
   // Filtered designs
   const filteredDesigns = useMemo(() => {
     return designs.filter((d) => {
@@ -131,7 +329,34 @@ export const AdminDocuments: React.FC = () => {
 
       if (!matchSearch) return false;
 
-      // 2. Status Tab
+      // 2. Sub-View Filtering
+      if (selectedView === 'SUBMISSIONS') {
+        // All submissions
+      } else if (selectedView === 'FLOOR_PLANS') {
+        if (!['HOUSE_MAP', 'FLOOR_PLAN_GROUND', 'FLOOR_PLAN_FIRST', 'FLOOR_PLAN_MULTI'].includes(d.category) && !d.title.toLowerCase().includes('floor plan')) return false;
+      } else if (selectedView === 'HOUSE_MAPS') {
+        if (!['HOUSE_MAP', 'MUNICIPAL_SANCTION', 'SITE_LAYOUT'].includes(d.category) && !d.title.toLowerCase().includes('house map') && !d.title.toLowerCase().includes('site plan')) return false;
+      } else if (selectedView === '2D_DRAWINGS') {
+        if (!['DRAWING_2D', 'SECTION_DRAWINGS', 'RENOVATION_DRAWING'].includes(d.category) && !d.title.toLowerCase().includes('2d') && !d.title.toLowerCase().includes('section')) return false;
+      } else if (selectedView === '3D_DESIGNS') {
+        if (d.category !== 'ELEVATION_3D' && d.fileType !== 'PNG' && d.fileType !== 'JPG' && !d.title.toLowerCase().includes('3d') && !d.title.toLowerCase().includes('render')) return false;
+      } else if (selectedView === 'ELEVATIONS') {
+        if (d.category !== 'ELEVATION_3D' && !d.title.toLowerCase().includes('elevation') && !d.title.toLowerCase().includes('facade')) return false;
+      } else if (selectedView === 'WORKING_DRAWINGS') {
+        if (!['WORKING_DRAWINGS', 'STRUCTURAL_COORDINATION'].includes(d.category) && !d.title.toLowerCase().includes('working') && !d.title.toLowerCase().includes('mep') && !d.title.toLowerCase().includes('structural') && !d.title.toLowerCase().includes('column')) return false;
+      } else if (selectedView === 'BOQ') {
+        if (d.category !== 'BOQ_SPEC' && !d.title.toLowerCase().includes('boq') && !d.title.toLowerCase().includes('finishes') && !d.title.toLowerCase().includes('estimate') && !d.title.toLowerCase().includes('quantity')) return false;
+      } else if (selectedView === 'APPROVAL_REQUESTS') {
+        if (d.status !== 'SUBMITTED_TO_ADMIN' && d.status !== 'PENDING_CUSTOMER_APPROVAL' && d.status !== 'FORWARDED_TO_CUSTOMER') return false;
+      } else if (selectedView === 'REVISIONS') {
+        if (d.status !== 'REVISION_REQUESTED' && d.status !== 'CUSTOMER_REVISION_REQUESTED') return false;
+      } else if (selectedView === 'APPROVED') {
+        if (d.status !== 'APPROVED' && d.status !== 'CUSTOMER_APPROVED' && d.status !== 'ADMIN_APPROVED' && !d.isLatestApproved) return false;
+      } else if (selectedView === 'REJECTED') {
+        if (d.status !== 'REJECTED') return false;
+      }
+
+      // 3. Status Tab
       if (activeStatusTab === 'PENDING_REVIEW' && d.status !== 'SUBMITTED_TO_ADMIN') return false;
       if (
         activeStatusTab === 'FORWARDED' &&
@@ -154,7 +379,7 @@ export const AdminDocuments: React.FC = () => {
         return false;
       if (activeStatusTab === 'REJECTED' && d.status !== 'REJECTED') return false;
 
-      // 3. Category Filter
+      // 4. Category Filter
       if (activeCategoryFilter !== 'ALL') {
         if (activeCategoryFilter === 'FLOOR_PLAN') {
           if (!['HOUSE_MAP', 'FLOOR_PLAN_GROUND', 'FLOOR_PLAN_FIRST', 'FLOOR_PLAN_MULTI'].includes(d.category))
@@ -176,7 +401,101 @@ export const AdminDocuments: React.FC = () => {
 
       return true;
     });
-  }, [designs, search, activeStatusTab, activeCategoryFilter]);
+  }, [designs, search, selectedView, activeStatusTab, activeCategoryFilter]);
+
+  // Section 10 Action: Direct Quick Approve
+  const handleQuickApprove = (design: ArchitecturalDesign) => {
+    const updated = updateArchitectDesignStatus(design.id, 'APPROVED', 'Technical and statutory compliance audit approved.');
+    if (updated) {
+      logAdminAuditAction({
+        action: 'APPROVE_DESIGN_DIRECT',
+        module: 'DOCUMENT_MANAGEMENT',
+        entity: `${updated.title} (${updated.currentVersion})`,
+        details: `Directly approved document ${updated.id} for project ${updated.projectId}. Ready for site execution.`,
+      });
+      pushToCloud().catch(() => {});
+      success(`Document ${updated.title} (${updated.currentVersion}) marked as APPROVED!`);
+      if (selectedDesign?.id === updated.id) {
+        setSelectedDesign(updated);
+      }
+      setRefreshKey((k) => k + 1);
+    }
+  };
+
+  // Section 10 Action: Reopen Rejected Submission
+  const handleReopenSubmission = (design: ArchitecturalDesign) => {
+    const updated = updateArchitectDesignStatus(design.id, 'SUBMITTED_TO_ADMIN', 'Reopened by Admin Desk for reconsideration.');
+    if (updated) {
+      logAdminAuditAction({
+        action: 'REOPEN_DESIGN_SUBMISSION',
+        module: 'DOCUMENT_MANAGEMENT',
+        entity: `${updated.title} (${updated.currentVersion})`,
+        details: `Reopened rejected document ${updated.id} into active review queue.`,
+      });
+      pushToCloud().catch(() => {});
+      success(`Document ${updated.title} reopened and returned to active review queue!`);
+      if (selectedDesign?.id === updated.id) {
+        setSelectedDesign(updated);
+      }
+      setRefreshKey((k) => k + 1);
+    }
+  };
+
+  // Section 10 Action: Upload New Version
+  const handleCreateNewVersion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!versionModalDesign) return;
+
+    const updated = addDesignVersion(versionModalDesign.id, {
+      fileUrl: newVersionFileUrl.trim() || versionModalDesign.fileUrl,
+      fileName: newVersionFileName.trim() || `${versionModalDesign.title.replace(/\s+/g, '_')}_vNext.pdf`,
+      fileSize: newVersionFileSize || '3.5 MB',
+      revisionNotes: newVersionNotes.trim() || 'Revised version submitted per redline markups.',
+    });
+
+    if (updated) {
+      logAdminAuditAction({
+        action: 'ADD_DESIGN_VERSION',
+        module: 'DOCUMENT_MANAGEMENT',
+        entity: `${updated.title} (${updated.currentVersion})`,
+        details: `Created new version ${updated.currentVersion} for design ${updated.id}. Changelog: ${newVersionNotes.trim()}`,
+      });
+      pushToCloud().catch(() => {});
+      success(`New version ${updated.currentVersion} published for ${updated.title}!`);
+      if (selectedDesign?.id === updated.id) {
+        setSelectedDesign(updated);
+      }
+      setVersionModalDesign(null);
+      setNewVersionNotes('');
+      setNewVersionFileUrl('');
+      setNewVersionFileName('');
+      setRefreshKey((k) => k + 1);
+    }
+  };
+
+  // Section 10 Action: Confirm Technical Rejection
+  const handleConfirmRejection = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectModalDesign) return;
+    const combinedReason = `${rejectReason}${rejectCustomNotes.trim() ? `. Details: ${rejectCustomNotes.trim()}` : ''}`;
+    const updated = adminRejectDesign(rejectModalDesign.id, combinedReason);
+    if (updated) {
+      logAdminAuditAction({
+        action: 'REJECT_DESIGN_SUBMISSION',
+        module: 'DOCUMENT_MANAGEMENT',
+        entity: `${updated.title} (${updated.currentVersion})`,
+        details: `Rejected submission ${updated.id}. Reason: ${combinedReason}`,
+      });
+      pushToCloud().catch(() => {});
+      success(`Design submission ${updated.title} marked as REJECTED.`);
+      if (selectedDesign?.id === updated.id) {
+        setSelectedDesign(updated);
+      }
+      setRejectModalDesign(null);
+      setRejectCustomNotes('');
+      setRefreshKey((k) => k + 1);
+    }
+  };
 
   // Section 10 Action: Approve & Forward to Customer
   const handleApproveAndForward = (design: ArchitecturalDesign, customNotes?: string) => {
@@ -478,6 +797,76 @@ export const AdminDocuments: React.FC = () => {
         </div>
       </div>
 
+      {/* ---------------- MODULE 8: VIEW SWITCHER DROPDOWN & 13-PILL ACTION STRIP ---------------- */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Select Design &amp; Document Management View (Module 8):
+            </span>
+          </div>
+
+          {/* Feature Dropdown Selector */}
+          <div className="relative w-full sm:w-96">
+            <select
+              value={selectedView}
+              onChange={(e) => handleSelectView(e.target.value as DocumentSubView)}
+              className="w-full appearance-none px-3.5 py-2.5 bg-slate-50 border border-slate-300 hover:border-blue-500 text-slate-900 font-bold text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer pr-10"
+            >
+              <option value="SUBMISSIONS">1. Architect Design Submissions ({subCounts.submissions})</option>
+              <option value="FLOOR_PLANS">2. Floor Plans ({subCounts.floorPlans})</option>
+              <option value="HOUSE_MAPS">3. House Maps ({subCounts.houseMaps})</option>
+              <option value="2D_DRAWINGS">4. 2D Drawings ({subCounts.drawings2D})</option>
+              <option value="3D_DESIGNS">5. 3D Designs ({subCounts.designs3D})</option>
+              <option value="ELEVATIONS">6. Elevation Designs ({subCounts.elevations})</option>
+              <option value="WORKING_DRAWINGS">7. Working Drawings ({subCounts.workingDrawings})</option>
+              <option value="BOQ">8. BOQ Documents ({subCounts.boq})</option>
+              <option value="APPROVAL_REQUESTS">9. Design Approval Requests ({subCounts.approvalRequests})</option>
+              <option value="REVISIONS">10. Revision Requests ({subCounts.revisions})</option>
+              <option value="APPROVED">11. Approved Documents ({subCounts.approved})</option>
+              <option value="REJECTED">12. Rejected Documents ({subCounts.rejected})</option>
+              <option value="VERSION_HISTORY">13. Document Version History ({subCounts.versions})</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* 13-Pill Action Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 pt-2 border-t border-slate-100">
+          {SUB_VIEWS.map((sv) => {
+            const isActive = selectedView === sv.key;
+            const badgeCount = (subCounts as any)[sv.countKey] || 0;
+            const Icon = sv.icon;
+
+            return (
+              <button
+                key={sv.key}
+                type="button"
+                onClick={() => handleSelectView(sv.key)}
+                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/40'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                  <span className="truncate text-[11px]">{sv.label.replace(/^\d+\.\s*/, '')}</span>
+                </div>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold shrink-0 ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {badgeCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Discipline Switcher Pill Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100 rounded-2xl border border-slate-200">
         <div className="flex items-center gap-2">
@@ -683,9 +1072,238 @@ export const AdminDocuments: React.FC = () => {
           ))}
         </div>
 
+        {/* View-Specific Title & Hint Banner */}
+        <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200/80 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              {SUB_VIEWS.find((s) => s.key === selectedView)?.icon &&
+                React.createElement(SUB_VIEWS.find((s) => s.key === selectedView)!.icon, { className: 'w-5 h-5' })}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black font-display text-navy-950">
+                  {SUB_VIEWS.find((s) => s.key === selectedView)?.label}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-600 text-white">
+                  {selectedView === 'VERSION_HISTORY' ? `${allVersionHistory.length} Versions` : `${filteredDesigns.length} Drawings`}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                {selectedView === 'SUBMISSIONS' && 'Incoming Architect Submissions Desk - Fast-track triage, structural vetting & customer delivery.'}
+                {selectedView === 'FLOOR_PLANS' && 'Floor Plans & Space Zoning - Dimensioned room layouts, carpet area calculations & Vaastu compliance.'}
+                {selectedView === 'HOUSE_MAPS' && 'House Maps & Municipal Clearances - Setback blueprints, ground coverage % & authority sanction drawings.'}
+                {selectedView === '2D_DRAWINGS' && '2D Detailed Architectural Drawings - Cross-sectional profiles, lintel heights & fenestration schedules.'}
+                {selectedView === '3D_DESIGNS' && '3D Concept Visualizations - Photorealistic Day & Night exterior/interior renders with zoom inspection.'}
+                {selectedView === 'ELEVATIONS' && 'Elevation Designs - Front, corner, side and rear architectural facade treatments & cladding details.'}
+                {selectedView === 'WORKING_DRAWINGS' && 'Working Drawings & MEP - Column centerlines, beam ductile detailing (IS 456), plumbing & electrical.'}
+                {selectedView === 'BOQ' && 'Bill of Quantities (BOQ) - Itemized cost estimation, civil material schedules and rate sheets.'}
+                {selectedView === 'APPROVAL_REQUESTS' && 'Pending Technical Approval Desk - Clear drawings for client delivery with 1-click handover stamp.'}
+                {selectedView === 'REVISIONS' && 'Revision Management Desk - Tracking admin/client redlines, turnaround deadlines & re-submissions.'}
+                {selectedView === 'APPROVED' && 'Approved Documents Vault - Formally verified, watermarked blueprints locked for site execution.'}
+                {selectedView === 'REJECTED' && 'Rejected Drawings Desk - Submissions marked non-compliant with municipal bye-laws or NBC standards.'}
+                {selectedView === 'VERSION_HISTORY' && 'Document Version Lineage Console - Full multi-version audit trail (v1.0 to vX.X) across all projects.'}
+              </p>
+            </div>
+          </div>
+
+          {selectedView === 'VERSION_HISTORY' && (
+            <button
+              onClick={() => {
+                if (designs.length > 0) {
+                  setVersionModalDesign(designs[0]);
+                  setNewVersionFileName(`${designs[0].title.replace(/\s+/g, '_')}_v2.0.pdf`);
+                  setNewVersionNotes('');
+                }
+              }}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Upload New Version</span>
+            </button>
+          )}
+        </div>
+
         {/* Data Table */}
         <div className="overflow-x-auto rounded-xl border border-slate-200 mt-2">
-          {discipline === 'INTERIOR' ? (
+          {selectedView === 'VERSION_HISTORY' ? (
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Version &amp; File</th>
+                  <th className="py-3 px-3">Parent Blueprint</th>
+                  <th className="py-3 px-3">Project &amp; Client</th>
+                  <th className="py-3 px-3">Architect Partner</th>
+                  <th className="py-3 px-3">Uploaded Date</th>
+                  <th className="py-3 px-3">Changelog / Redline Remarks</th>
+                  <th className="py-3 px-3 text-center">Version Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {allVersionHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <History className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-600">No version history records found.</p>
+                      <span className="text-[11px] text-slate-400 mt-1 block">
+                        When architects submit revised drafts, the version lineage (v1.0, v1.1, v2.0...) will track here.
+                      </span>
+                    </td>
+                  </tr>
+                ) : (
+                  allVersionHistory.map((ver) => {
+                    const isVApproved =
+                      ver.status === 'APPROVED' ||
+                      ver.status === 'CUSTOMER_APPROVED' ||
+                      ver.status === 'ADMIN_APPROVED';
+                    const isVRevision =
+                      ver.status === 'REVISION_REQUESTED' ||
+                      ver.status === 'CUSTOMER_REVISION_REQUESTED';
+                    const isVRejected = ver.status === 'REJECTED';
+
+                    return (
+                      <tr key={ver.id} className="hover:bg-slate-50/80 transition">
+                        {/* 1. Version & File */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-600 text-white shadow-2xs">
+                              {ver.versionNumber}
+                            </span>
+                            <div>
+                              <strong className="text-slate-900 block text-xs">{ver.fileName}</strong>
+                              <span className="text-[10px] text-slate-400 font-mono">{ver.fileSize}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Parent Blueprint */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-slate-900 block truncate max-w-[180px]" title={ver.parentDesign.title}>
+                              {ver.parentDesign.title}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-sans font-medium">
+                              {ver.parentDesign.category.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 3. Project & Client */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700">
+                              {ver.parentDesign.projectId}
+                            </span>
+                            <span className="text-[10px] text-slate-600 block">{ver.parentDesign.customerName}</span>
+                          </div>
+                        </td>
+
+                        {/* 4. Architect Partner */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-900 block">{ver.parentDesign.architectName || 'Lead Architect'}</span>
+                            <span className="text-[10px] text-slate-500 block">{ver.parentDesign.architectFirm || 'Studio Partner'}</span>
+                          </div>
+                        </td>
+
+                        {/* 5. Uploaded Date */}
+                        <td className="py-3 px-3">
+                          <span className="text-xs text-slate-700 font-mono block">
+                            {formatDate(ver.uploadedAt)}
+                          </span>
+                        </td>
+
+                        {/* 6. Changelog / Remarks */}
+                        <td className="py-3 px-3">
+                          <div className="max-w-[220px]">
+                            <p className="text-[11px] text-slate-700 line-clamp-2">
+                              {ver.revisionNotes || ver.customerComments || ver.adminReviewNotes || 'Initial baseline release.'}
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* 7. Version Status */}
+                        <td className="py-3 px-3 text-center">
+                          {isVApproved ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Approved</span>
+                            </span>
+                          ) : isVRevision ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1">
+                              <RotateCcw className="w-3 h-3 text-purple-600" />
+                              <span>Revision</span>
+                            </span>
+                          ) : isVRejected ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>Rejected</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-sky-600" />
+                              <span>{ver.status || 'Active'}</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 8. Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedDesign(ver.parentDesign);
+                                setInspectedVersion({
+                                  versionNumber: ver.versionNumber,
+                                  fileUrl: ver.fileUrl,
+                                  fileName: ver.fileName,
+                                  fileSize: ver.fileSize,
+                                  uploadedAt: ver.uploadedAt,
+                                  revisionNotes: ver.revisionNotes || '',
+                                  status: (ver.status as any) || 'FORWARDED_TO_CUSTOMER',
+                                });
+                              }}
+                              className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Audit version blueprint"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-sky-600" />
+                              <span>Audit</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setVersionModalDesign(ver.parentDesign);
+                                setNewVersionFileName(`${ver.parentDesign.title.replace(/\s+/g, '_')}_v${(parseFloat(ver.versionNumber.replace('v', '')) + 0.1).toFixed(1)}.pdf`);
+                                setNewVersionNotes('');
+                              }}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Upload successor version"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Next Ver</span>
+                            </button>
+
+                            {ver.fileUrl && (
+                              <a
+                                href={ver.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={ver.fileName}
+                                className="p-1 text-slate-400 hover:text-slate-700 rounded transition"
+                                title="Download file"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : discipline === 'INTERIOR' ? (
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200">
                 <tr>
@@ -1003,16 +1621,42 @@ export const AdminDocuments: React.FC = () => {
 
                         {/* 7. Moderation Actions */}
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             {isPending && (
-                              <button
-                                onClick={() => handleApproveAndForward(d)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                title="Approve & Forward to Homeowner"
-                              >
-                                <Send className="w-3 h-3" />
-                                <span>Forward</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleApproveAndForward(d)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  title="Approve & Forward to Homeowner"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  <span>Forward</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickApprove(d)}
+                                  className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Quick Approve Document"
+                                >
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  onClick={() => setRevisionModalDesign(d)}
+                                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Request Revision from Architect"
+                                >
+                                  <RotateCcw className="w-3 h-3 text-amber-600" />
+                                  <span>Revise</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRejectSubmission(d)}
+                                  className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                  title="Reject Technical Submission"
+                                >
+                                  <X className="w-3 h-3 text-rose-600" />
+                                  <span>Reject</span>
+                                </button>
+                              </>
                             )}
 
                             {isCustomerRevision && (
@@ -1028,6 +1672,30 @@ export const AdminDocuments: React.FC = () => {
                                 <span>Route to Arch</span>
                               </button>
                             )}
+
+                            {d.status === 'REJECTED' && (
+                              <button
+                                onClick={() => handleReopenSubmission(d)}
+                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Reopen Rejected Submission"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Reopen</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setVersionModalDesign(d);
+                                setNewVersionFileName(`${d.title.replace(/\s+/g, '_')}_v${(parseFloat(d.currentVersion.replace('v', '')) + 0.1).toFixed(1)}.pdf`);
+                                setNewVersionNotes('');
+                              }}
+                              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Upload Successor Version"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Version</span>
+                            </button>
 
                             <button
                               onClick={() => {
@@ -2108,6 +2776,233 @@ export const AdminDocuments: React.FC = () => {
                   <span>Confirm Decision</span>
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: UPLOAD NEW VERSION */}
+      <AnimatePresence>
+        {versionModalDesign && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5"
+            >
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <History className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base">
+                      Upload New Blueprint Version
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Publish successor drawing version for {versionModalDesign.projectId}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVersionModalDesign(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateNewVersion} className="space-y-4">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-500">Document:</span>
+                    <span className="font-bold text-navy-950">{versionModalDesign.title}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-500">Current Version:</span>
+                    <span className="font-mono font-bold text-blue-700">{versionModalDesign.currentVersion}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-500">Successor Version:</span>
+                    <span className="font-mono font-bold text-emerald-700">
+                      v{(parseFloat(versionModalDesign.currentVersion.replace('v', '')) + 0.1).toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    File Name (with extension)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newVersionFileName}
+                    onChange={(e) => setNewVersionFileName(e.target.value)}
+                    placeholder="e.g. Master_Plan_Ground_v2.0_Revision.pdf"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      File Size
+                    </label>
+                    <input
+                      type="text"
+                      value={newVersionFileSize}
+                      onChange={(e) => setNewVersionFileSize(e.target.value)}
+                      placeholder="e.g. 4.2 MB"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Demo File URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newVersionFileUrl}
+                      onChange={(e) => setNewVersionFileUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Version Changelog / Redline Corrections (Required)
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={newVersionNotes}
+                    onChange={(e) => setNewVersionNotes(e.target.value)}
+                    placeholder="e.g. Kitchen relocated to Agni kon, front cantilever balcony reduced to 1.2m per municipal setback clearance."
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setVersionModalDesign(null)}
+                    className="px-4 py-2 border rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Publish Version</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: TECHNICAL REJECTION */}
+      <AnimatePresence>
+        {rejectModalDesign && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5"
+            >
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                    <AlertTriangle className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base">
+                      Reject Technical Submission
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Flag drawing as non-compliant and return to partner architect
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRejectModalDesign(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmRejection} className="space-y-4">
+                <div className="p-3 rounded-2xl bg-rose-50/60 border border-rose-200 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-600">Drawing:</span>
+                    <span className="font-bold text-slate-900">{rejectModalDesign.title}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-600">Architect:</span>
+                    <span className="font-bold text-navy-950">{rejectModalDesign.architectName || 'Lead Partner'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Primary Non-Compliance Reason
+                  </label>
+                  <select
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-rose-500 font-bold"
+                  >
+                    <option value="Setback violation under NBC 2016 norms">Setback violation under NBC 2016 norms</option>
+                    <option value="Vastu orientation non-compliance">Vastu orientation non-compliance</option>
+                    <option value="IS 456 Structural reinforcement discrepancy">IS 456 Structural reinforcement discrepancy</option>
+                    <option value="Missing MEP plumbing/drainage line specs">Missing MEP plumbing/drainage line specs</option>
+                    <option value="Drawing resolution illegible or dimensions unannotated">Drawing resolution illegible or dimensions unannotated</option>
+                    <option value="Other technical non-compliance">Other technical non-compliance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Specific Audit Notes &amp; Rectification Directives
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={rejectCustomNotes}
+                    onChange={(e) => setRejectCustomNotes(e.target.value)}
+                    placeholder="Specify the exact drawing coordinate, column grid, or bye-law section that requires correction before re-submission."
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setRejectModalDesign(null)}
+                    className="px-4 py-2 border rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Confirm Rejection</span>
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
