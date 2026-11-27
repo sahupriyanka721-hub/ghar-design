@@ -33,6 +33,23 @@ import {
   adminRejectInteriorDesign,
   adminForwardCustomerRevisionToInteriorDesigner,
   getInteriorBOQItems,
+  saveInteriorBOQItem,
+  getBOQProjectSummary,
+  submitBOQToAdmin,
+  adminReviewBOQ,
+  adminForwardBOQToCustomer,
+  customerReviewBOQ,
+  getInteriorSiteVisits,
+  saveInteriorSiteVisit,
+  requestSiteVisitRescheduleThroughAdmin,
+  submitSiteVisitReportToAdmin,
+  getSiteVisitReports,
+  getInteriorCoordinationRequests,
+  createCoordinationRequestViaAdmin,
+  adminMediateCoordinationRequest,
+  getInteriorSnagItems,
+  saveInteriorSnagItem,
+  resolveInteriorSnagItem,
   ALL_INTERIOR_SPECIALIZATIONS,
 } from '../data/interiorDesignerStore.js';
 
@@ -444,10 +461,10 @@ describe('Interior Designer Panel & Store Tests', () => {
     const boqItems = getInteriorBOQItems('prj-int-1');
     expect(boqItems.length).toBeGreaterThanOrEqual(4);
 
-    const plywood = boqItems[0];
-    expect(plywood.quantity).toBe(24);
-    expect(plywood.unitRate).toBe(4200);
-    expect(plywood.totalAmount).toBeGreaterThan(100000);
+    const firstItem = boqItems[0];
+    expect(firstItem.quantity).toBe(12);
+    expect(firstItem.unitRate).toBe(9400);
+    expect(firstItem.totalAmount).toBeGreaterThan(100000);
   });
 
   it('deletes an individual interior designer account', () => {
@@ -481,5 +498,170 @@ describe('Interior Designer Panel & Store Tests', () => {
     expect(designer.specializations).toEqual([]);
     expect(designer.yearsOfExperience).toBe(0);
     expect(designer.businessDescription).toBe('');
+  });
+
+  it('implements Mandatory Section 23 Test 5: BOQ preparation, Admin review, and Customer acceptance', () => {
+    const projectId = 'BG-2026-TEST-BOQ';
+
+    // Step 1: Interior Designer prepares itemized BOQ
+    const item1 = saveInteriorBOQItem({
+      projectId,
+      roomName: 'Master Bedroom',
+      category: 'WARDROBE',
+      itemName: 'Floor-to-Ceiling Acrylic Wardrobe Carcass',
+      specification: '18mm BWP Marine Plywood • Hafele Soft Close Hinges',
+      quantity: 1,
+      unit: 'Set',
+      unitRate: 185000,
+      labourCost: 25000,
+      installationCost: 10000,
+      costStage: 'PRELIMINARY_ESTIMATE',
+      status: 'DRAFT',
+    });
+    expect(item1.id).toBeDefined();
+    expect(item1.totalAmount).toBeGreaterThan(200000);
+
+    const item2 = saveInteriorBOQItem({
+      projectId,
+      roomName: 'Living Room',
+      category: 'FALSE_CEILING',
+      itemName: 'Perimeter Cove Gyproc False Ceiling with Pelmet',
+      specification: 'Gyproc 12.5mm moisture resistant board • GI Framing',
+      quantity: 450,
+      unit: 'sq.ft',
+      unitRate: 140,
+      labourCost: 15000,
+      installationCost: 8000,
+      costStage: 'PRELIMINARY_ESTIMATE',
+      status: 'DRAFT',
+    });
+    expect(item2.totalAmount).toBeGreaterThan(80000);
+
+    // Step 2: Interior Designer submits BOQ to Admin
+    const submittedSummary = submitBOQToAdmin(projectId, 'BOQ prepared per approved 2D drawings v2.0.');
+    expect(submittedSummary.status).toBe('SUBMITTED_TO_ADMIN');
+    expect(submittedSummary.preliminaryEstimateTotal).toBe(item1.totalAmount + item2.totalAmount);
+
+    // Step 3: Admin reviews BOQ and approves
+    const adminApproved = adminReviewBOQ(
+      projectId,
+      'APPROVE',
+      'Material rates and labor estimates cross-checked with BuildGhar standard index.'
+    );
+    expect(adminApproved.status).toBe('APPROVED_BY_ADMIN');
+    expect(adminApproved.costStage).toBe('APPROVED_BOQ');
+
+    // Step 4: Approved BOQ forwarded to Customer
+    const forwardedToCustomer = adminForwardBOQToCustomer(
+      projectId,
+      'Approved BOQ forwarded to homeowner for formal budget and contractual sign-off.'
+    );
+    expect(forwardedToCustomer.status).toBe('FORWARDED_TO_CUSTOMER');
+
+    // Step 5: Customer accepts BOQ
+    const acceptedSummary = customerReviewBOQ(
+      projectId,
+      'ACCEPT',
+      'All room-wise items and material specs look good. Approved for execution.'
+    );
+    expect(acceptedSummary.status).toBe('CUSTOMER_ACCEPTED');
+    expect(acceptedSummary.costStage).toBe('BINDING_CONTRACT_AMOUNT');
+    expect(acceptedSummary.clientFeedback).toContain('Approved for execution');
+  });
+
+  it('manages Section 11 Site Visits: rescheduling and audit report submission to Admin', () => {
+    const projectId = 'BG-2026-TEST-SITE';
+
+    // 1. Log Site Visit
+    const visit = saveInteriorSiteVisit({
+      projectId,
+      projectName: 'DLF Crest Suite',
+      scheduledDate: '2026-12-05',
+      timeSlot: '11:00 AM - 01:00 PM',
+      purpose: 'Modular kitchen carcass alignment and countertop measurement verification',
+      siteLocation: 'Tower 4, Flat 1802',
+      status: 'SCHEDULED',
+    });
+    expect(visit.id).toBeDefined();
+    expect(visit.status).toBe('SCHEDULED');
+
+    // 2. Request Reschedule via Admin
+    const rescheduled = requestSiteVisitRescheduleThroughAdmin(
+      visit.id,
+      '2026-12-08',
+      'Civil plaster work not fully cured. Delay needed for accurate laser survey.'
+    );
+    expect(rescheduled.status).toBe('RESCHEDULE_REQUESTED');
+    expect(rescheduled.rescheduleReason).toContain('2026-12-08');
+
+    // 3. Submit Site Visit Report to Admin
+    const report = submitSiteVisitReportToAdmin({
+      projectId,
+      projectName: 'DLF Crest Suite',
+      visitDate: '2026-12-08',
+      siteLocation: 'Tower 4, Flat 1802',
+      roomMeasurements: 'Living room 5.8m x 4.2m, ceiling height 3.1m clear',
+      existingSiteCondition: 'Plaster cured, electrical conduits laid per MEP v1.0',
+      designRecommendations: 'Offset island counter by 150mm for unhindered fridge swing',
+      issuesFound: 'Drop beam level lower by 40mm in balcony entry',
+      requiredMaterials: 'Dr. Fixit damp primer • 250 sq.ft Gyproc boards',
+      submittedBy: 'Ar. Pooja Mehra',
+    });
+    expect(report.id).toMatch(/^BG-SVR-/);
+    expect(report.status).toBe('SUBMITTED_TO_ADMIN');
+    expect(report.designRecommendations).toContain('Offset island counter');
+
+    const allReports = getSiteVisitReports(projectId);
+    expect(allReports.some((r) => r.id === report.id)).toBe(true);
+  });
+
+  it('manages Section 12 Multi-Disciplinary Coordination and Snags via Admin mediation', () => {
+    const projectId = 'BG-2026-TEST-COORD';
+
+    // 1. Create coordination request via Admin
+    const req = createCoordinationRequestViaAdmin({
+      projectId,
+      projectName: 'The Crest Penthouse',
+      targetDiscipline: 'ARCHITECT',
+      type: 'ARCHITECT_DRAWING_REQUEST',
+      title: 'Sanctioned Column Grid & Beam Drop Levels',
+      description: 'Require approved structural beam elevation drawing to align false ceiling pelmet drops.',
+      requestedBy: 'Ar. Pooja Mehra',
+    });
+    expect(req.id).toMatch(/^BG-CRD-INT-/);
+    expect(req.adminMediationStatus).toBe('PENDING_ADMIN_REVIEW');
+
+    // 2. Admin forwards to Architect
+    const forwarded = adminMediateCoordinationRequest(
+      req.id,
+      'FORWARD',
+      'Forwarded to Ar. Rajesh Verma for structural CAD DWG'
+    );
+    expect(forwarded.adminMediationStatus).toBe('ADMIN_FORWARDED');
+
+    // 3. Admin resolves request with comments
+    const resolved = adminMediateCoordinationRequest(
+      req.id,
+      'RESOLVE',
+      'Architect provided beam section rev-B. Pelmet clear height confirmed at 2.95m.'
+    );
+    expect(resolved.adminMediationStatus).toBe('RESOLVED_BY_ADMIN');
+    expect(resolved.resolvedAt).toBeDefined();
+
+    // 4. Report & Resolve Snag
+    const snag = saveInteriorSnagItem({
+      projectId,
+      roomName: 'Kitchen',
+      category: 'CARPENTRY',
+      description: 'Soft-close tandem runner sticking on bottom drawer',
+      severity: 'MEDIUM',
+      assignedContractor: 'Lead Carpenter (Mohan Sharma)',
+    });
+    expect(snag.id).toBeDefined();
+    expect(snag.status).toBe('OPEN');
+
+    const resolvedSnag = resolveInteriorSnagItem(snag.id);
+    expect(resolvedSnag.status).toBe('RESOLVED');
+    expect(resolvedSnag.resolvedDate).toBeDefined();
   });
 });

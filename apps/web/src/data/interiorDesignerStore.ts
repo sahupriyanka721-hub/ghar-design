@@ -2652,32 +2652,163 @@ export const createDesignAssetRevision = (
 
 
 // ==========================================
-// SECTION E: ESTIMATION & BOQ (BILL OF QUANTITIES)
+// SECTION 10: ESTIMATION & BOQ (BILL OF QUANTITIES)
 // ==========================================
+export type BOQCategory =
+  | 'MODULAR_KITCHEN'
+  | 'WARDROBE'
+  | 'FURNITURE'
+  | 'FLOORING'
+  | 'FALSE_CEILING'
+  | 'LIGHTING'
+  | 'PAINTING_FINISHES'
+  | 'MATERIAL_ESTIMATE'
+  | 'LABOR_ESTIMATE'
+  | 'INSTALLATION_ESTIMATE'
+  | 'Plywood & Hardware'
+  | 'Laminates & Veneer'
+  | 'Modular Fittings'
+  | 'Lighting & Electricals'
+  | 'Civil & Tiles'
+  | 'Paint & Finishes';
+
+export type BOQCostStage =
+  | 'PRELIMINARY_ESTIMATE'
+  | 'APPROVED_BOQ'
+  | 'BINDING_CONTRACT_AMOUNT'
+  | 'ACTUAL_PURCHASE_AMOUNT';
+
+export type BOQReviewStatus =
+  | 'DRAFT'
+  | 'SUBMITTED_TO_ADMIN'
+  | 'APPROVED_BY_ADMIN'
+  | 'FORWARDED_TO_CUSTOMER'
+  | 'CUSTOMER_ACCEPTED'
+  | 'REVISION_REQUIRED'
+  | 'ESTIMATED'
+  | 'APPROVED'
+  | 'ORDERED'
+  | 'DELIVERED_TO_SITE';
+
 export interface InteriorBOQItem {
   id: string;
   projectId: string;
   roomName: string;
-  category: 'Plywood & Hardware' | 'Laminates & Veneer' | 'Modular Fittings' | 'Lighting & Electricals' | 'Civil & Tiles' | 'Paint & Finishes';
+  category: BOQCategory;
   itemName: string;
   specification: string;
-  brand: string;
+  brand?: string;
   quantity: number;
-  unit: string;
+  unit: string; // 'Running Feet' | 'Square Feet' | 'Nos' | 'Lump Sum' | 'Meters'
   unitRate: number;
-  wastagePercent: number;
-  labourCost: number;
-  taxPercent: number;
+  wastagePercent?: number;
+  labourCost?: number;
+  installationCost?: number;
+  taxPercent: number; // default 18
+  taxAmount?: number;
   totalAmount: number;
-  supplierName: string;
-  status: 'ESTIMATED' | 'APPROVED' | 'ORDERED' | 'DELIVERED_TO_SITE';
+  description?: string;
+  remarks?: string;
+  costStage?: BOQCostStage;
+  status: BOQReviewStatus;
+  supplierName?: string;
+}
+
+export interface InteriorBOQProjectSummary {
+  projectId: string;
+  projectName: string;
+  costStage: BOQCostStage;
+  status: BOQReviewStatus;
+  preliminaryEstimateTotal: number;
+  approvedBOQTotal: number;
+  bindingContractTotal: number;
+  actualPurchaseTotal: number;
+  adminFeedback?: string;
+  clientFeedback?: string;
+  updatedAt: string;
 }
 
 export const TEST_BOQ: InteriorBOQItem[] = [
-  { id: 'boq-1', projectId: 'prj-int-1', roomName: 'Kitchen', category: 'Plywood & Hardware', itemName: 'Greenlam Marine Plywood (BWP 710)', specification: 'Greenlam 18mm BWP IS:710 Marine Grade', brand: 'Greenlam', unit: 'sq.ft', quantity: 24, unitRate: 4200, wastagePercent: 5, labourCost: 500, taxPercent: 18, totalAmount: 112800, supplierName: 'Greenply Industries Ltd', status: 'ORDERED' },
-  { id: 'boq-2', projectId: 'prj-int-1', roomName: 'Kitchen', category: 'Modular Fittings', itemName: 'Blum Soft-Close Tandembox Drawers', specification: 'Blum Austria Antaro 500mm', brand: 'Blum', unit: 'sets', quantity: 8, unitRate: 3800, wastagePercent: 0, labourCost: 350, taxPercent: 18, totalAmount: 33200, supplierName: 'Hafele India Pvt Ltd', status: 'DELIVERED_TO_SITE' },
-  { id: 'boq-3', projectId: 'prj-int-1', roomName: 'Master Bedroom', category: 'Laminates & Veneer', itemName: 'Century Natural Teak Veneer 4mm', specification: 'CenturyVeneers Group 1 Teak', brand: 'CenturyPly', unit: 'sheets', quantity: 12, unitRate: 2400, wastagePercent: 8, labourCost: 400, taxPercent: 18, totalAmount: 33600, supplierName: 'Century Plyboards Ltd', status: 'APPROVED' },
-  { id: 'boq-4', projectId: 'prj-int-1', roomName: 'Living Room', category: 'Paint & Finishes', itemName: 'Asian Paints Royale Luxury Emulsion', specification: 'Asian Paints White Base Matt', brand: 'Asian Paints', unit: 'litres', quantity: 40, unitRate: 550, wastagePercent: 2, labourCost: 150, taxPercent: 18, totalAmount: 28000, supplierName: 'Asian Paints Colour Ideas', status: 'APPROVED' },
+  {
+    id: 'boq-1',
+    projectId: 'prj-int-1',
+    roomName: 'Modular Kitchen',
+    category: 'MODULAR_KITCHEN',
+    itemName: 'Modular Kitchen Acrylic Island Counter',
+    specification: 'BWP 710 Marine Ply • Blum Tandembox • 12 Running Feet',
+    brand: 'Greenlam / Blum',
+    unit: 'Running Feet',
+    quantity: 12,
+    unitRate: 9400,
+    wastagePercent: 5,
+    labourCost: 12000,
+    installationCost: 8000,
+    taxPercent: 18,
+    totalAmount: 112800,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Greenply Industries Ltd',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-2',
+    projectId: 'prj-int-1',
+    roomName: 'Master Bedroom',
+    category: 'WARDROBE',
+    itemName: 'Floor-to-Ceiling Sliding Wardrobe',
+    specification: 'Lacquer Glass & Tinted Profile • Hafele Slido • 80 sq.ft',
+    brand: 'Hafele Slido',
+    unit: 'Square Feet',
+    quantity: 80,
+    unitRate: 2150,
+    wastagePercent: 0,
+    labourCost: 15000,
+    installationCost: 7000,
+    taxPercent: 18,
+    totalAmount: 172000,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Hafele India Pvt Ltd',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-3',
+    projectId: 'prj-int-1',
+    roomName: 'Living Room',
+    category: 'FALSE_CEILING',
+    itemName: 'Gyproc Perimeter False Ceiling with Cove Lighting',
+    specification: 'Gyproc Saint-Gobain 12.5mm Plasterboard • 250 sq.ft',
+    brand: 'Saint-Gobain',
+    unit: 'Square Feet',
+    quantity: 250,
+    unitRate: 145,
+    wastagePercent: 8,
+    labourCost: 8000,
+    installationCost: 4000,
+    taxPercent: 18,
+    totalAmount: 36250,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'BuildGhar Depot',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-4',
+    projectId: 'prj-int-1',
+    roomName: 'Full Penthouse',
+    category: 'FLOORING',
+    itemName: 'Italian Bottochino Marble Laying & Diamond Polishing',
+    specification: 'Grade A Italian Marble with Mirror Diamond Finish • 600 sq.ft',
+    brand: 'Classic Marble Co',
+    unit: 'Square Feet',
+    quantity: 600,
+    unitRate: 650,
+    wastagePercent: 5,
+    labourCost: 45000,
+    installationCost: 20000,
+    taxPercent: 18,
+    totalAmount: 390000,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Classic Marble Co',
+    status: 'APPROVED_BY_ADMIN',
+  },
 ];
 
 export const SEED_INTERIOR_BOQ_ITEMS: InteriorBOQItem[] = TEST_BOQ;
@@ -2692,63 +2823,320 @@ export const getInteriorBOQItems = (projectId?: string): InteriorBOQItem[] => {
       }
     }
   } catch (e) {}
-  const defaults = isTest ? TEST_BOQ : [];
+  const defaults = TEST_BOQ;
   return projectId ? defaults.filter((b) => b.projectId === projectId) : defaults;
 };
 
+export const saveInteriorBOQItem = (item: Partial<InteriorBOQItem>): InteriorBOQItem => {
+  const all = getInteriorBOQItems();
+  const existingIdx = all.findIndex((b) => b.id === item.id);
+  const now = new Date().toISOString();
+
+  let updated: InteriorBOQItem;
+  if (existingIdx >= 0) {
+    updated = { ...all[existingIdx], ...item };
+    all[existingIdx] = updated;
+  } else {
+    const qty = Number(item.quantity) || 1;
+    const rate = Number(item.unitRate) || 0;
+    const labour = Number(item.labourCost) || 0;
+    const install = Number(item.installationCost) || 0;
+    const subtotal = qty * rate + labour + install;
+    const tax = Math.round(subtotal * 0.18);
+
+    updated = {
+      id: item.id || `boq-${Date.now()}`,
+      projectId: item.projectId || 'prj-int-1',
+      roomName: item.roomName || 'Living Room',
+      category: item.category || 'FURNITURE',
+      itemName: item.itemName || 'Custom Interior Fixture',
+      specification: item.specification || 'Commercial Grade Specification',
+      brand: item.brand || 'BuildGhar Verified',
+      quantity: qty,
+      unit: item.unit || 'Nos',
+      unitRate: rate,
+      wastagePercent: item.wastagePercent || 5,
+      labourCost: labour,
+      installationCost: install,
+      taxPercent: item.taxPercent || 18,
+      taxAmount: tax,
+      totalAmount: subtotal + tax,
+      description: item.description,
+      remarks: item.remarks,
+      costStage: item.costStage || 'PRELIMINARY_ESTIMATE',
+      status: item.status || 'DRAFT',
+      supplierName: item.supplierName || 'BuildGhar Depot',
+    };
+    all.unshift(updated);
+  }
+
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return updated;
+};
+
+export const deleteInteriorBOQItem = (id: string): boolean => {
+  const all = getInteriorBOQItems();
+  const filtered = all.filter((b) => b.id !== id);
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(filtered));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+export const getBOQProjectSummary = (projectId: string): InteriorBOQProjectSummary => {
+  try {
+    const stored = localStorage.getItem(`gd_boq_summary_${projectId}`);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {}
+
+  const items = getInteriorBOQItems(projectId);
+  const total = items.reduce((s, b) => s + (b.totalAmount || 0), 0);
+
+  return {
+    projectId,
+    projectName: items[0]?.roomName ? `Project ${projectId}` : 'BuildGhar Interior Project',
+    costStage: total > 0 ? 'APPROVED_BOQ' : 'PRELIMINARY_ESTIMATE',
+    status: total > 0 ? 'APPROVED_BY_ADMIN' : 'DRAFT',
+    preliminaryEstimateTotal: total > 0 ? Math.round(total * 0.95) : 0,
+    approvedBOQTotal: total,
+    bindingContractTotal: total > 0 ? Math.round(total * 1.05) : 0,
+    actualPurchaseTotal: total > 0 ? Math.round(total * 0.4) : 0,
+    updatedAt: new Date().toISOString(),
+  };
+};
+
+export const submitBOQToAdmin = (projectId: string, notes?: string): InteriorBOQProjectSummary => {
+  const items = getInteriorBOQItems(projectId);
+  const total = items.reduce((s, b) => s + (b.totalAmount || 0), 0);
+
+  // Update all items in this project to SUBMITTED_TO_ADMIN
+  const updatedItems = items.map((i) => ({
+    ...i,
+    status: 'SUBMITTED_TO_ADMIN' as const,
+  }));
+  const allItems = getInteriorBOQItems().map((i) => (i.projectId === projectId ? { ...i, status: 'SUBMITTED_TO_ADMIN' as const } : i));
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(allItems));
+  } catch (e) {}
+
+  const summary: InteriorBOQProjectSummary = {
+    projectId,
+    projectName: `Project ${projectId}`,
+    costStage: 'PRELIMINARY_ESTIMATE',
+    status: 'SUBMITTED_TO_ADMIN',
+    preliminaryEstimateTotal: total,
+    approvedBOQTotal: total,
+    bindingContractTotal: total,
+    actualPurchaseTotal: 0,
+    adminFeedback: notes,
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem(`gd_boq_summary_${projectId}`, JSON.stringify(summary));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return summary;
+};
+
+export const adminReviewBOQ = (
+  projectId: string,
+  action: 'APPROVE' | 'REJECT' | 'REQUEST_REVISION',
+  feedback?: string
+): InteriorBOQProjectSummary => {
+  const summary = getBOQProjectSummary(projectId);
+
+  if (action === 'APPROVE') {
+    summary.status = 'APPROVED_BY_ADMIN';
+    summary.costStage = 'APPROVED_BOQ';
+    summary.adminFeedback = feedback || 'BOQ and rate estimates approved by Admin Desk';
+  } else if (action === 'REQUEST_REVISION') {
+    summary.status = 'REVISION_REQUIRED';
+    summary.adminFeedback = feedback || 'Rate revision requested';
+  } else {
+    summary.status = 'REVISION_REQUIRED';
+    summary.adminFeedback = feedback || 'Rejected by Admin';
+  }
+
+  summary.updatedAt = new Date().toISOString();
+
+  // Also update items
+  const allItems = getInteriorBOQItems().map((i) =>
+    i.projectId === projectId ? { ...i, status: summary.status, costStage: summary.costStage } : i
+  );
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(allItems));
+    localStorage.setItem(`gd_boq_summary_${projectId}`, JSON.stringify(summary));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return summary;
+};
+
+export const adminForwardBOQToCustomer = (
+  projectId: string,
+  handoverNotes?: string
+): InteriorBOQProjectSummary => {
+  const summary = getBOQProjectSummary(projectId);
+  summary.status = 'FORWARDED_TO_CUSTOMER';
+  summary.adminFeedback = handoverNotes || 'Approved BOQ forwarded to customer for commercial sign-off';
+  summary.updatedAt = new Date().toISOString();
+
+  const allItems = getInteriorBOQItems().map((i) =>
+    i.projectId === projectId ? { ...i, status: 'FORWARDED_TO_CUSTOMER' as const } : i
+  );
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(allItems));
+    localStorage.setItem(`gd_boq_summary_${projectId}`, JSON.stringify(summary));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return summary;
+};
+
+export const customerReviewBOQ = (
+  projectId: string,
+  action: 'ACCEPT' | 'REQUEST_REVISION',
+  feedback?: string
+): InteriorBOQProjectSummary => {
+  const summary = getBOQProjectSummary(projectId);
+
+  if (action === 'ACCEPT') {
+    summary.status = 'CUSTOMER_ACCEPTED';
+    summary.costStage = 'BINDING_CONTRACT_AMOUNT';
+    summary.clientFeedback = feedback || 'BOQ accepted by homeowner';
+  } else {
+    summary.status = 'REVISION_REQUIRED';
+    summary.clientFeedback = feedback || 'Customer requested BOQ modifications';
+  }
+  summary.updatedAt = new Date().toISOString();
+
+  const allItems = getInteriorBOQItems().map((i) =>
+    i.projectId === projectId ? { ...i, status: summary.status, costStage: summary.costStage } : i
+  );
+  try {
+    localStorage.setItem('gd_interior_boq_v1', JSON.stringify(allItems));
+    localStorage.setItem(`gd_boq_summary_${projectId}`, JSON.stringify(summary));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_boq_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return summary;
+};
+
 // ==========================================
-// SECTION F: SITE VISIT & SNAG LIST MANAGEMENT
+// SECTION 11: SITE VISIT MANAGEMENT & REPORTS
 // ==========================================
-export interface InteriorSiteVisit {
-  id: string;
+export type SiteVisitStatus =
+  | 'SCHEDULED'
+  | 'RESCHEDULE_REQUESTED'
+  | 'COMPLETED'
+  | 'REPORT_SUBMITTED'
+  | 'APPROVED_BY_ADMIN'
+  | 'FORWARDED_TO_CUSTOMER';
+
+export interface InteriorSiteVisitReport {
+  id: string; // BG-SVR-XXXX
   projectId: string;
   projectName: string;
   visitDate: string;
-  purpose: string;
-  siteEngineer: string;
-  measurementsSummary: string;
-  workCompleted: string;
-  pendingActivities: string;
-  nextVisitDate: string;
-  photos: string[];
+  siteLocation: string;
+  roomMeasurements: string;
+  existingSiteCondition: string;
+  designRecommendations: string;
+  issuesFound: string;
+  requiredMaterials: string;
+  supportingPhotos: string[];
+  supportingVideos?: string[];
+  additionalNotes: string;
+  submittedBy: string;
+  submittedAt: string;
+  status: 'DRAFT' | 'SUBMITTED_TO_ADMIN' | 'ADMIN_APPROVED' | 'FORWARDED_TO_CUSTOMER';
+  adminFeedback?: string;
 }
 
-export interface InteriorSnagItem {
+export interface InteriorSiteVisit {
   id: string;
   projectId: string;
-  roomName: string;
-  description: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'VERIFIED';
-  reportedDate: string;
-  resolvedDate?: string;
-  assignedContractor: string;
+  projectName?: string;
+  visitDate?: string;
+  scheduledDate: string;
+  timeSlot: string;
+  purpose: string;
+  siteEngineer?: string;
+  siteLocation?: string;
+  status: SiteVisitStatus;
+  rescheduleReason?: string;
+  measurementsSummary?: string;
+  workCompleted?: string;
+  pendingActivities?: string;
+  nextVisitDate?: string;
+  findingsNotes?: string;
+  report?: InteriorSiteVisitReport;
+  photos?: string[];
 }
 
 export const TEST_SITE_VISITS: InteriorSiteVisit[] = [
   {
     id: 'sv-101',
     projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
     scheduledDate: '2026-12-02',
     timeSlot: '11:00 AM - 01:00 PM',
     purpose: 'Modular kitchen carcass alignment and countertop measurement verification',
+    siteLocation: 'Tower 4, Flat 1802, DLF Phase 5, Gurugram',
     status: 'SCHEDULED',
     findingsNotes: 'Pending site inspection with contractor.',
+    photos: ['https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=600'],
   },
   {
     id: 'sv-102',
     projectId: 'prj-int-2',
+    projectName: 'Scandinavian Minimalist Penthouse',
     scheduledDate: '2026-12-05',
     timeSlot: '02:30 PM - 04:30 PM',
     purpose: 'False ceiling electrical points and perimeter cove light trough inspection',
+    siteLocation: 'Golf Course Extension, Sector 65, Gurugram',
     status: 'SCHEDULED',
     findingsNotes: 'Verify LED channel dimensions.',
+    photos: ['https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600'],
   },
 ];
 
 export const SEED_INTERIOR_SITE_VISITS: InteriorSiteVisit[] = TEST_SITE_VISITS;
-
-export const SEED_INTERIOR_SNAG_ITEMS: InteriorSnagItem[] = [];
 
 export const getInteriorSiteVisits = (projectId?: string): InteriorSiteVisit[] => {
   try {
@@ -2763,6 +3151,330 @@ export const getInteriorSiteVisits = (projectId?: string): InteriorSiteVisit[] =
   return projectId ? SEED_INTERIOR_SITE_VISITS.filter((v) => v.projectId === projectId) : SEED_INTERIOR_SITE_VISITS;
 };
 
+export const saveInteriorSiteVisit = (visit: Partial<InteriorSiteVisit>): InteriorSiteVisit => {
+  const all = getInteriorSiteVisits();
+  const existingIdx = all.findIndex((v) => v.id === visit.id);
+  let updated: InteriorSiteVisit;
+
+  if (existingIdx >= 0) {
+    updated = { ...all[existingIdx], ...visit };
+    all[existingIdx] = updated;
+  } else {
+    updated = {
+      id: visit.id || `sv-${Date.now()}`,
+      projectId: visit.projectId || 'prj-int-1',
+      projectName: visit.projectName || 'Interior Site',
+      scheduledDate: visit.scheduledDate || new Date().toISOString().slice(0, 10),
+      timeSlot: visit.timeSlot || '10:00 AM - 12:00 PM',
+      purpose: visit.purpose || 'Comprehensive Site Survey & Laser Measurement',
+      siteLocation: visit.siteLocation || 'Site Address',
+      status: visit.status || 'SCHEDULED',
+      findingsNotes: visit.findingsNotes,
+      photos: visit.photos || [],
+    };
+    all.unshift(updated);
+  }
+
+  try {
+    localStorage.setItem('gd_interior_visits_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_visits_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return updated;
+};
+
+export const requestSiteVisitRescheduleThroughAdmin = (
+  visitId: string,
+  preferredDate: string,
+  reason: string
+): InteriorSiteVisit => {
+  const all = getInteriorSiteVisits();
+  const visit = all.find((v) => v.id === visitId);
+  if (!visit) throw new Error('Site visit not found');
+
+  visit.status = 'RESCHEDULE_REQUESTED';
+  visit.rescheduleReason = `Preferred date: ${preferredDate}. Reason: ${reason}`;
+
+  return saveInteriorSiteVisit(visit);
+};
+
+export const submitSiteVisitReportToAdmin = (
+  report: Partial<InteriorSiteVisitReport>
+): InteriorSiteVisitReport => {
+  const now = new Date().toISOString();
+  const newReport: InteriorSiteVisitReport = {
+    id: report.id || `BG-SVR-${Math.floor(1000 + Math.random() * 9000)}`,
+    projectId: report.projectId || 'BG-2026-0002',
+    projectName: report.projectName || 'Interior Architecture Site',
+    visitDate: report.visitDate || now.slice(0, 10),
+    siteLocation: report.siteLocation || 'Gurugram, Haryana',
+    roomMeasurements: report.roomMeasurements || 'Laser measured 4.2m x 5.8m ceiling clear 3.1m',
+    existingSiteCondition: report.existingSiteCondition || 'Plaster completed, electrical conduits laid per MEP v1.0',
+    designRecommendations: report.designRecommendations || 'Offset island counter by 150mm for plumbing clearance',
+    issuesFound: report.issuesFound || 'Minor moisture seepage on balcony wall requiring damp-proof primer',
+    requiredMaterials: report.requiredMaterials || 'Dr. Fixit damp-proof coat • 250 sq.ft Gyproc boards',
+    supportingPhotos: report.supportingPhotos || [
+      'https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=600',
+    ],
+    additionalNotes: report.additionalNotes || 'Contractor briefed on Blume soft-close tolerances',
+    submittedBy: report.submittedBy || 'Ar. Pooja Mehra',
+    submittedAt: now,
+    status: 'SUBMITTED_TO_ADMIN',
+  };
+
+  try {
+    const existing = localStorage.getItem('gd_site_visit_reports_v1');
+    const list: InteriorSiteVisitReport[] = existing ? JSON.parse(existing) : [];
+    list.unshift(newReport);
+    localStorage.setItem('gd_site_visit_reports_v1', JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_site_reports_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return newReport;
+};
+
+export const getSiteVisitReports = (projectId?: string): InteriorSiteVisitReport[] => {
+  try {
+    const data = localStorage.getItem('gd_site_visit_reports_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return projectId ? parsed.filter((r: InteriorSiteVisitReport) => r.projectId === projectId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return [];
+};
+
+export const adminApproveSiteVisitReport = (
+  reportId: string,
+  notes?: string
+): InteriorSiteVisitReport => {
+  const reports = getSiteVisitReports();
+  const rep = reports.find((r) => r.id === reportId);
+  if (!rep) throw new Error('Site visit report not found');
+
+  rep.status = 'ADMIN_APPROVED';
+  if (notes) rep.adminFeedback = notes;
+
+  try {
+    localStorage.setItem('gd_site_visit_reports_v1', JSON.stringify(reports));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return rep;
+};
+
+export const adminForwardSiteVisitReportToCustomer = (
+  reportId: string
+): InteriorSiteVisitReport => {
+  const reports = getSiteVisitReports();
+  const rep = reports.find((r) => r.id === reportId);
+  if (!rep) throw new Error('Site visit report not found');
+
+  rep.status = 'FORWARDED_TO_CUSTOMER';
+
+  try {
+    localStorage.setItem('gd_site_visit_reports_v1', JSON.stringify(reports));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return rep;
+};
+
+// ==========================================
+// SECTION 12: MULTI-DISCIPLINARY COORDINATION & SNAGS
+// ==========================================
+export type CoordinationDiscipline = 'ARCHITECT' | 'CONTRACTOR' | 'VENDOR' | 'PMC_ADMIN';
+export type CoordinationType =
+  | 'ARCHITECT_DRAWING_REQUEST'
+  | 'CONTRACTOR_SITE_ALIGNMENT'
+  | 'VENDOR_MATERIAL_SPEC'
+  | 'INSTALLATION_PLANNING'
+  | 'QUALITY_DEFECT_ESCALATION';
+
+export interface InteriorCoordinationRequest {
+  id: string; // BG-CRD-INT-XXXX
+  projectId: string;
+  projectName: string;
+  targetDiscipline: CoordinationDiscipline;
+  type: CoordinationType;
+  title: string;
+  description: string;
+  requestedBy: string;
+  requestedAt: string;
+  adminMediationStatus: 'PENDING_ADMIN_REVIEW' | 'ADMIN_FORWARDED' | 'RESOLVED_BY_ADMIN' | 'REJECTED';
+  adminNotes?: string;
+  responseDocumentUrl?: string;
+  responseComments?: string;
+  resolvedAt?: string;
+}
+
+export interface InteriorSnagItem {
+  id: string;
+  projectId: string;
+  roomName: string;
+  description: string;
+  category?: 'CARPENTRY' | 'ELECTRICAL' | 'CIVIL' | 'PAINT_FINISH' | 'MODULAR_FITTINGS';
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'VERIFIED';
+  photoUrl?: string;
+  reportedDate: string;
+  resolvedDate?: string;
+  assignedContractor: string;
+  adminVerified?: boolean;
+}
+
+export const TEST_COORDINATION_REQUESTS: InteriorCoordinationRequest[] = [
+  {
+    id: 'BG-CRD-INT-101',
+    projectId: 'BG-2026-0002',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    targetDiscipline: 'ARCHITECT',
+    type: 'ARCHITECT_DRAWING_REQUEST',
+    title: 'Sanctioned Column Grid & Drop Beam Levels Drawing Request',
+    description: 'Require approved structural beam elevation drawing to align false ceiling pelmet drops.',
+    requestedBy: 'Ar. Pooja Mehra',
+    requestedAt: '2026-11-20T10:30:00Z',
+    adminMediationStatus: 'ADMIN_FORWARDED',
+    adminNotes: 'Admin requested sanctioned CAD DWG from Ar. Rajesh Verma.',
+  },
+  {
+    id: 'BG-CRD-INT-102',
+    projectId: 'BG-2026-0002',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    targetDiscipline: 'CONTRACTOR',
+    type: 'CONTRACTOR_SITE_ALIGNMENT',
+    title: 'Plumbing Trap Offset for Kitchen Sink Waste Outlet',
+    description: 'Sink waste line needs 120mm eastward shift to prevent clashing with Blum under-sink pull-out.',
+    requestedBy: 'Ar. Pooja Mehra',
+    requestedAt: '2026-11-22T14:15:00Z',
+    adminMediationStatus: 'RESOLVED_BY_ADMIN',
+    adminNotes: 'PMC site engineer verified modification on site on 23rd Nov.',
+    responseComments: 'Contractor plumber completed trap offset.',
+    resolvedAt: '2026-11-23T16:00:00Z',
+  },
+];
+
+export const getInteriorCoordinationRequests = (projectId?: string): InteriorCoordinationRequest[] => {
+  try {
+    const data = localStorage.getItem('gd_interior_coordination_v1');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return projectId ? parsed.filter((c: InteriorCoordinationRequest) => c.projectId === projectId) : parsed;
+      }
+    }
+  } catch (e) {}
+  return projectId ? TEST_COORDINATION_REQUESTS.filter((c) => c.projectId === projectId) : TEST_COORDINATION_REQUESTS;
+};
+
+export const createCoordinationRequestViaAdmin = (
+  req: Partial<InteriorCoordinationRequest>
+): InteriorCoordinationRequest => {
+  const all = getInteriorCoordinationRequests();
+  const newReq: InteriorCoordinationRequest = {
+    id: req.id || `BG-CRD-INT-${Math.floor(100 + Math.random() * 900)}`,
+    projectId: req.projectId || 'BG-2026-0002',
+    projectName: req.projectName || 'Interior Architecture Project',
+    targetDiscipline: req.targetDiscipline || 'ARCHITECT',
+    type: req.type || 'ARCHITECT_DRAWING_REQUEST',
+    title: req.title || 'Technical Alignment Request',
+    description: req.description || 'Coordination details required through Admin mediation.',
+    requestedBy: req.requestedBy || 'Ar. Pooja Mehra',
+    requestedAt: new Date().toISOString(),
+    adminMediationStatus: 'PENDING_ADMIN_REVIEW',
+  };
+
+  all.unshift(newReq);
+  try {
+    localStorage.setItem('gd_interior_coordination_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_coordination_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return newReq;
+};
+
+export const adminMediateCoordinationRequest = (
+  id: string,
+  action: 'FORWARD' | 'RESOLVE' | 'REJECT',
+  notes?: string,
+  docUrl?: string
+): InteriorCoordinationRequest => {
+  const all = getInteriorCoordinationRequests();
+  const req = all.find((r) => r.id === id);
+  if (!req) throw new Error('Coordination request not found');
+
+  if (action === 'FORWARD') {
+    req.adminMediationStatus = 'ADMIN_FORWARDED';
+    req.adminNotes = notes || 'Forwarded to authorized discipline by Admin';
+  } else if (action === 'RESOLVE') {
+    req.adminMediationStatus = 'RESOLVED_BY_ADMIN';
+    req.responseComments = notes;
+    if (docUrl) req.responseDocumentUrl = docUrl;
+    req.resolvedAt = new Date().toISOString();
+  } else {
+    req.adminMediationStatus = 'REJECTED';
+    req.adminNotes = notes || 'Rejected by Admin';
+  }
+
+  try {
+    localStorage.setItem('gd_interior_coordination_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_coordination_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return req;
+};
+
+export const TEST_SNAG_ITEMS: InteriorSnagItem[] = [
+  {
+    id: 'sng-101',
+    projectId: 'prj-int-1',
+    roomName: 'Kitchen',
+    category: 'CARPENTRY',
+    description: 'Overhead wall unit hydraulic lift-up stay has 3mm hinge misalignment',
+    severity: 'MEDIUM',
+    status: 'OPEN',
+    reportedDate: '2026-11-20',
+    assignedContractor: 'Lead Carpenter (Mohan Sharma)',
+    adminVerified: false,
+  },
+  {
+    id: 'sng-102',
+    projectId: 'prj-int-1',
+    roomName: 'Master Bedroom',
+    category: 'PAINT_FINISH',
+    description: 'Fluted panel groove has paint overspray near AC duct',
+    severity: 'LOW',
+    status: 'IN_PROGRESS',
+    reportedDate: '2026-11-21',
+    assignedContractor: 'Finishing Painter',
+    adminVerified: true,
+  },
+];
+
 export const getInteriorSnagItems = (projectId?: string): InteriorSnagItem[] => {
   try {
     const data = localStorage.getItem('gd_interior_snags_v1');
@@ -2773,7 +3485,55 @@ export const getInteriorSnagItems = (projectId?: string): InteriorSnagItem[] => 
       }
     }
   } catch (e) {}
-  return projectId ? SEED_INTERIOR_SNAG_ITEMS.filter((s) => s.projectId === projectId) : SEED_INTERIOR_SNAG_ITEMS;
+  return projectId ? TEST_SNAG_ITEMS.filter((s) => s.projectId === projectId) : TEST_SNAG_ITEMS;
+};
+
+export const saveInteriorSnagItem = (snag: Partial<InteriorSnagItem>): InteriorSnagItem => {
+  const all = getInteriorSnagItems();
+  const existingIdx = all.findIndex((s) => s.id === snag.id);
+  let updated: InteriorSnagItem;
+
+  if (existingIdx >= 0) {
+    updated = { ...all[existingIdx], ...snag };
+    all[existingIdx] = updated;
+  } else {
+    updated = {
+      id: snag.id || `sng-${Date.now()}`,
+      projectId: snag.projectId || 'prj-int-1',
+      roomName: snag.roomName || 'Living Room',
+      category: snag.category || 'CARPENTRY',
+      description: snag.description || 'Quality defect reported on site',
+      severity: snag.severity || 'MEDIUM',
+      status: snag.status || 'OPEN',
+      photoUrl: snag.photoUrl,
+      reportedDate: new Date().toISOString().slice(0, 10),
+      assignedContractor: snag.assignedContractor || 'Site In-charge',
+      adminVerified: false,
+    };
+    all.unshift(updated);
+  }
+
+  try {
+    localStorage.setItem('gd_interior_snags_v1', JSON.stringify(all));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('interior_snags_updated'));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return updated;
+};
+
+export const resolveInteriorSnagItem = (snagId: string): InteriorSnagItem => {
+  const all = getInteriorSnagItems();
+  const snag = all.find((s) => s.id === snagId);
+  if (!snag) throw new Error('Snag item not found');
+
+  snag.status = 'RESOLVED';
+  snag.resolvedDate = new Date().toISOString().slice(0, 10);
+
+  return saveInteriorSnagItem(snag);
 };
 
 // ==========================================
