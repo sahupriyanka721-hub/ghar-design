@@ -11,6 +11,7 @@ import {
   ImageIcon,
   CreditCard,
   ShieldCheck,
+  AlertTriangle,
   ArrowRight,
   ArrowLeft,
   Plus,
@@ -245,12 +246,18 @@ export const InteriorDesignerProfileWizard: React.FC = () => {
 
   // ---------------- STEP I: DECLARATION ----------------
   const [declarationAgreed, setDeclarationAgreed] = useState(false);
+  const [adminFeedback, setAdminFeedback] = useState<string>('');
+  const [designerStatus, setDesignerStatus] = useState<string>('');
 
   // Load existing profile or draft if available
   useEffect(() => {
     if (user?.phone) {
       const existing = getInteriorDesignerByPhone(user.phone);
       if (existing) {
+        if (existing.adminReviewRemarks) {
+          setAdminFeedback(existing.adminReviewRemarks);
+        }
+        setDesignerStatus(existing.accountStatus);
         setPersonal((prev) => ({
           ...prev,
           name: existing.name || prev.name,
@@ -696,6 +703,25 @@ export const InteriorDesignerProfileWizard: React.FC = () => {
             Complete the 9 official sections below to submit your practice for BuildGhar Centralized Admin verification.
           </p>
         </div>
+
+        {/* Admin Feedback Notice if Corrections/Docs Required */}
+        {adminFeedback &&
+          (designerStatus === 'RESUBMISSION_REQUIRED' || designerStatus === 'DOCUMENTS_REQUIRED') && (
+            <div className="mb-6 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                  Admin Verification Notice ({designerStatus.replace('_', ' ')})
+                </div>
+                <p className="text-xs font-medium text-amber-900 mt-0.5">
+                  "{adminFeedback}"
+                </p>
+                <div className="text-[11px] text-amber-700 mt-1">
+                  Please review the requested changes, update your profile or documents, and submit your application for re-verification.
+                </div>
+              </div>
+            </div>
+          )}
 
         {/* ---------------- STEP INDICATOR PILLS (9 Steps) ---------------- */}
         <div className="mb-8 grid grid-cols-3 sm:grid-cols-9 gap-2">

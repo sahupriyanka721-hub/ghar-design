@@ -235,8 +235,12 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="bg-white rounded-3xl p-6 sm:p-10 border-2 border-blue-100 shadow-lg relative overflow-hidden"
         >
-          {/* 1. PENDING APPROVAL or UNDER REVIEW */}
-          {(status === 'PENDING_APPROVAL' || status === 'UNDER_REVIEW') && (
+          {/* 1. PENDING APPROVAL, SUBMITTED, PENDING REVIEW, or UNDER VERIFICATION */}
+          {(status === 'PENDING_APPROVAL' ||
+            status === 'SUBMITTED' ||
+            status === 'PENDING_REVIEW' ||
+            status === 'UNDER_VERIFICATION' ||
+            status === 'UNDER_REVIEW') && (
             <div className="space-y-6 text-center sm:text-left">
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-inner">
@@ -244,17 +248,19 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                 </div>
                 <div>
                   <div className="inline-block px-3 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-black uppercase font-mono mb-1">
-                    {status === 'UNDER_REVIEW' ? 'Under Review by Admin' : 'Application Submitted'}
+                    {status === 'UNDER_VERIFICATION' || status === 'UNDER_REVIEW'
+                      ? 'Under Verification by Admin Desk'
+                      : 'Application Submitted & Queued'}
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black font-display text-navy-950">
-                    Your Application is Under Verification
+                    Application Under Admin Verification
                   </h2>
                 </div>
               </div>
 
               <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                Thank you for applying to the BuildGhar Interior Designer Partner Network. Our Operations Governance
-                Desk is reviewing your firm credentials, professional qualifications, and residential portfolio.
+                Thank you for applying to BuildGhar's Interior Designer Partner Network. Our Centralized Operations
+                Governance Desk is verifying your studio registration, degree qualifications, and residential portfolio.
               </p>
 
               {/* Progress Milestones */}
@@ -262,7 +268,7 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                   <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>1. OTP Mobile Verified</span>
+                    <span>1. Mobile OTP Verified</span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">Ph: +91 {designer?.phone}</div>
                 </div>
@@ -270,9 +276,11 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                   <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>2. Profile & Docs Uploaded</span>
+                    <span>2. Profile & KYC Submitted</span>
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-1">{designer?.specializations?.length || 0} Specializations Configured</div>
+                  <div className="text-[11px] text-slate-500 mt-1">
+                    {(designer?.servicesOffered || designer?.specializations)?.length || 0} Services Configured
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
@@ -282,6 +290,55 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">Estimated 24-48 Hours</div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 2. RESUBMISSION REQUIRED (Correction Request from Admin) */}
+          {status === 'RESUBMISSION_REQUIRED' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <div className="w-16 h-16 rounded-3xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-inner">
+                  <AlertTriangle className="w-8 h-8 text-purple-700" />
+                </div>
+                <div>
+                  <div className="inline-block px-3 py-0.5 rounded-full bg-purple-100 text-purple-900 text-xs font-black uppercase font-mono mb-1">
+                    Profile Corrections Requested
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black font-display text-navy-950">
+                    Corrections Required on Your Application
+                  </h2>
+                </div>
+              </div>
+
+              {/* Admin Remarks */}
+              <div className="p-5 rounded-2xl bg-purple-50 border-2 border-purple-300 space-y-2">
+                <div className="text-xs font-black text-purple-950 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <Sliders className="w-4 h-4 text-purple-700" />
+                  <span>Admin Governance Correction Notice</span>
+                </div>
+                <p className="text-xs sm:text-sm text-purple-900 font-medium leading-relaxed">
+                  "{designer?.adminReviewRemarks || 'Please update your business details and make sure registration documents match before resubmission.'}"
+                </p>
+                <div className="text-[10px] text-purple-700 font-mono pt-1">
+                  Reviewed by: {designer?.adminReviewedBy || 'Operations Governance Desk'}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <Link
+                  to="/interior-designer/profile-wizard"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <span>Open Profile Wizard & Resubmit</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/interior-designer"
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition text-center"
+                >
+                  View Partner Guidelines
+                </Link>
               </div>
             </div>
           )}
@@ -440,8 +497,8 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
             </div>
           )}
 
-          {/* 5. SUSPENDED */}
-          {status === 'SUSPENDED' && (
+          {/* 5. SUSPENDED or DEACTIVATED */}
+          {(status === 'SUSPENDED' || status === 'DEACTIVATED') && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 shadow-inner">
@@ -449,7 +506,7 @@ export const InteriorDesignerApplicationStatus: React.FC = () => {
                 </div>
                 <div>
                   <div className="inline-block px-3 py-0.5 rounded-full bg-rose-100 text-rose-900 text-xs font-black uppercase font-mono mb-1">
-                    Account Suspended
+                    {status === 'DEACTIVATED' ? 'Account Deactivated' : 'Account Suspended'}
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black font-display text-navy-950">
                     Partner Privileges Temporarily Suspended

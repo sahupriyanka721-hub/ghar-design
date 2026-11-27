@@ -9,12 +9,17 @@ import { pushToCloud } from './cloudSync.js';
 
 export type InteriorDesignerAccountStatus =
   | 'PROFILE_INCOMPLETE'
+  | 'DRAFT'
+  | 'SUBMITTED'
   | 'PENDING_APPROVAL'
-  | 'UNDER_REVIEW'
+  | 'PENDING_REVIEW'
+  | 'UNDER_VERIFICATION'
   | 'DOCUMENTS_REQUIRED'
+  | 'RESUBMISSION_REQUIRED'
   | 'APPROVED'
   | 'REJECTED'
-  | 'SUSPENDED';
+  | 'SUSPENDED'
+  | 'DEACTIVATED';
 
 export type InteriorDesignerBusinessType =
   | 'Individual Interior Designer'
@@ -168,6 +173,16 @@ export interface InteriorDesignerAccount {
   adminReviewedBy?: string;
   adminReviewedAt?: string;
   isVerified: boolean;
+  isKycVerified?: boolean;
+  isBusinessVerified?: boolean;
+  adminInternalNotes?: string[];
+  correctionNotice?: string;
+  statusHistory?: Array<{
+    status: InteriorDesignerAccountStatus;
+    timestamp: string;
+    changedBy: string;
+    remarks?: string;
+  }>;
   applicationId: string;
   registeredAt: string;
   updatedAt: string;
@@ -487,6 +502,14 @@ export const updateInteriorDesignerStatus = (
   if (idx === -1) return null;
 
   const now = new Date().toISOString();
+  const history = current[idx].statusHistory || [];
+  history.push({
+    status: newStatus,
+    timestamp: now,
+    changedBy: reviewerName || 'Admin Operations Desk',
+    remarks: remarks || '',
+  });
+
   current[idx] = {
     ...current[idx],
     accountStatus: newStatus,
@@ -494,6 +517,7 @@ export const updateInteriorDesignerStatus = (
     adminReviewRemarks: remarks ?? current[idx].adminReviewRemarks,
     adminReviewedBy: reviewerName || 'Admin Operations Desk',
     adminReviewedAt: now,
+    statusHistory: history,
     updatedAt: now,
   };
 
@@ -520,6 +544,188 @@ export const updateInteriorDesignerStatus = (
   } catch (e) {}
 
   return current[idx];
+};
+
+export const verifyDesignerKyc = (id: string, reviewerName = 'Super Admin KYC Desk'): InteriorDesignerAccount | null => {
+  const current = getInteriorDesignerAccounts();
+  const idx = current.findIndex((a) => a.id === id);
+  if (idx === -1) return null;
+
+  const now = new Date().toISOString();
+  const verifiedDocs = (current[idx].documents || []).map((doc) => ({
+    ...doc,
+    status: 'VERIFIED' as const,
+  }));
+
+  current[idx] = {
+    ...current[idx],
+    isKycVerified: true,
+    documents: verifiedDocs,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(INTERIOR_STORAGE_KEY, JSON.stringify(current));
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('interior_designer_store_updated', { detail: current[idx] }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return current[idx];
+};
+
+export const verifyDesignerBusiness = (id: string, reviewerName = 'Super Admin Business Desk'): InteriorDesignerAccount | null => {
+  const current = getInteriorDesignerAccounts();
+  const idx = current.findIndex((a) => a.id === id);
+  if (idx === -1) return null;
+
+  const now = new Date().toISOString();
+  current[idx] = {
+    ...current[idx],
+    isBusinessVerified: true,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(INTERIOR_STORAGE_KEY, JSON.stringify(current));
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('interior_designer_store_updated', { detail: current[idx] }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return current[idx];
+};
+
+export const updateDocumentVerificationStatus = (
+  designerId: string,
+  docId: string,
+  status: 'VERIFIED' | 'PENDING' | 'REJECTED',
+  rejectionReason?: string
+): InteriorDesignerAccount | null => {
+  const current = getInteriorDesignerAccounts();
+  const idx = current.findIndex((a) => a.id === designerId);
+  if (idx === -1) return null;
+
+  const now = new Date().toISOString();
+  const updatedDocs = (current[idx].documents || []).map((doc) => {
+    if (doc.id === docId) {
+      return {
+        ...doc,
+        status,
+        rejectionReason: status === 'REJECTED' ? rejectionReason : undefined,
+      };
+    }
+    return doc;
+  });
+
+  const allMandatoryVerified = updatedDocs.every((d) => d.status === 'VERIFIED');
+
+  current[idx] = {
+    ...current[idx],
+    documents: updatedDocs,
+    isKycVerified: allMandatoryVerified,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(INTERIOR_STORAGE_KEY, JSON.stringify(current));
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('interior_designer_store_updated', { detail: current[idx] }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return current[idx];
+};
+
+export const addDesignerInternalNote = (
+  designerId: string,
+  note: string,
+  authorName = 'Super Admin'
+): InteriorDesignerAccount | null => {
+  const current = getInteriorDesignerAccounts();
+  const idx = current.findIndex((a) => a.id === designerId);
+  if (idx === -1) return null;
+
+  const now = new Date().toISOString();
+  const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+  const formattedNote = `[${timestamp} by ${authorName}]: ${note.trim()}`;
+  const notes = current[idx].adminInternalNotes || [];
+  notes.unshift(formattedNote);
+
+  current[idx] = {
+    ...current[idx],
+    adminInternalNotes: notes,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(INTERIOR_STORAGE_KEY, JSON.stringify(current));
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('interior_designer_store_updated', { detail: current[idx] }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return current[idx];
+};
+
+export const resubmitInteriorDesignerApplication = (
+  id: string,
+  updatedFields: Partial<InteriorDesignerAccount>
+): InteriorDesignerAccount | null => {
+  const current = getInteriorDesignerAccounts();
+  const idx = current.findIndex((a) => a.id === id);
+  if (idx === -1) return null;
+
+  const now = new Date().toISOString();
+  const history = current[idx].statusHistory || [];
+  history.push({
+    status: 'SUBMITTED',
+    timestamp: now,
+    changedBy: current[idx].name || 'Designer Resubmission',
+    remarks: 'Profile corrections and updated documents re-submitted for review.',
+  });
+
+  current[idx] = {
+    ...current[idx],
+    ...updatedFields,
+    accountStatus: 'SUBMITTED',
+    isVerified: false,
+    statusHistory: history,
+    updatedAt: now,
+  };
+
+  localStorage.setItem(INTERIOR_STORAGE_KEY, JSON.stringify(current));
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('interior_designer_store_updated', { detail: current[idx] }));
+    }
+    pushToCloud().catch(() => {});
+  } catch (e) {}
+
+  return current[idx];
+};
+
+// Access Control & Permission Helpers (Prompt Section 4 & 20)
+export const isDesignerApproved = (idOrPhone: string): boolean => {
+  const account = getInteriorDesignerById(idOrPhone) || getInteriorDesignerByPhone(idOrPhone);
+  return account ? account.accountStatus === 'APPROVED' && account.isVerified : false;
+};
+
+export const canDesignerAcceptAssignments = (idOrPhone: string): boolean => {
+  return isDesignerApproved(idOrPhone);
+};
+
+export const canDesignerSubmitQuotations = (idOrPhone: string): boolean => {
+  return isDesignerApproved(idOrPhone);
 };
 
 export const deleteInteriorDesignerAccount = (id: string): boolean => {

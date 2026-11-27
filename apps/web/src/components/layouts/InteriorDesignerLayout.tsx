@@ -44,24 +44,17 @@ export const InteriorDesignerLayout: React.FC = () => {
     return <Navigate to="/interior-designer/login" replace />;
   }
 
-  // Check account status in store
+  // Check account status in store - Strict Access Control (Section 4 & 20)
   const designer = user.phone ? getInteriorDesignerByPhone(user.phone) : null;
   if (designer) {
-    if (designer.accountStatus === 'PROFILE_INCOMPLETE') {
+    if (designer.accountStatus === 'PROFILE_INCOMPLETE' || (designer.accountStatus as any) === 'DRAFT') {
       return <Navigate to="/interior-designer/profile-wizard" replace />;
     }
-    if (
-      designer.accountStatus === 'PENDING_APPROVAL' ||
-      designer.accountStatus === 'UNDER_REVIEW' ||
-      designer.accountStatus === 'DOCUMENTS_REQUIRED' ||
-      designer.accountStatus === 'REJECTED' ||
-      designer.accountStatus === 'SUSPENDED'
-    ) {
+    if (designer.accountStatus !== 'APPROVED') {
       return <Navigate to="/interior-designer/application-status" replace />;
     }
   }
 
-  // 14 Master Sidebar Groups (A-N from Section 5)
   const navItems = [
     { label: 'A. Dashboard', path: '/interior-designer/dashboard', icon: LayoutDashboard, exact: true },
     { label: 'B. Quotation Management', path: '/interior-designer/quotations', icon: FileCheck2 },
