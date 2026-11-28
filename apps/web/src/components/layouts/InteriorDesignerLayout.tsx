@@ -169,7 +169,21 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Issues & Delays', path: '/interior-designer/execution?view=ISSUES_DELAYS', view: 'ISSUES_DELAYS' },
       ],
     },
-    { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
+    {
+      label: '9. Milestone & Deliverable Management',
+      path: '/interior-designer/milestones',
+      icon: CheckSquare,
+      subItems: [
+        { label: 'Project Milestones', path: '/interior-designer/milestones?view=PROJECT_MILESTONES', view: 'PROJECT_MILESTONES' },
+        { label: 'Submit Deliverables', path: '/interior-designer/milestones?view=SUBMIT_DELIVERABLES', view: 'SUBMIT_DELIVERABLES' },
+        { label: 'Milestone Submission', path: '/interior-designer/milestones?view=MILESTONE_SUBMISSION', view: 'MILESTONE_SUBMISSION' },
+        { label: 'Pending Admin Review', path: '/interior-designer/milestones?view=PENDING_ADMIN_REVIEW', view: 'PENDING_ADMIN_REVIEW' },
+        { label: 'Customer Approval Status', path: '/interior-designer/milestones?view=CUSTOMER_APPROVAL_STATUS', view: 'CUSTOMER_APPROVAL_STATUS' },
+        { label: 'Revision Required', path: '/interior-designer/milestones?view=REVISION_REQUIRED', view: 'REVISION_REQUIRED' },
+        { label: 'Approved Milestones', path: '/interior-designer/milestones?view=APPROVED_MILESTONES', view: 'APPROVED_MILESTONES' },
+        { label: 'Completed Deliverables', path: '/interior-designer/milestones?view=COMPLETED_DELIVERABLES', view: 'COMPLETED_DELIVERABLES' },
+      ],
+    },
     { label: 'I. Client Management', path: '/interior-designer/clients', icon: Users },
     { label: 'J. Communication Desk', path: '/interior-designer/messages', icon: MessageSquare },
     { label: 'K. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
@@ -360,7 +374,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                   sub.view === 'MY_PROJECTS' ||
                                   sub.view === 'DESIGN_BRIEFS' ||
                                   sub.view === 'CREATE_BOQ' ||
-                                  sub.view === 'EXECUTION_PLANNING')));
+                                  sub.view === 'EXECUTION_PLANNING' ||
+                                  sub.view === 'PROJECT_MILESTONES')));
 
                           return (
                             <Link
