@@ -141,6 +141,7 @@ import { InteriorDesignerClients } from './pages/interior-designer/InteriorDesig
 import { InteriorDesignerTeam } from './pages/interior-designer/InteriorDesignerTeam.js';
 import { InteriorDesignerBilling } from './pages/interior-designer/InteriorDesignerBilling.js';
 import { InteriorDesignerReports } from './pages/interior-designer/InteriorDesignerReports.js';
+import { InteriorDesignerReviews } from './pages/interior-designer/InteriorDesignerReviews.js';
 import { InteriorDesignerSupport } from './pages/interior-designer/InteriorDesignerSupport.js';
 import { InteriorDesignerMessages } from './pages/interior-designer/InteriorDesignerMessages.js';
 import { InteriorDesignerNotifications } from './pages/interior-designer/InteriorDesignerNotifications.js';
@@ -406,7 +407,7 @@ export const App: React.FC = () => {
           <Route path="billing" element={<InteriorDesignerBilling />} />
           <Route path="reports" element={<InteriorDesignerReports />} />
           <Route path="support" element={<InteriorDesignerSupport />} />
-          <Route path="reviews" element={<InteriorDesignerSupport />} />
+          <Route path="reviews" element={<InteriorDesignerReviews />} />
           <Route path="disputes" element={<InteriorDesignerSupport />} />
           <Route path="settings" element={<InteriorDesignerSettings />} />
         </Route>

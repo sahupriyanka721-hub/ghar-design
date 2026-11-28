@@ -228,6 +228,16 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Performance Reports', path: '/interior-designer/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
       ],
     },
+    {
+      label: '13. Reviews & Ratings',
+      path: '/interior-designer/reviews',
+      icon: Star,
+      subItems: [
+        { label: 'Customer Reviews', path: '/interior-designer/reviews?view=CUSTOMER_REVIEWS', view: 'CUSTOMER_REVIEWS' },
+        { label: 'Project Feedback', path: '/interior-designer/reviews?view=PROJECT_FEEDBACK', view: 'PROJECT_FEEDBACK' },
+        { label: 'Ratings History', path: '/interior-designer/reviews?view=RATINGS_HISTORY', view: 'RATINGS_HISTORY' },
+      ],
+    },
     { label: 'N. Support & Disputes', path: '/interior-designer/support', icon: LifeBuoy },
     { label: 'O. Notifications', path: '/interior-designer/notifications', icon: Bell },
     { label: 'P. Settings', path: '/interior-designer/settings', icon: Sliders },
@@ -417,7 +427,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                   sub.view === 'PROJECT_MILESTONES' ||
                                   sub.view === 'ADMIN_MESSAGES' ||
                                   sub.view === 'PROFESSIONAL_FEES' ||
-                                  sub.view === 'PROJECT_REPORTS')));
+                                  sub.view === 'PROJECT_REPORTS' ||
+                                  sub.view === 'CUSTOMER_REVIEWS')));
 
                           return (
                             <Link
