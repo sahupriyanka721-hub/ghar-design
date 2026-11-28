@@ -453,7 +453,11 @@ export const AdminLayout: React.FC = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const q = searchQuery.toLowerCase();
-    if (q.includes('contractor')) {
+    if (q.includes('exec') || q.includes('coord') || q.includes('instruct') || q.includes('snag') || q.includes('labor') || q.includes('dpr')) {
+      navigate('/admin/execution');
+    } else if (q.includes('review') || q.includes('rating') || q.includes('feed') || q.includes('nps')) {
+      navigate('/admin/reviews');
+    } else if (q.includes('contractor')) {
       navigate('/admin/contractors');
     } else if (q.includes('project')) {
       navigate('/admin/projects');
@@ -684,6 +688,22 @@ export const AdminLayout: React.FC = () => {
             { label: 'Milestone Payment Eligibility', path: '/admin/timeline?view=PAYMENT_ELIGIBILITY', view: 'PAYMENT_ELIGIBILITY' },
           ],
         },
+        {
+          label: 'Project Execution & Coordination',
+          path: '/admin/execution',
+          icon: HardHat,
+          subItems: [
+            { label: 'Execution Planning', path: '/admin/execution?view=EXECUTION_PLANNING', view: 'EXECUTION_PLANNING' },
+            { label: 'Work Instructions', path: '/admin/execution?view=WORK_INSTRUCTIONS', view: 'WORK_INSTRUCTIONS' },
+            { label: 'Vendor Coordination', path: '/admin/execution?view=VENDOR_COORDINATION', view: 'VENDOR_COORDINATION' },
+            { label: 'Material Coordination', path: '/admin/execution?view=MATERIAL_COORDINATION', view: 'MATERIAL_COORDINATION' },
+            { label: 'Contractor Coordination', path: '/admin/execution?view=CONTRACTOR_COORDINATION', view: 'CONTRACTOR_COORDINATION' },
+            { label: 'Installation Schedule', path: '/admin/execution?view=INSTALLATION_SCHEDULE', view: 'INSTALLATION_SCHEDULE' },
+            { label: 'Work Inspection & QA', path: '/admin/execution?view=WORK_INSPECTION', view: 'WORK_INSPECTION' },
+            { label: 'Site Progress Reports', path: '/admin/execution?view=PROGRESS_REPORTS', view: 'PROGRESS_REPORTS' },
+            { label: 'Issues & Delays Desk', path: '/admin/execution?view=ISSUES_DELAYS', view: 'ISSUES_DELAYS' },
+          ],
+        },
         { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
         { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
       ],
@@ -800,6 +820,16 @@ export const AdminLayout: React.FC = () => {
             { label: 'Email Templates', path: '/admin/notifications?view=EMAIL_TEMPLATES', view: 'EMAIL_TEMPLATES' },
             { label: 'SMS Templates', path: '/admin/notifications?view=SMS_TEMPLATES', view: 'SMS_TEMPLATES' },
             { label: 'Notification History', path: '/admin/notifications?view=NOTIFICATION_HISTORY', view: 'NOTIFICATION_HISTORY' },
+          ],
+        },
+        {
+          label: 'Reviews & Ratings Desk',
+          path: '/admin/reviews',
+          icon: Crown,
+          subItems: [
+            { label: 'Customer Reviews', path: '/admin/reviews?view=CUSTOMER_REVIEWS', view: 'CUSTOMER_REVIEWS' },
+            { label: 'Project Feedback Surveys', path: '/admin/reviews?view=PROJECT_FEEDBACK', view: 'PROJECT_FEEDBACK' },
+            { label: 'Professional Ratings History', path: '/admin/reviews?view=RATINGS_HISTORY', view: 'RATINGS_HISTORY' },
           ],
         },
         { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
@@ -1157,7 +1187,7 @@ export const AdminLayout: React.FC = () => {
                   Navigation
                 </span>
                 <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
-                  31 Menus
+                  33 Menus
                 </span>
               </div>
               <div className="flex items-center gap-1">

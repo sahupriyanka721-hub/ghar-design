@@ -113,6 +113,8 @@ import { AdminInvoices } from './pages/admin/AdminInvoices.js';
 import { AdminNotifications } from './pages/admin/AdminNotifications.js';
 import { AdminCMSContent } from './pages/admin/AdminCMSContent.js';
 import { AdminServiceConfig } from './pages/admin/AdminServiceConfig.js';
+import { AdminExecution } from './pages/admin/AdminExecution.js';
+import { AdminReviews } from './pages/admin/AdminReviews.js';
 
 // Architect Partner Portal Pages (Master Development Prompt)
 import { ArchitectLandingPage } from './pages/public/ArchitectLandingPage.js';
@@ -484,6 +486,10 @@ export const App: React.FC = () => {
           <Route path="activity-logs" element={<AdminAuditLogs />} />
           <Route path="assignments" element={<AdminAssignments />} />
           <Route path="documents" element={<AdminDocuments />} />
+          <Route path="execution" element={<AdminExecution />} />
+          <Route path="coordination" element={<AdminExecution />} />
+          <Route path="reviews" element={<AdminReviews />} />
+          <Route path="ratings" element={<AdminReviews />} />
           <Route path="payouts" element={<AdminPayouts />} />
           <Route path="invoices" element={<AdminInvoices />} />
           <Route path="notifications" element={<AdminNotifications />} />
