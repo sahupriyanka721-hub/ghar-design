@@ -352,33 +352,22 @@ export const AdminLayout: React.FC = () => {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   // Quick Section Category Filter for 0-scroll navigation: 'ALL' | 0 | 1 | 2 | 3 | 4 | 5
   const [activeSectionFilter, setActiveSectionFilter] = useState<'ALL' | number>('ALL');
-  // Accordion state for the 6 navSections (single open section by default for zero vertical scroll)
+  // Accordion state for the 6 navSections: all sections open by default so all menus cover full sidebar height
   const [openSections, setOpenSections] = useState<Record<number, boolean>>({
     0: true,
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: false,
+    1: true,
+    2: true,
+    3: true,
+    4: true,
+    5: true,
   });
   const { success } = useToast();
 
   const toggleSection = (idx: number) => {
-    setOpenSections((prev) => {
-      const isCurrentlyOpen = Boolean(prev[idx]);
-      if (isCurrentlyOpen) {
-        return { ...prev, [idx]: false };
-      }
-      return {
-        0: false,
-        1: false,
-        2: false,
-        3: false,
-        4: false,
-        5: false,
-        [idx]: true,
-      };
-    });
+    setOpenSections((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
   };
 
   const expandAllSections = () => {
@@ -879,15 +868,10 @@ export const AdminLayout: React.FC = () => {
       )
     );
     if (activeIdx !== -1) {
-      setOpenSections({
-        0: false,
-        1: false,
-        2: false,
-        3: false,
-        4: false,
-        5: false,
+      setOpenSections((prev) => ({
+        ...prev,
         [activeIdx]: true,
-      });
+      }));
     }
     setExpandedMenus({});
   }, [location.pathname]);
@@ -1227,15 +1211,11 @@ export const AdminLayout: React.FC = () => {
                     key={pill.idx}
                     type="button"
                     onClick={() => {
-                      setOpenSections({
-                        0: false,
-                        1: false,
-                        2: false,
-                        3: false,
-                        4: false,
-                        5: false,
-                        [pill.idx]: true,
-                      });
+                      setOpenSections((prev) => ({ ...prev, [pill.idx]: true }));
+                      const el = document.getElementById(`nav-sec-${pill.idx}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
                     }}
                     className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition whitespace-nowrap cursor-pointer ${
                       isPillActive
@@ -1250,8 +1230,8 @@ export const AdminLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* Single-Column Accordion Menu List (Zero Vertical Scroll) */}
-          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto lg:overflow-visible select-none scrollbar-thin">
+          {/* Single-Column Full-Height Menu List (Covering all the way to bottom) */}
+          <div className="flex-1 p-2 space-y-2 overflow-y-auto select-none scrollbar-thin">
             {navSections.map((sec, sIdx) => {
               const isOpen = Boolean(openSections[sIdx]);
               const hasActiveItem = sec.items.some((item) =>
@@ -1263,19 +1243,14 @@ export const AdminLayout: React.FC = () => {
               return (
                 <div
                   key={sIdx}
-                  className={`rounded-xl border transition-all duration-150 ${
-                    isOpen
-                      ? 'border-blue-200 bg-white/95 shadow-xs'
-                      : hasActiveItem
-                      ? 'border-blue-200/80 bg-blue-50/50'
-                      : 'border-slate-100 hover:border-blue-100 bg-white/60 hover:bg-white'
-                  }`}
+                  id={`nav-sec-${sIdx}`}
+                  className="rounded-xl border border-blue-100/90 bg-white/95 p-1.5 shadow-2xs space-y-1 transition-all"
                 >
                   {/* Accordion Header */}
                   <button
                     type="button"
                     onClick={() => toggleSection(sIdx)}
-                    className="w-full px-2.5 py-1.5 flex items-center justify-between text-left cursor-pointer group"
+                    className="w-full px-2 py-1 flex items-center justify-between text-left cursor-pointer group hover:bg-blue-50/70 rounded-lg transition"
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span
@@ -1285,11 +1260,9 @@ export const AdminLayout: React.FC = () => {
                       />
                       <span
                         className={`text-[11px] font-black tracking-tight truncate ${
-                          isOpen
+                          hasActiveItem
                             ? 'text-blue-950 font-black'
-                            : hasActiveItem
-                            ? 'text-blue-900 font-bold'
-                            : 'text-slate-600 group-hover:text-slate-900'
+                            : 'text-slate-700 group-hover:text-blue-900 font-bold'
                         }`}
                       >
                         {sec.title}
@@ -1309,7 +1282,7 @@ export const AdminLayout: React.FC = () => {
 
                   {/* Section Items */}
                   {isOpen && (
-                    <div className="px-1.5 pb-1.5 pt-0.5 space-y-0.5 border-t border-blue-50 animate-in fade-in duration-100">
+                    <div className="px-0.5 pb-0.5 pt-0.5 space-y-0.5 border-t border-blue-50/80 animate-in fade-in duration-100">
                       {sec.items.map((item: any, itemIdx: number) => {
                         const isBottomHalf = sIdx >= 4 || itemIdx >= 3;
                         return renderMenuItem(item, isBottomHalf);
