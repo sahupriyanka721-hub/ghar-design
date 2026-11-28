@@ -238,7 +238,18 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Ratings History', path: '/interior-designer/reviews?view=RATINGS_HISTORY', view: 'RATINGS_HISTORY' },
       ],
     },
-    { label: 'N. Support & Disputes', path: '/interior-designer/support', icon: LifeBuoy },
+    {
+      label: '15. Support & Help Center',
+      path: '/interior-designer/support',
+      icon: LifeBuoy,
+      subItems: [
+        { label: 'Raise Support Ticket', path: '/interior-designer/support?view=RAISE_TICKET', view: 'RAISE_TICKET' },
+        { label: 'Technical Support', path: '/interior-designer/support?view=TECHNICAL_SUPPORT', view: 'TECHNICAL_SUPPORT' },
+        { label: 'Payment Support', path: '/interior-designer/support?view=PAYMENT_SUPPORT', view: 'PAYMENT_SUPPORT' },
+        { label: 'Project Disputes', path: '/interior-designer/support?view=PROJECT_DISPUTES', view: 'PROJECT_DISPUTES' },
+        { label: 'Help Center', path: '/interior-designer/support?view=HELP_CENTER', view: 'HELP_CENTER' },
+      ],
+    },
     { label: 'O. Notifications', path: '/interior-designer/notifications', icon: Bell },
     { label: 'P. Settings', path: '/interior-designer/settings', icon: Sliders },
   ];
@@ -428,7 +439,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                   sub.view === 'ADMIN_MESSAGES' ||
                                   sub.view === 'PROFESSIONAL_FEES' ||
                                   sub.view === 'PROJECT_REPORTS' ||
-                                  sub.view === 'CUSTOMER_REVIEWS')));
+                                  sub.view === 'CUSTOMER_REVIEWS' ||
+                                  sub.view === 'RAISE_TICKET')));
 
                           return (
                             <Link
