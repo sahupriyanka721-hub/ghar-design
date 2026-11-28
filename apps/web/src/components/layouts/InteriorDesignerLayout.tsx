@@ -199,7 +199,22 @@ export const InteriorDesignerLayout: React.FC = () => {
       ],
     },
     { label: 'K. Team & Vendors', path: '/interior-designer/team', icon: Briefcase },
-    { label: 'L. Billing & Payments', path: '/interior-designer/billing', icon: CreditCard },
+    {
+      label: '11. Billing & Payment Management',
+      path: '/interior-designer/billing',
+      icon: CreditCard,
+      subItems: [
+        { label: 'My Professional Fees', path: '/interior-designer/billing?view=PROFESSIONAL_FEES', view: 'PROFESSIONAL_FEES' },
+        { label: 'Payment Schedule', path: '/interior-designer/billing?view=PAYMENT_SCHEDULE', view: 'PAYMENT_SCHEDULE' },
+        { label: 'Eligible Payouts', path: '/interior-designer/billing?view=ELIGIBLE_PAYOUTS', view: 'ELIGIBLE_PAYOUTS' },
+        { label: 'Pending Payouts', path: '/interior-designer/billing?view=PENDING_PAYOUTS', view: 'PENDING_PAYOUTS' },
+        { label: 'Payout History', path: '/interior-designer/billing?view=PAYOUT_HISTORY', view: 'PAYOUT_HISTORY' },
+        { label: 'Payment Statements', path: '/interior-designer/billing?view=PAYMENT_STATEMENTS', view: 'PAYMENT_STATEMENTS' },
+        { label: 'Invoices', path: '/interior-designer/billing?view=INVOICES', view: 'INVOICES' },
+        { label: 'Tax Statements', path: '/interior-designer/billing?view=TAX_STATEMENTS', view: 'TAX_STATEMENTS' },
+        { label: 'Deductions & Commission', path: '/interior-designer/billing?view=DEDUCTIONS_COMMISSION', view: 'DEDUCTIONS_COMMISSION' },
+      ],
+    },
     { label: 'M. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
     { label: 'N. Support & Disputes', path: '/interior-designer/support', icon: LifeBuoy },
     { label: 'O. Notifications', path: '/interior-designer/notifications', icon: Bell },
@@ -388,7 +403,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                   sub.view === 'CREATE_BOQ' ||
                                   sub.view === 'EXECUTION_PLANNING' ||
                                   sub.view === 'PROJECT_MILESTONES' ||
-                                  sub.view === 'ADMIN_MESSAGES')));
+                                  sub.view === 'ADMIN_MESSAGES' ||
+                                  sub.view === 'PROFESSIONAL_FEES')));
 
                           return (
                             <Link
