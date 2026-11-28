@@ -350,28 +350,43 @@ export const AdminLayout: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   // All submenus closed by default; only open when explicitly clicked by user
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
-  // Quick Section Category Filter for 0-scroll navigation: 'ALL' | 0 | 1 | 2 | 3 | 4
+  // Quick Section Category Filter for 0-scroll navigation: 'ALL' | 0 | 1 | 2 | 3 | 4 | 5
   const [activeSectionFilter, setActiveSectionFilter] = useState<'ALL' | number>('ALL');
-  // Accordion state for the 5 navSections
+  // Accordion state for the 6 navSections (single open section by default for zero vertical scroll)
   const [openSections, setOpenSections] = useState<Record<number, boolean>>({
     0: true,
-    1: true,
-    2: true,
-    3: true,
-    4: true,
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+    5: false,
   });
   const { success } = useToast();
 
   const toggleSection = (idx: number) => {
-    setOpenSections((prev) => ({ ...prev, [idx]: !prev[idx] }));
+    setOpenSections((prev) => {
+      const isCurrentlyOpen = Boolean(prev[idx]);
+      if (isCurrentlyOpen) {
+        return { ...prev, [idx]: false };
+      }
+      return {
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+        [idx]: true,
+      };
+    });
   };
 
   const expandAllSections = () => {
-    setOpenSections({ 0: true, 1: true, 2: true, 3: true, 4: true });
+    setOpenSections({ 0: true, 1: true, 2: true, 3: true, 4: true, 5: true });
   };
 
   const collapseAllSections = () => {
-    setOpenSections({ 0: false, 1: false, 2: false, 3: false, 4: false });
+    setOpenSections({ 0: false, 1: false, 2: false, 3: false, 4: false, 5: false });
   };
 
   useEffect(() => {
@@ -824,14 +839,28 @@ export const AdminLayout: React.FC = () => {
     },
   ];
 
-  // Column groupings for 2-column zero-scroll layout
-  const col1Sections = [navSections[0], navSections[1], navSections[2]];
-  const col2Sections = [navSections[3], navSections[4], navSections[5]];
-
-  // Close floating popovers on route change
+  // Auto-expand the section containing the current active route and keep single-accordion for zero vertical scrolling
   useEffect(() => {
+    const activeIdx = navSections.findIndex((sec) =>
+      sec.items.some((item) =>
+        item.exact
+          ? location.pathname === item.path
+          : location.pathname.startsWith(item.path)
+      )
+    );
+    if (activeIdx !== -1) {
+      setOpenSections({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+        [activeIdx]: true,
+      });
+    }
     setExpandedMenus({});
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   // Close floating popovers when clicking outside the sidebar
   useEffect(() => {
@@ -1113,68 +1142,153 @@ export const AdminLayout: React.FC = () => {
             className="fixed inset-0 bg-navy-950/40 z-30 lg:hidden backdrop-blur-xs"
           />
         )}
-        {/* Dedicated Admin Light Blue Sidebar (2-Column Zero-Scroll Layout) */}
+        {/* Dedicated Admin Single-Column Zero-Scroll Sidebar */}
         <aside
-          className={`admin-sidebar-container fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-80 sm:w-96 lg:w-[480px] xl:w-[500px] bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
+          className={`admin-sidebar-container fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-64 sm:w-68 bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
         >
-          {/* Top Info Header */}
-          <div className="px-3 py-1.5 border-b border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-navy-950">
-                Admin Console Navigation
-              </span>
-              <span className="text-[10px] font-mono font-black bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
-                31 Menus
-              </span>
-            </div>
-            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 hidden sm:inline-block">
-              Zero-Scroll View
-            </span>
-          </div>
-
-          {/* 2-Column Balanced Menu Grid (All 31 Menus 100% Visible Without Vertical Scroll) */}
-          <div className="flex-1 p-2 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto lg:overflow-hidden select-none">
-            {/* Column 1: Core Governance, Stakeholders & Quotation Desk (14 Items) */}
-            <div className="space-y-1.5 flex flex-col justify-between">
-              {col1Sections.map((sec, sIdx) => (
-                <div key={sIdx} className="rounded-xl border border-blue-100/80 bg-white/80 p-1.5 shadow-2xs space-y-0.5">
-                  <div className="px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-900/90 flex items-center justify-between">
-                    <span className="truncate">{sec.title}</span>
-                    <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 rounded">
-                      {sec.items.length}
-                    </span>
-                  </div>
-                  <div className="space-y-0.5">
-                    {sec.items.map((item: any) => renderMenuItem(item, false))}
-                  </div>
-                </div>
-              ))}
+          {/* Top Header & Quick Category Jump Pills */}
+          <div className="border-b border-blue-200/80 bg-white/80 backdrop-blur-xs shrink-0">
+            <div className="px-3 py-1.5 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-wider text-navy-950">
+                  Navigation
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
+                  31 Menus
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={expandAllSections}
+                  title="Expand All Sections"
+                  className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
+                >
+                  Expand
+                </button>
+                <span className="text-slate-300 text-[10px]">|</span>
+                <button
+                  type="button"
+                  onClick={collapseAllSections}
+                  title="Collapse All Sections"
+                  className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
+                >
+                  Collapse
+                </button>
+              </div>
             </div>
 
-            {/* Column 2: Projects, Finance & Operations (17 Items) */}
-            <div className="space-y-1.5 flex flex-col justify-between">
-              {col2Sections.map((sec, sIdx) => {
-                const isBottomSec = sIdx === col2Sections.length - 1;
+            {/* Quick Category Jump Pills */}
+            <div className="px-2 pb-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none">
+              {[
+                { label: 'Core', idx: 0 },
+                { label: 'Users', idx: 1 },
+                { label: 'Quotes', idx: 2 },
+                { label: 'Projects', idx: 3 },
+                { label: 'Finance', idx: 4 },
+                { label: 'Ops', idx: 5 },
+              ].map((pill) => {
+                const isPillActive = Boolean(openSections[pill.idx]);
                 return (
-                  <div key={sIdx} className="rounded-xl border border-blue-100/80 bg-white/80 p-1.5 shadow-2xs space-y-0.5">
-                    <div className="px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-900/90 flex items-center justify-between">
-                      <span className="truncate">{sec.title}</span>
-                      <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 rounded">
-                        {sec.items.length}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {sec.items.map((item: any, itemIdx: number) =>
-                        renderMenuItem(item, isBottomSec && itemIdx >= 3)
-                      )}
-                    </div>
-                  </div>
+                  <button
+                    key={pill.idx}
+                    type="button"
+                    onClick={() => {
+                      setOpenSections({
+                        0: false,
+                        1: false,
+                        2: false,
+                        3: false,
+                        4: false,
+                        5: false,
+                        [pill.idx]: true,
+                      });
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition whitespace-nowrap cursor-pointer ${
+                      isPillActive
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-blue-50/80 text-blue-800 hover:bg-blue-100'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
                 );
               })}
             </div>
+          </div>
+
+          {/* Single-Column Accordion Menu List (Zero Vertical Scroll) */}
+          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto lg:overflow-visible select-none scrollbar-thin">
+            {navSections.map((sec, sIdx) => {
+              const isOpen = Boolean(openSections[sIdx]);
+              const hasActiveItem = sec.items.some((item) =>
+                item.exact
+                  ? location.pathname === item.path
+                  : location.pathname.startsWith(item.path)
+              );
+
+              return (
+                <div
+                  key={sIdx}
+                  className={`rounded-xl border transition-all duration-150 ${
+                    isOpen
+                      ? 'border-blue-200 bg-white/95 shadow-xs'
+                      : hasActiveItem
+                      ? 'border-blue-200/80 bg-blue-50/50'
+                      : 'border-slate-100 hover:border-blue-100 bg-white/60 hover:bg-white'
+                  }`}
+                >
+                  {/* Accordion Header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(sIdx)}
+                    className="w-full px-2.5 py-1.5 flex items-center justify-between text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          hasActiveItem ? 'bg-blue-600' : 'bg-slate-300 group-hover:bg-blue-400'
+                        }`}
+                      />
+                      <span
+                        className={`text-[11px] font-black tracking-tight truncate ${
+                          isOpen
+                            ? 'text-blue-950 font-black'
+                            : hasActiveItem
+                            ? 'text-blue-900 font-bold'
+                            : 'text-slate-600 group-hover:text-slate-900'
+                        }`}
+                      >
+                        {sec.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 py-0.2 rounded">
+                        {sec.items.length}
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
+                          isOpen ? 'rotate-180 text-blue-600' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Section Items */}
+                  {isOpen && (
+                    <div className="px-1.5 pb-1.5 pt-0.5 space-y-0.5 border-t border-blue-50 animate-in fade-in duration-100">
+                      {sec.items.map((item: any, itemIdx: number) => {
+                        const isBottomHalf = sIdx >= 4 || itemIdx >= 3;
+                        return renderMenuItem(item, isBottomHalf);
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Slim Space-Saving Bottom Status Bar */}
