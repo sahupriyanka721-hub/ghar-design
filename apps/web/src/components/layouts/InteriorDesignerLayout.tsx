@@ -102,7 +102,29 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'On-Hold Projects', path: '/interior-designer/projects?view=ON_HOLD_PROJECTS', view: 'ON_HOLD_PROJECTS' },
       ],
     },
-    { label: 'E. Design & 3D', path: '/interior-designer/designs', icon: Box },
+    {
+      label: '5. Interior Design Management',
+      path: '/interior-designer/designs',
+      icon: Box,
+      subItems: [
+        { label: 'Design Briefs', path: '/interior-designer/designs?view=DESIGN_BRIEFS', view: 'DESIGN_BRIEFS' },
+        { label: 'Space Planning', path: '/interior-designer/designs?view=SPACE_PLANNING', view: 'SPACE_PLANNING' },
+        { label: '2D Layout Design', path: '/interior-designer/designs?view=LAYOUT_2D', view: 'LAYOUT_2D' },
+        { label: '3D Interior Design', path: '/interior-designer/designs?view=VISUALIZATION_3D', view: 'VISUALIZATION_3D' },
+        { label: 'Living Room Design', path: '/interior-designer/designs?view=LIVING_ROOM', view: 'LIVING_ROOM' },
+        { label: 'Bedroom Design', path: '/interior-designer/designs?view=BEDROOM', view: 'BEDROOM' },
+        { label: 'Kitchen Design', path: '/interior-designer/designs?view=KITCHEN', view: 'KITCHEN' },
+        { label: 'Bathroom Design', path: '/interior-designer/designs?view=BATHROOM', view: 'BATHROOM' },
+        { label: 'Furniture Layout', path: '/interior-designer/designs?view=FURNITURE_LAYOUT', view: 'FURNITURE_LAYOUT' },
+        { label: 'Lighting Layout', path: '/interior-designer/designs?view=LIGHTING_LAYOUT', view: 'LIGHTING_LAYOUT' },
+        { label: 'False Ceiling Design', path: '/interior-designer/designs?view=FALSE_CEILING', view: 'FALSE_CEILING' },
+        { label: 'Material & Finish Selection', path: '/interior-designer/designs?view=MATERIAL_FINISHES', view: 'MATERIAL_FINISHES' },
+        { label: 'Design Submissions', path: '/interior-designer/designs?view=DESIGN_SUBMISSIONS', view: 'DESIGN_SUBMISSIONS' },
+        { label: 'Revision Requests', path: '/interior-designer/designs?view=REVISION_REQUESTS', view: 'REVISION_REQUESTS' },
+        { label: 'Approved Designs', path: '/interior-designer/designs?view=APPROVED_DESIGNS', view: 'APPROVED_DESIGNS' },
+        { label: 'Design Version History', path: '/interior-designer/designs?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
+      ],
+    },
     { label: 'F. Estimation & BOQ', path: '/interior-designer/boq', icon: Layers },
     { label: 'G. Site & Snag List', path: '/interior-designer/site-management', icon: Camera },
     { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
@@ -291,7 +313,10 @@ export const InteriorDesignerLayout: React.FC = () => {
                           const isSubActive =
                             location.pathname.startsWith(item.path) &&
                             (currentViewParam === sub.view ||
-                              (!currentViewParam && (sub.view === 'NEW_REQUESTS' || sub.view === 'MY_PROJECTS')));
+                              (!currentViewParam &&
+                                (sub.view === 'NEW_REQUESTS' ||
+                                  sub.view === 'MY_PROJECTS' ||
+                                  sub.view === 'DESIGN_BRIEFS')));
 
                           return (
                             <Link

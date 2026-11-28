@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
@@ -27,6 +27,19 @@ import {
   Check,
   Paperclip,
   Compass,
+  Sofa,
+  Bed,
+  Utensils,
+  Bath,
+  Sun,
+  Grid,
+  Palette,
+  FileCheck2,
+  RefreshCw,
+  History,
+  ChevronRight,
+  ChevronDown,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
@@ -44,6 +57,24 @@ import {
 } from '../../data/interiorDesignerStore.js';
 import { formatINR } from '../../lib/utils.js';
 
+export type DesignStudioViewMode =
+  | 'DESIGN_BRIEFS'
+  | 'SPACE_PLANNING'
+  | 'LAYOUT_2D'
+  | 'VISUALIZATION_3D'
+  | 'LIVING_ROOM'
+  | 'BEDROOM'
+  | 'KITCHEN'
+  | 'BATHROOM'
+  | 'FURNITURE_LAYOUT'
+  | 'LIGHTING_LAYOUT'
+  | 'FALSE_CEILING'
+  | 'MATERIAL_FINISHES'
+  | 'DESIGN_SUBMISSIONS'
+  | 'REVISION_REQUESTS'
+  | 'APPROVED_DESIGNS'
+  | 'VERSION_HISTORY';
+
 export const InteriorDesignerDesignStudio: React.FC = () => {
   const { user } = useAuth();
   const { success, error, info } = useToast();
@@ -52,7 +83,6 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
   const [projects, setProjects] = useState<InteriorProject[]>(() => getInteriorProjects());
   const [assets, setAssets] = useState<InteriorDesignAsset[]>(() => getInteriorDesignAssets());
 
-  const [activeTab, setActiveTab] = useState<'ALL' | 'BRIEFS' | 'SPACE_PLANNING' | 'LAYOUT_2D' | 'VISUALIZATION_3D' | 'MATERIAL_FINISHES' | 'SUBMISSIONS'>('ALL');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => searchParams.get('projectId') || 'ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -80,10 +110,10 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
     projectId: projects[0]?.id || 'prj-int-1',
     title: '',
     category: 'VISUALIZATION_3D',
-    roomName: 'Living Room',
+    roomName: 'Living & Dining Room',
     version: 'v1.0',
     fileUrl: '',
-    dimensionsOrSpecs: '3840 x 2160 • 4K UHD Render • 3ds Max + V-Ray',
+    dimensionsOrSpecs: '3840 x 2160 • 4K UHD Render • 3ds Max + V-Ray 6',
     submitImmediately: true,
   });
 
@@ -102,26 +132,149 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
     };
   }, []);
 
-  // Filtered Assets
-  const filteredAssets = assets.filter((a) => {
-    if (selectedProjectId !== 'ALL' && a.projectId !== selectedProjectId) return false;
-    if (activeTab === 'SPACE_PLANNING' && a.category !== 'SPACE_PLANNING') return false;
-    if (activeTab === 'LAYOUT_2D' && a.category !== 'LAYOUT_2D') return false;
-    if (activeTab === 'VISUALIZATION_3D' && a.category !== 'VISUALIZATION_3D') return false;
-    if (activeTab === 'MATERIAL_FINISHES' && a.category !== 'MATERIAL_FINISHES') return false;
-    if (activeTab === 'SUBMISSIONS' && a.adminReviewStatus === 'PENDING_ADMIN_REVIEW') return false;
+  // Current view from URL query param
+  const currentView: DesignStudioViewMode =
+    (searchParams.get('view') as DesignStudioViewMode) || 'DESIGN_BRIEFS';
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        a.title.toLowerCase().includes(q) ||
-        a.roomName.toLowerCase().includes(q) ||
-        a.documentId.toLowerCase().includes(q) ||
-        a.projectName.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const handleSetView = (view: DesignStudioViewMode) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('view', view);
+    setSearchParams(params);
+  };
+
+  // View-specific asset filtering
+  const filterAssetsByView = (list: InteriorDesignAsset[], view: DesignStudioViewMode) => {
+    return list.filter((a) => {
+      if (selectedProjectId !== 'ALL' && a.projectId !== selectedProjectId) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+          a.title.toLowerCase().includes(q) ||
+          a.roomName.toLowerCase().includes(q) ||
+          a.documentId.toLowerCase().includes(q) ||
+          a.projectName.toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      switch (view) {
+        case 'DESIGN_BRIEFS':
+          return true;
+        case 'SPACE_PLANNING':
+          return a.category === 'SPACE_PLANNING';
+        case 'LAYOUT_2D':
+          return a.category === 'LAYOUT_2D';
+        case 'VISUALIZATION_3D':
+          return a.category === 'VISUALIZATION_3D';
+        case 'LIVING_ROOM':
+          return (
+            a.roomName.toLowerCase().includes('living') ||
+            a.roomName.toLowerCase().includes('dining') ||
+            a.title.toLowerCase().includes('living')
+          );
+        case 'BEDROOM':
+          return (
+            a.roomName.toLowerCase().includes('bedroom') ||
+            a.roomName.toLowerCase().includes('suite') ||
+            a.title.toLowerCase().includes('bedroom')
+          );
+        case 'KITCHEN':
+          return (
+            a.roomName.toLowerCase().includes('kitchen') ||
+            a.title.toLowerCase().includes('kitchen')
+          );
+        case 'BATHROOM':
+          return (
+            a.roomName.toLowerCase().includes('bath') ||
+            a.roomName.toLowerCase().includes('toilet') ||
+            a.roomName.toLowerCase().includes('powder') ||
+            a.title.toLowerCase().includes('bath')
+          );
+        case 'FURNITURE_LAYOUT':
+          return (
+            a.title.toLowerCase().includes('furniture') ||
+            a.title.toLowerCase().includes('joinery') ||
+            (a.dimensionsOrSpecs && a.dimensionsOrSpecs.toLowerCase().includes('furniture')) ||
+            a.category === 'SPACE_PLANNING'
+          );
+        case 'LIGHTING_LAYOUT':
+          return (
+            a.title.toLowerCase().includes('light') ||
+            a.title.toLowerCase().includes('wiring') ||
+            (a.dimensionsOrSpecs && a.dimensionsOrSpecs.toLowerCase().includes('track')) ||
+            (a.dimensionsOrSpecs && a.dimensionsOrSpecs.toLowerCase().includes('lighting'))
+          );
+        case 'FALSE_CEILING':
+          return (
+            a.title.toLowerCase().includes('ceiling') ||
+            a.title.toLowerCase().includes('cove') ||
+            a.title.toLowerCase().includes('pelmet') ||
+            (a.dimensionsOrSpecs && a.dimensionsOrSpecs.toLowerCase().includes('ceiling'))
+          );
+        case 'MATERIAL_FINISHES':
+          return a.category === 'MATERIAL_FINISHES' || a.category === 'MOOD_BOARD';
+        case 'DESIGN_SUBMISSIONS':
+          return true; // All official submissions
+        case 'REVISION_REQUESTS':
+          return (
+            a.adminReviewStatus === 'REVISION_REQUESTED' ||
+            a.clientApprovalStatus === 'REVISION_REQUESTED'
+          );
+        case 'APPROVED_DESIGNS':
+          return a.adminReviewStatus === 'APPROVED_BY_ADMIN' && a.clientApprovalStatus === 'APPROVED';
+        case 'VERSION_HISTORY':
+          return true;
+        default:
+          return true;
+      }
+    });
+  };
+
+  const filteredAssets = useMemo(() => {
+    return filterAssetsByView(assets, currentView);
+  }, [assets, currentView, selectedProjectId, searchQuery]);
+
+  // Counts for each of the 16 views
+  const viewCounts = useMemo(() => {
+    const counts: Record<DesignStudioViewMode, number> = {
+      DESIGN_BRIEFS: projects.filter((p) => p.designBrief).length,
+      SPACE_PLANNING: assets.filter((a) => a.category === 'SPACE_PLANNING').length,
+      LAYOUT_2D: assets.filter((a) => a.category === 'LAYOUT_2D').length,
+      VISUALIZATION_3D: assets.filter((a) => a.category === 'VISUALIZATION_3D').length,
+      LIVING_ROOM: assets.filter((a) => a.roomName.toLowerCase().includes('living') || a.roomName.toLowerCase().includes('dining')).length,
+      BEDROOM: assets.filter((a) => a.roomName.toLowerCase().includes('bedroom')).length,
+      KITCHEN: assets.filter((a) => a.roomName.toLowerCase().includes('kitchen')).length,
+      BATHROOM: assets.filter((a) => a.roomName.toLowerCase().includes('bath')).length,
+      FURNITURE_LAYOUT: assets.filter((a) => a.title.toLowerCase().includes('furniture') || a.category === 'SPACE_PLANNING').length,
+      LIGHTING_LAYOUT: assets.filter((a) => a.title.toLowerCase().includes('light') || a.title.toLowerCase().includes('wiring')).length,
+      FALSE_CEILING: assets.filter((a) => a.title.toLowerCase().includes('ceiling') || a.title.toLowerCase().includes('cove')).length,
+      MATERIAL_FINISHES: assets.filter((a) => a.category === 'MATERIAL_FINISHES' || a.category === 'MOOD_BOARD').length,
+      DESIGN_SUBMISSIONS: assets.length,
+      REVISION_REQUESTS: assets.filter((a) => a.adminReviewStatus === 'REVISION_REQUESTED' || a.clientApprovalStatus === 'REVISION_REQUESTED').length,
+      APPROVED_DESIGNS: assets.filter((a) => a.adminReviewStatus === 'APPROVED_BY_ADMIN' && a.clientApprovalStatus === 'APPROVED').length,
+      VERSION_HISTORY: assets.reduce((acc, a) => acc + 1 + (a.versionHistory?.length || 0), 0),
+    };
+    return counts;
+  }, [assets, projects]);
+
+  const DESIGN_VIEW_TABS: { id: DesignStudioViewMode; label: string; icon: any }[] = [
+    { id: 'DESIGN_BRIEFS', label: '1. Design Briefs', icon: FileText },
+    { id: 'SPACE_PLANNING', label: '2. Space Planning', icon: Compass },
+    { id: 'LAYOUT_2D', label: '3. 2D Layout Design', icon: Grid },
+    { id: 'VISUALIZATION_3D', label: '4. 3D Interior Design', icon: Box },
+    { id: 'LIVING_ROOM', label: '5. Living Room Design', icon: Sofa },
+    { id: 'BEDROOM', label: '6. Bedroom Design', icon: Bed },
+    { id: 'KITCHEN', label: '7. Kitchen Design', icon: Utensils },
+    { id: 'BATHROOM', label: '8. Bathroom Design', icon: Bath },
+    { id: 'FURNITURE_LAYOUT', label: '9. Furniture Layout', icon: Layers },
+    { id: 'LIGHTING_LAYOUT', label: '10. Lighting Layout', icon: Sun },
+    { id: 'FALSE_CEILING', label: '11. False Ceiling Design', icon: Sparkles },
+    { id: 'MATERIAL_FINISHES', label: '12. Material & Finish Selection', icon: Palette },
+    { id: 'DESIGN_SUBMISSIONS', label: '13. Design Submissions', icon: FileCheck2 },
+    { id: 'REVISION_REQUESTS', label: '14. Revision Requests', icon: RefreshCw },
+    { id: 'APPROVED_DESIGNS', label: '15. Approved Designs', icon: CheckCircle2 },
+    { id: 'VERSION_HISTORY', label: '16. Design Version History', icon: History },
+  ];
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,13 +296,13 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
       fileUrl: newFile,
       thumbnailUrl: newFile,
       dimensionsOrSpecs: uploadData.dimensionsOrSpecs,
-      adminReviewStatus: uploadData.submitImmediately ? 'PENDING_ADMIN_REVIEW' : 'PENDING_ADMIN_REVIEW',
+      adminReviewStatus: 'PENDING_ADMIN_REVIEW',
       clientApprovalStatus: 'PENDING_CUSTOMER_REVIEW',
     });
 
     if (uploadData.submitImmediately) {
       submitDesignAssetToAdmin(saved.id);
-      success(`Design asset ${saved.documentId} submitted to Admin for review!`);
+      success(`Design asset ${saved.documentId} submitted to Admin for quality audit!`);
     } else {
       success(`Design asset ${saved.documentId} saved to workspace!`);
     }
@@ -159,10 +312,10 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
       projectId: projects[0]?.id || 'prj-int-1',
       title: '',
       category: 'VISUALIZATION_3D',
-      roomName: 'Living Room',
+      roomName: 'Living & Dining Room',
       version: 'v1.0',
       fileUrl: '',
-      dimensionsOrSpecs: '3840 x 2160 • 4K UHD Render • 3ds Max + V-Ray',
+      dimensionsOrSpecs: '3840 x 2160 • 4K UHD Render • 3ds Max + V-Ray 6',
       submitImmediately: true,
     });
     loadData();
@@ -183,44 +336,94 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans pb-12">
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ---------------- HEADER & VIEW SELECTOR ---------------- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-950 text-xs font-black uppercase font-mono mb-1.5 border border-blue-200">
             <Box className="w-3.5 h-3.5 text-blue-600" />
-            <span>Section 9 • Interior Design Management Workspace</span>
+            <span>Module 5 • Interior Design Studio & Spatial Management</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black font-display text-navy-950">
-            Design Studio & Document Submissions
+            Interior Design Management
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-            Space planning, 2D working drawings, photorealistic 3D renders, and material finish palettes organized with Admin mediated customer approval workflows.
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl">
+            Complete architectural space planning, 2D working drawings, 4K photorealistic 3D renders, and room-by-room finishes with BuildGhar Admin-governed customer approval workflows.
           </p>
         </div>
 
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition flex items-center gap-2 shadow-md self-start sm:self-auto"
-        >
-          <Upload className="w-4 h-4" />
-          <span>Upload Design Drawing</span>
-        </button>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2.5">
+          <div className="relative">
+            <select
+              value={currentView}
+              onChange={(e) => handleSetView(e.target.value as DesignStudioViewMode)}
+              className="appearance-none pl-3 pr-8 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-navy-950 shadow-2xs hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
+            >
+              {DESIGN_VIEW_TABS.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label} ({viewCounts[tab.id]})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition flex items-center gap-2 shadow-sm shrink-0"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Upload Design</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- 16-PILL SUB-FEATURE ACTION STRIP ---------------- */}
+      <div className="p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs overflow-x-auto">
+        <div className="flex items-center gap-1.5 min-w-max">
+          {DESIGN_VIEW_TABS.map((tab) => {
+            const isActive = currentView === tab.id;
+            const Icon = tab.icon;
+            const count = viewCounts[tab.id];
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleSetView(tab.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ---------------- SECTION 9 ROUTING RULE BANNER ---------------- */}
-      <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
+      <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
         <div className="flex items-center gap-2.5">
           <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
           <span>
-            <strong>Section 9 Design Submission Rule:</strong> Interior Designer uploads design ➔ BuildGhar Admin verifies compliance ➔ Admin forwards to Customer ➔ Customer Approves or Requests Revision. Every upload is version controlled (`v1.0`, `v2.0`).
+            <strong>Section 9 Design Submission Rule:</strong> Designer uploads drawing ➔ BuildGhar Admin verifies compliance ➔ Admin forwards to Customer ➔ Customer Approves or Requests Revision. All drawings are version controlled (`v1.0`, `v2.0`).
           </span>
         </div>
-        <span className="font-mono font-bold bg-white text-blue-900 px-3 py-1 rounded-full border border-blue-200 shrink-0">
-          Immutable Versions
+        <span className="font-mono font-bold bg-white text-blue-900 px-3 py-1 rounded-full border border-blue-200 shrink-0 text-[11px]">
+          Admin Mediated Workflow
         </span>
       </div>
 
-      {/* ---------------- PROJECT SELECTOR & SEARCH ---------------- */}
+      {/* ---------------- PROJECT FILTER & SEARCH BAR ---------------- */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-white border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-xs font-bold text-slate-500 shrink-0 pl-2">Filter by Project:</span>
@@ -250,43 +453,26 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
         </div>
       </div>
 
-      {/* ---------------- SECTION 9 CATEGORY TABS ---------------- */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-        {[
-          { tab: 'ALL', label: 'All Designs', count: assets.length },
-          { tab: 'BRIEFS', label: '9A. Approved Design Briefs', count: projects.filter((p) => p.designBrief).length },
-          { tab: 'SPACE_PLANNING', label: '9B. Space Planning (Layouts)', count: assets.filter((a) => a.category === 'SPACE_PLANNING').length },
-          { tab: 'LAYOUT_2D', label: '9C. 2D Working CAD Plans', count: assets.filter((a) => a.category === 'LAYOUT_2D').length },
-          { tab: 'VISUALIZATION_3D', label: '9D. 3D Photorealistic Renders', count: assets.filter((a) => a.category === 'VISUALIZATION_3D').length },
-          { tab: 'MATERIAL_FINISHES', label: '9E. Material & Finish Palettes', count: assets.filter((a) => a.category === 'MATERIAL_FINISHES').length },
-          { tab: 'SUBMISSIONS', label: '9F. Revisions & Version Audit', count: assets.filter((a) => a.adminReviewStatus === 'REVISION_REQUESTED').length },
-        ].map((t) => (
-          <button
-            key={t.tab}
-            onClick={() => setActiveTab(t.tab as any)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-              activeTab === t.tab
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <span>{t.label}</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                activeTab === t.tab ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              {t.count}
+      {/* ========================================================================= */}
+      {/* VIEW 1: DESIGN BRIEFS (APPROVED CLIENT BRIEFS - SECTION 9A)              */}
+      {/* ========================================================================= */}
+      {currentView === 'DESIGN_BRIEFS' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div>
+                <h3 className="font-bold text-navy-950 text-sm">Approved Design Briefs & Scope Directives</h3>
+                <p className="text-xs text-slate-600">
+                  Interior Designer must work strictly from these Admin-approved briefs. All revisions must be logged as formal change requests.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-white text-emerald-900 border border-emerald-200 font-mono font-bold text-xs">
+              {projects.filter((p) => p.designBrief).length} Verified Briefs
             </span>
-          </button>
-        ))}
-      </div>
+          </div>
 
-      {/* ========================================================================= */}
-      {/* VIEW: SECTION 9A APPROVED DESIGN BRIEFS                                   */}
-      {/* ========================================================================= */}
-      {activeTab === 'BRIEFS' && (
-        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {projects
               .filter((p) => p.designBrief && (selectedProjectId === 'ALL' || p.id === selectedProjectId))
@@ -295,7 +481,7 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                 return (
                   <div
                     key={p.id}
-                    className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3 hover:border-blue-300 transition"
+                    className="p-5 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-3.5 hover:border-blue-300 transition"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
@@ -310,7 +496,7 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                       <h3 className="font-black text-navy-950 text-base">{p.title}</h3>
                       <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{p.location}</span>
+                        <span>{p.location} • Client: {p.customerName}</span>
                       </div>
                     </div>
 
@@ -322,12 +508,11 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                       <p className="text-slate-600 leading-relaxed">{b.customerRequirements}</p>
                     </div>
 
-                    {/* Preferences Tags */}
                     <div className="space-y-1.5 text-xs">
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">Material Preferences</span>
                       <div className="flex flex-wrap gap-1">
                         {b.materialPreferences.map((m, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium">
+                          <span key={i} className="px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200 text-[11px] font-medium">
                             {m}
                           </span>
                         ))}
@@ -335,8 +520,20 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-bold">Approved Budget:</span>
-                      <span className="font-mono font-bold text-navy-950">{formatINR(b.targetBudget)}</span>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Target Budget</span>
+                        <span className="font-mono font-bold text-navy-950">{formatINR(b.targetBudget)}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleSetView('VISUALIZATION_3D');
+                          setSelectedProjectId(p.id);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
+                      >
+                        <span>Open 3D Renders</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -346,120 +543,265 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* VIEW: DESIGN ASSETS GRID (SPACE PLANNING, 2D, 3D, MATERIAL FINISHES)      */}
+      {/* VIEWS 2 TO 15: ASSETS GRID (FILTERED BY VIEW)                             */}
       {/* ========================================================================= */}
-      {activeTab !== 'BRIEFS' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredAssets.map((asset) => (
-            <div
-              key={asset.id}
-              className="rounded-3xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-300 transition flex flex-col justify-between overflow-hidden"
-            >
-              {/* Image Preview & Badges */}
-              <div className="relative h-48 bg-slate-100 overflow-hidden group cursor-pointer" onClick={() => setPreviewAsset(asset)}>
-                <img
-                  src={asset.thumbnailUrl}
-                  alt={asset.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                />
-                <div className="absolute inset-0 bg-navy-950/20 group-hover:bg-navy-950/40 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  <div className="p-2.5 rounded-full bg-white/90 text-navy-950 shadow-md">
-                    <Maximize2 className="w-5 h-5" />
-                  </div>
-                </div>
-
-                {/* Top Badges */}
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                  <span className="px-2.5 py-0.5 rounded-full bg-navy-950/80 text-white text-[10px] font-mono font-bold backdrop-blur-xs">
-                    {asset.version}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-600/90 text-white text-[10px] font-bold backdrop-blur-xs">
-                    {asset.category.replace(/_/g, ' ')}
-                  </span>
-                </div>
-
-                <div className="absolute top-3 right-3">
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase backdrop-blur-xs ${
-                      asset.clientApprovalStatus === 'APPROVED'
-                        ? 'bg-emerald-600/90 text-white'
-                        : asset.adminReviewStatus === 'REVISION_REQUESTED'
-                        ? 'bg-rose-600/90 text-white'
-                        : 'bg-amber-600/90 text-white'
-                    }`}
-                  >
-                    {asset.clientApprovalStatus === 'APPROVED' ? 'CLIENT APPROVED' : asset.adminReviewStatus.replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="p-4 space-y-2.5">
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-blue-700">{asset.documentId}</span>
-                  <h3 className="font-bold text-navy-950 text-sm leading-snug">{asset.title}</h3>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    Room: <span className="font-semibold text-slate-700">{asset.roomName}</span> • {asset.projectName}
-                  </div>
-                </div>
-
-                {asset.dimensionsOrSpecs && (
-                  <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 font-mono">
-                    {asset.dimensionsOrSpecs}
-                  </p>
-                )}
-
-                {/* Feedback Alert if Revision */}
-                {asset.adminFeedback && (
-                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs flex items-start gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span className="text-amber-900 leading-tight">
-                      <strong>Feedback:</strong> {asset.adminFeedback}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="p-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-[10px] text-slate-400">{asset.fileSize}</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setPreviewAsset(asset)}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition"
-                    title="Inspect & View"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-
-                  <a
-                    href={asset.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition"
-                    title="Download Drawing"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </a>
-
-                  {(asset.adminReviewStatus === 'REVISION_REQUESTED' || asset.clientApprovalStatus === 'CHANGES_REQUESTED') && (
-                    <button
-                      onClick={() => setRevisionModal({ open: true, asset, newUrl: '', notes: '' })}
-                      className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] transition flex items-center gap-1 shadow-2xs"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      <span>Revise</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+      {currentView !== 'DESIGN_BRIEFS' && currentView !== 'VERSION_HISTORY' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header banner describing the active category */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <h3 className="font-extrabold text-navy-950 text-sm">
+                {DESIGN_VIEW_TABS.find((t) => t.id === currentView)?.label}
+              </h3>
+              <p className="text-slate-500 mt-0.5">
+                Showing {filteredAssets.length} verified deliverables for project: {selectedProjectId === 'ALL' ? 'All Shared Projects' : selectedProjectId}
+              </p>
             </div>
-          ))}
+            <button
+              onClick={() => {
+                setUploadData((prev) => ({
+                  ...prev,
+                  title: `${DESIGN_VIEW_TABS.find((t) => t.id === currentView)?.label.replace(/^\d+\.\s*/, '')} Plan`,
+                }));
+                setIsUploadModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload New File</span>
+            </button>
+          </div>
+
+          {filteredAssets.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-white border border-slate-200">
+              <FolderOpen className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+              <h4 className="font-bold text-navy-950">No Drawings Found in This Category</h4>
+              <p className="text-xs text-slate-500 mt-1">Upload a drawing or select "All Shared Projects" to view files.</p>
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="mt-3 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
+              >
+                Upload Drawing Now
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredAssets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className="rounded-3xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-300 transition flex flex-col justify-between overflow-hidden group"
+                >
+                  <div>
+                    {/* Thumbnail Preview Area */}
+                    <div className="relative h-48 bg-slate-100 overflow-hidden cursor-pointer" onClick={() => setPreviewAsset(asset)}>
+                      <img
+                        src={asset.thumbnailUrl || asset.fileUrl}
+                        alt={asset.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent flex items-end justify-between p-3.5">
+                        <span className="font-mono font-bold text-white text-xs bg-navy-950/80 px-2.5 py-0.5 rounded-full border border-white/20">
+                          {asset.documentId} • {asset.version}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewAsset(asset);
+                          }}
+                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-white hover:text-navy-950 backdrop-blur-xs transition"
+                          title="Fullscreen View"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Metadata Body */}
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                          {asset.roomName} • {asset.category.replace(/_/g, ' ')}
+                        </span>
+                        <h4 className="font-extrabold text-navy-950 text-sm mt-0.5 line-clamp-1">{asset.title}</h4>
+                        <span className="text-xs text-slate-400 block mt-0.5">{asset.projectName}</span>
+                      </div>
+
+                      {/* Dimensions or Specs */}
+                      {asset.dimensionsOrSpecs && (
+                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 font-mono">
+                          {asset.dimensionsOrSpecs}
+                        </div>
+                      )}
+
+                      {/* Status Badges */}
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            asset.adminReviewStatus === 'APPROVED_BY_ADMIN'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : asset.adminReviewStatus === 'REVISION_REQUESTED'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          Admin: {asset.adminReviewStatus.replace(/_/g, ' ')}
+                        </span>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            asset.clientApprovalStatus === 'APPROVED'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : asset.clientApprovalStatus === 'REVISION_REQUESTED'
+                              ? 'bg-rose-50 text-rose-700'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          Client: {asset.clientApprovalStatus.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+
+                      {/* Feedback Note if Revision Requested */}
+                      {asset.adminFeedback && (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1">
+                          <span className="font-bold flex items-center gap-1 text-[11px]">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            Admin Revision Feedback:
+                          </span>
+                          <p className="text-[11px] text-amber-900">{asset.adminFeedback}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Actions */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {asset.uploadedAt.slice(0, 10)}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setPreviewAsset(asset)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition flex items-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Inspect</span>
+                      </button>
+
+                      {asset.adminReviewStatus === 'REVISION_REQUESTED' && (
+                        <button
+                          onClick={() => setRevisionModal({ open: true, asset, newUrl: '', notes: '' })}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Revise</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: UPLOAD NEW DESIGN DRAWING (Section 9B, C, D, E, F)                 */}
+      {/* VIEW 16: DESIGN VERSION HISTORY (IMMUTABLE AUDIT TRAIL)                   */}
+      {/* ========================================================================= */}
+      {currentView === 'VERSION_HISTORY' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <History className="w-5 h-5 text-blue-700 shrink-0" />
+              <div>
+                <h3 className="font-bold text-navy-950 text-sm">Design Drawing Version History & Audit Log</h3>
+                <p className="text-xs text-slate-600">
+                  Every drawing upload creates an immutable revision stamp (`v1.0`, `v1.1`, `v2.0`) recorded in BuildGhar Vault.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-white text-blue-900 border border-blue-200 font-mono font-bold text-xs">
+              {assets.length} Master Assets Tracked
+            </span>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4">
+            <h4 className="font-extrabold text-navy-950 text-base">Complete Version Change Log</h4>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                    <th className="py-3 px-3.5">Document ID & Title</th>
+                    <th className="py-3 px-3.5">Project & Room</th>
+                    <th className="py-3 px-3.5">Current Version</th>
+                    <th className="py-3 px-3.5">Admin Audit Status</th>
+                    <th className="py-3 px-3.5">Client Status</th>
+                    <th className="py-3 px-3.5">Last Uploaded</th>
+                    <th className="py-3 px-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {assets.map((asset) => (
+                    <tr key={asset.id} className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 text-[11px]">
+                            {asset.documentId}
+                          </span>
+                          <span className="font-bold text-navy-950">{asset.title}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <span className="font-medium text-slate-800 block">{asset.projectName}</span>
+                        <span className="text-[11px] text-slate-400">{asset.roomName}</span>
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <span className="font-mono font-bold text-blue-800 bg-slate-100 px-2 py-0.5 rounded">
+                          {asset.version}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            asset.adminReviewStatus === 'APPROVED_BY_ADMIN'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : asset.adminReviewStatus === 'REVISION_REQUESTED'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {asset.adminReviewStatus.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3.5">
+                        <span className="font-bold text-slate-700">
+                          {asset.clientApprovalStatus.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-500 font-mono text-[11px]">
+                        {asset.uploadedAt.slice(0, 10)}
+                      </td>
+                      <td className="py-3 px-3.5 text-right">
+                        <button
+                          onClick={() => setPreviewAsset(asset)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs"
+                        >
+                          Inspect File
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: UPLOAD DESIGN DRAWING (SECTION 9 MANDATORY COMPLIANCE)            */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {isUploadModalOpen && (
@@ -472,30 +814,24 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700">
-                    <Upload className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-navy-950 text-base">Upload Design Drawing / Render</h3>
-                    <span className="text-[10px] text-slate-400">Routes strictly to BuildGhar Admin Review</span>
-                  </div>
+                  <Upload className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-black text-navy-950 text-base">Upload Design Deliverable</h3>
                 </div>
                 <button
                   onClick={() => setIsUploadModalOpen(false)}
-                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleUploadSubmit} className="space-y-3.5 text-xs">
-                {/* Project Selector */}
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Target Project</label>
+                  <label className="font-bold text-navy-950 block mb-1">Target Project</label>
                   <select
                     value={uploadData.projectId}
                     onChange={(e) => setUploadData({ ...uploadData, projectId: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-bold bg-slate-50"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950 font-bold"
                   >
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -505,118 +841,91 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Category & Room */}
+                <div>
+                  <label className="font-bold text-navy-950 block mb-1">Drawing / Deliverable Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Living Room 4K Evening Render with Statuario Marble"
+                    value={uploadData.title}
+                    onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950"
+                    required
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Category (Section 9)</label>
+                    <label className="font-bold text-navy-950 block mb-1">Design Category</label>
                     <select
                       value={uploadData.category}
                       onChange={(e) => setUploadData({ ...uploadData, category: e.target.value as any })}
-                      className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-medium bg-slate-50"
+                      className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950 font-semibold"
                     >
-                      <option value="SPACE_PLANNING">9B. Space Planning (Layout)</option>
-                      <option value="LAYOUT_2D">9C. 2D Working CAD Plan</option>
-                      <option value="VISUALIZATION_3D">9D. 3D Photorealistic Render</option>
-                      <option value="MATERIAL_FINISHES">9E. Material & Finish Palette</option>
-                      <option value="MOOD_BOARD">Moodboard & Swatches</option>
+                      <option value="VISUALIZATION_3D">3D Photorealistic Render</option>
+                      <option value="LAYOUT_2D">2D Working CAD Layout</option>
+                      <option value="SPACE_PLANNING">Space Planning & Zoning</option>
+                      <option value="MATERIAL_FINISHES">Material & Finish Swatches</option>
+                      <option value="MOOD_BOARD">Design Moodboard</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Room / Space</label>
-                    <select
+                    <label className="font-bold text-navy-950 block mb-1">Room / Zone</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Living & Dining, Kitchen, Master Suite"
                       value={uploadData.roomName}
                       onChange={(e) => setUploadData({ ...uploadData, roomName: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-medium bg-slate-50"
-                    >
-                      <option value="Living Room">Living Room</option>
-                      <option value="Modular Kitchen">Modular Kitchen</option>
-                      <option value="Master Bedroom Suite">Master Bedroom Suite</option>
-                      <option value="Kids Bedroom">Kids Bedroom</option>
-                      <option value="Dining Area">Dining Area</option>
-                      <option value="Foyer & Entrance">Foyer & Entrance</option>
-                      <option value="Pooja Room">Pooja Room</option>
-                      <option value="Full Home">Full Home</option>
-                    </select>
+                      className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950"
+                      required
+                    />
                   </div>
                 </div>
 
-                {/* Title */}
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Drawing / Render Title</label>
+                  <label className="font-bold text-navy-950 block mb-1">Drawing Image or Document URL</label>
                   <input
-                    type="text"
-                    placeholder="e.g. Living Room 4K Evening Lighting 3D Perspective"
-                    value={uploadData.title}
-                    onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-bold focus:border-blue-500"
-                  />
-                </div>
-
-                {/* File URL */}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">File URL / Secure Storage Reference</label>
-                  <input
-                    type="text"
-                    placeholder="https://... or choose sample preset"
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or cloud PDF/DWG link"
                     value={uploadData.fileUrl}
                     onChange={(e) => setUploadData({ ...uploadData, fileUrl: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-mono text-xs focus:border-blue-500"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950"
                   />
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-slate-400">Presets:</span>
-                    <button
-                      type="button"
-                      onClick={() => setUploadData({ ...uploadData, fileUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80' })}
-                      className="text-[10px] text-blue-700 underline"
-                    >
-                      Luxury Living Render
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUploadData({ ...uploadData, fileUrl: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1600&q=80' })}
-                      className="text-[10px] text-blue-700 underline"
-                    >
-                      2D Kitchen Plan
-                    </button>
-                  </div>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Leave blank for sample render asset.</span>
                 </div>
 
-                {/* Technical Specifications */}
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Technical Specs & Dimensions</label>
+                  <label className="font-bold text-navy-950 block mb-1">Technical Specifications / Notes</label>
                   <input
                     type="text"
+                    placeholder="e.g. 3840 x 2160 UHD • Scale 1:25 • Blum Antaro & Statuario Italian Marble"
                     value={uploadData.dimensionsOrSpecs}
                     onChange={(e) => setUploadData({ ...uploadData, dimensionsOrSpecs: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-mono text-xs focus:border-blue-500"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950 font-mono"
                   />
                 </div>
 
-                <div className="p-3 rounded-xl bg-blue-50 text-blue-900 text-xs flex items-center justify-between">
-                  <span>Submit immediately to BuildGhar Admin for review</span>
-                  <input
-                    type="checkbox"
-                    checked={uploadData.submitImmediately}
-                    onChange={(e) => setUploadData({ ...uploadData, submitImmediately: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded"
-                  />
+                <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-950 text-[11px] flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    Upload will create version <strong>{uploadData.version}</strong> and automatically submit to BuildGhar Admin for compliance review.
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setIsUploadModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 shadow-md"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 shadow-sm"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span>Upload & Submit</span>
+                    <span>Upload & Submit to Admin</span>
                   </button>
                 </div>
               </form>
@@ -626,164 +935,84 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
       </AnimatePresence>
 
       {/* ========================================================================= */}
-      {/* MODAL: PREVIEW ASSET & TECHNICAL SPECS                                    */}
+      {/* MODAL 2: CREATE REVISION (SECTION 9 VERSION BUMP v1.0 -> v2.0)            */}
       {/* ========================================================================= */}
       <AnimatePresence>
-        {previewAsset && (
-          <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        {revisionModal.open && revisionModal.asset && (
+          <div className="fixed inset-0 z-50 bg-navy-950/60 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto"
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                      {previewAsset.documentId}
-                    </span>
-                    <span className="font-mono text-xs font-bold text-slate-500">Version {previewAsset.version}</span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                        previewAsset.clientApprovalStatus === 'APPROVED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : previewAsset.adminReviewStatus === 'REVISION_REQUESTED'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {previewAsset.clientApprovalStatus === 'APPROVED' ? 'CUSTOMER APPROVED' : previewAsset.adminReviewStatus.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <h2 className="text-lg font-black text-navy-950 mt-1">{previewAsset.title}</h2>
+                <div className="flex items-center gap-2">
+                  <RotateCcw className="w-5 h-5 text-amber-600" />
+                  <h3 className="font-black text-navy-950 text-base">Submit Revised Version</h3>
                 </div>
                 <button
-                  onClick={() => setPreviewAsset(null)}
-                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                  onClick={() => setRevisionModal({ open: false, asset: null, newUrl: '', notes: '' })}
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Large Image Preview */}
-              <div className="rounded-2xl overflow-hidden border border-slate-200 max-h-[50vh] bg-slate-900 flex items-center justify-center">
-                <img
-                  src={previewAsset.fileUrl}
-                  alt={previewAsset.title}
-                  className="max-h-[50vh] w-auto object-contain"
-                />
-              </div>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Target Deliverable</span>
+                  <span className="font-bold text-navy-950 block">{revisionModal.asset.title}</span>
+                  <span className="font-mono text-blue-700 text-[11px]">
+                    Current Version: {revisionModal.asset.version} ➔ Next Version: v
+                    {(parseFloat(revisionModal.asset.version.replace('v', '')) + 0.1).toFixed(1)}
+                  </span>
+                </div>
 
-              {/* Technical Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Category</span>
-                  <span className="font-bold text-navy-950">{previewAsset.category.replace(/_/g, ' ')}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Room / Space</span>
-                  <span className="font-bold text-navy-950">{previewAsset.roomName}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Uploaded By</span>
-                  <span className="font-bold text-navy-950">{previewAsset.uploadedBy}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">File Specs</span>
-                  <span className="font-bold text-navy-950">{previewAsset.fileSize}</span>
-                </div>
-              </div>
-
-              {previewAsset.dimensionsOrSpecs && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Rendering Engine & Specs</span>
-                  <span className="font-mono text-slate-800">{previewAsset.dimensionsOrSpecs}</span>
-                </div>
-              )}
-
-              {/* Revision remarks if present */}
-              {previewAsset.clientFeedback && (
-                <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs flex items-start gap-2">
-                  <RotateCcw className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-purple-950 block">Homeowner Change Request (via Admin):</span>
-                    <p className="text-purple-900 mt-0.5 leading-relaxed font-medium">"{previewAsset.clientFeedback}"</p>
+                {revisionModal.asset.adminFeedback && (
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950">
+                    <span className="font-bold block text-[11px] mb-0.5">Admin Feedback to Rectify:</span>
+                    <p className="text-amber-900">{revisionModal.asset.adminFeedback}</p>
                   </div>
-                </div>
-              )}
-
-              {previewAsset.adminForwardInstructions && (
-                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-blue-950 block">Admin Directive for Revision:</span>
-                    <p className="text-blue-900 mt-0.5 leading-relaxed font-medium">{previewAsset.adminForwardInstructions}</p>
-                  </div>
-                </div>
-              )}
-
-              {previewAsset.adminFeedback && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-amber-950 block">Admin Feedback Remarks:</span>
-                    <p className="text-amber-900 mt-0.5 leading-relaxed">{previewAsset.adminFeedback}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Version History List */}
-              {((previewAsset.versionHistory?.length || 0) > 0) && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-                  <span className="font-bold text-slate-700 block">Version History &amp; Prior Iterations</span>
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {previewAsset.versionHistory?.map((hist, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
-                        <div>
-                          <span className="font-mono font-bold text-slate-800">{hist.version}</span>
-                          <span className="text-[10px] text-slate-500 block truncate max-w-[280px]">
-                            {hist.comments || 'Previous version snapshot'}
-                          </span>
-                        </div>
-                        <a
-                          href={hist.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1 rounded bg-slate-100 text-slate-600 hover:text-slate-900"
-                        >
-                          <Download className="w-3 h-3" />
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <a
-                  href={previewAsset.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download High-Res</span>
-                </a>
-
-                {(previewAsset.adminReviewStatus === 'REVISION_REQUESTED' ||
-                  previewAsset.clientApprovalStatus === 'CHANGES_REQUESTED') && (
-                  <button
-                    onClick={() => {
-                      setRevisionModal({ open: true, asset: previewAsset, newUrl: '', notes: '' });
-                      setPreviewAsset(null);
-                    }}
-                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Create Revision v2.0</span>
-                  </button>
                 )}
+
+                <div>
+                  <label className="font-bold text-navy-950 block mb-1">New Revised File / Image URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/..."
+                    value={revisionModal.newUrl}
+                    onChange={(e) => setRevisionModal({ ...revisionModal, newUrl: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-navy-950 block mb-1">Revision Notes & Changes Made</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe changes made to rectify Admin/Client feedback..."
+                    value={revisionModal.notes}
+                    onChange={(e) => setRevisionModal({ ...revisionModal, notes: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-navy-950"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => setRevisionModal({ open: false, asset: null, newUrl: '', notes: '' })}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateRevision}
+                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Submit Revision for Admin Audit</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -791,78 +1020,95 @@ export const InteriorDesignerDesignStudio: React.FC = () => {
       </AnimatePresence>
 
       {/* ========================================================================= */}
-      {/* MODAL: REVISE DESIGN ASSET (VERSION CONTROL)                              */}
+      {/* MODAL 3: FULLSCREEN IMAGE LIGHTBOX PREVIEW                                */}
       {/* ========================================================================= */}
       <AnimatePresence>
-        {revisionModal.open && revisionModal.asset && (
-          <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        {previewAsset && (
+          <div className="fixed inset-0 z-50 bg-navy-950/90 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+              className="bg-white rounded-3xl max-w-4xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 max-h-[95vh] overflow-y-auto"
             >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
-                    <RotateCcw className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-navy-950 text-sm">Submit Design Revision</h3>
-                    <span className="font-mono text-[10px] text-slate-400">
-                      {revisionModal.asset.documentId} • Current: {revisionModal.asset.version}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                      {previewAsset.documentId} • {previewAsset.version}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        previewAsset.adminReviewStatus === 'APPROVED_BY_ADMIN'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      {previewAsset.adminReviewStatus.replace(/_/g, ' ')}
                     </span>
                   </div>
+                  <h3 className="font-black text-navy-950 text-base mt-1">{previewAsset.title}</h3>
                 </div>
                 <button
-                  onClick={() => setRevisionModal({ open: false, asset: null, newUrl: '', notes: '' })}
-                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400"
+                  onClick={() => setPreviewAsset(null)}
+                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed">
-                A new major version will be created (e.g. <strong>v2.0</strong>). The earlier version will be permanently preserved in version history.
-              </p>
+              {/* Full Image */}
+              <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center max-h-[60vh]">
+                <img
+                  src={previewAsset.fileUrl}
+                  alt={previewAsset.title}
+                  className="w-full h-full object-contain max-h-[60vh]"
+                />
+              </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">New Revised File URL</label>
-                  <input
-                    type="text"
-                    placeholder="Enter revised CAD/Render URL..."
-                    value={revisionModal.newUrl}
-                    onChange={(e) => setRevisionModal({ ...revisionModal, newUrl: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-navy-950 font-mono text-xs focus:border-amber-500"
-                  />
+              {/* Specs & Metadata */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Room / Zone</span>
+                  <span className="font-bold text-navy-950">{previewAsset.roomName}</span>
                 </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Revision Notes for Admin & Client</label>
-                  <textarea
-                    placeholder="Describe changes made per feedback..."
-                    value={revisionModal.notes}
-                    onChange={(e) => setRevisionModal({ ...revisionModal, notes: e.target.value })}
-                    className="w-full h-20 p-2.5 rounded-xl border border-slate-200 text-navy-950 text-xs focus:border-amber-500"
-                  />
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Category</span>
+                  <span className="font-bold text-navy-950">{previewAsset.category.replace(/_/g, ' ')}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Uploaded On</span>
+                  <span className="font-mono font-bold text-navy-950">{previewAsset.uploadedAt.slice(0, 10)}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Client Status</span>
+                  <span className="font-bold text-emerald-700">{previewAsset.clientApprovalStatus.replace(/_/g, ' ')}</span>
                 </div>
               </div>
+
+              {previewAsset.dimensionsOrSpecs && (
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700">
+                  <span className="text-slate-400 uppercase font-bold text-[10px] block mb-0.5">Specifications</span>
+                  {previewAsset.dimensionsOrSpecs}
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
-                  onClick={() => setRevisionModal({ open: false, asset: null, newUrl: '', notes: '' })}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                  onClick={() => setPreviewAsset(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs"
                 >
-                  Cancel
+                  Close
                 </button>
-                <button
-                  onClick={handleCreateRevision}
-                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
+                <a
+                  href={previewAsset.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Submit Revision</span>
-                </button>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Raw CAD/UHD Render</span>
+                </a>
               </div>
             </motion.div>
           </div>
