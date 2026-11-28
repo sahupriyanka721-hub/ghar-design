@@ -83,7 +83,25 @@ export const InteriorDesignerLayout: React.FC = () => {
       ],
     },
     { label: 'C. Booking Management', path: '/interior-designer/bookings', icon: CalendarCheck },
-    { label: 'D. Project Management', path: '/interior-designer/projects', icon: HardHat },
+    {
+      label: '4. Project Management',
+      path: '/interior-designer/projects',
+      icon: HardHat,
+      subItems: [
+        { label: 'My Projects', path: '/interior-designer/projects?view=MY_PROJECTS', view: 'MY_PROJECTS' },
+        { label: 'New Project Assignments', path: '/interior-designer/projects?view=NEW_ASSIGNMENTS', view: 'NEW_ASSIGNMENTS' },
+        { label: 'Project Overview', path: '/interior-designer/projects?view=PROJECT_OVERVIEW', view: 'PROJECT_OVERVIEW' },
+        { label: 'Project Kickoff', path: '/interior-designer/projects?view=PROJECT_KICKOFF', view: 'PROJECT_KICKOFF' },
+        { label: 'Project Planning', path: '/interior-designer/projects?view=PROJECT_PLANNING', view: 'PROJECT_PLANNING' },
+        { label: 'Project Timeline', path: '/interior-designer/projects?view=PROJECT_TIMELINE', view: 'PROJECT_TIMELINE' },
+        { label: 'Project Tasks', path: '/interior-designer/projects?view=PROJECT_TASKS', view: 'PROJECT_TASKS' },
+        { label: 'Project Schedule', path: '/interior-designer/projects?view=PROJECT_SCHEDULE', view: 'PROJECT_SCHEDULE' },
+        { label: 'Project Coordination', path: '/interior-designer/projects?view=PROJECT_COORDINATION', view: 'PROJECT_COORDINATION' },
+        { label: 'Project Status', path: '/interior-designer/projects?view=PROJECT_STATUS', view: 'PROJECT_STATUS' },
+        { label: 'Completed Projects', path: '/interior-designer/projects?view=COMPLETED_PROJECTS', view: 'COMPLETED_PROJECTS' },
+        { label: 'On-Hold Projects', path: '/interior-designer/projects?view=ON_HOLD_PROJECTS', view: 'ON_HOLD_PROJECTS' },
+      ],
+    },
     { label: 'E. Design & 3D', path: '/interior-designer/designs', icon: Box },
     { label: 'F. Estimation & BOQ', path: '/interior-designer/boq', icon: Layers },
     { label: 'G. Site & Snag List', path: '/interior-designer/site-management', icon: Camera },
@@ -272,7 +290,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                           const currentViewParam = new URLSearchParams(location.search).get('view');
                           const isSubActive =
                             location.pathname.startsWith(item.path) &&
-                            (currentViewParam === sub.view || (!currentViewParam && sub.view === 'NEW_REQUESTS'));
+                            (currentViewParam === sub.view ||
+                              (!currentViewParam && (sub.view === 'NEW_REQUESTS' || sub.view === 'MY_PROJECTS')));
 
                           return (
                             <Link
