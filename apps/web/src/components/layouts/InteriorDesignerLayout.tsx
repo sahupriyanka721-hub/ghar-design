@@ -41,6 +41,7 @@ export const InteriorDesignerLayout: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   // If not logged in as professional or interior designer
   if (!user || (user.role !== 'PROFESSIONAL' && (user.role as any) !== 'INTERIOR_DESIGNER')) {
@@ -63,7 +64,24 @@ export const InteriorDesignerLayout: React.FC = () => {
 
   const navItems = [
     { label: 'A. Dashboard', path: '/interior-designer/dashboard', icon: LayoutDashboard, exact: true },
-    { label: 'B. Quotation Management', path: '/interior-designer/quotations', icon: FileCheck2 },
+    {
+      label: '3. Quotation Management',
+      path: '/interior-designer/quotations',
+      icon: FileCheck2,
+      subItems: [
+        { label: 'New Quotation Requests', path: '/interior-designer/quotations?view=NEW_REQUESTS', view: 'NEW_REQUESTS' },
+        { label: 'Assigned Requests', path: '/interior-designer/quotations?view=ASSIGNED_REQUESTS', view: 'ASSIGNED_REQUESTS' },
+        { label: 'Accepted Assignments', path: '/interior-designer/quotations?view=ACCEPTED_ASSIGNMENTS', view: 'ACCEPTED_ASSIGNMENTS' },
+        { label: 'Generate Quotation', path: '/interior-designer/quotations?view=GENERATE_QUOTATION', view: 'GENERATE_QUOTATION' },
+        { label: 'Quotation List', path: '/interior-designer/quotations?view=QUOTATION_LIST', view: 'QUOTATION_LIST' },
+        { label: 'Pending Admin Review', path: '/interior-designer/quotations?view=PENDING_ADMIN_REVIEW', view: 'PENDING_ADMIN_REVIEW' },
+        { label: 'Approved Quotations', path: '/interior-designer/quotations?view=APPROVED_QUOTATIONS', view: 'APPROVED_QUOTATIONS' },
+        { label: 'Rejected Quotations', path: '/interior-designer/quotations?view=REJECTED_QUOTATIONS', view: 'REJECTED_QUOTATIONS' },
+        { label: 'Revision Required', path: '/interior-designer/quotations?view=REVISION_REQUIRED', view: 'REVISION_REQUIRED' },
+        { label: 'Customer Accepted Quotations', path: '/interior-designer/quotations?view=CUSTOMER_ACCEPTED', view: 'CUSTOMER_ACCEPTED' },
+        { label: 'Quotation History', path: '/interior-designer/quotations?view=QUOTATION_HISTORY', view: 'QUOTATION_HISTORY' },
+      ],
+    },
     { label: 'C. Booking Management', path: '/interior-designer/bookings', icon: CalendarCheck },
     { label: 'D. Project Management', path: '/interior-designer/projects', icon: HardHat },
     { label: 'E. Design & 3D', path: '/interior-designer/designs', icon: Box },
@@ -203,10 +221,84 @@ export const InteriorDesignerLayout: React.FC = () => {
             <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
               Workspace
             </div>
-            {navItems.map((item) => {
+            {navItems.map((item: any) => {
               const isActive = item.exact
                 ? location.pathname === item.path
                 : location.pathname.startsWith(item.path);
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isExpanded = Boolean(expandedMenus[item.path]);
+
+              if (hasSubItems) {
+                return (
+                  <div key={item.path} className="space-y-0.5">
+                    <div
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-700 hover:bg-blue-50 hover:text-navy-950 font-semibold'
+                      }`}
+                      onClick={() => {
+                        setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                        if (!location.pathname.startsWith(item.path)) {
+                          navigate(item.path);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                        }}
+                        className={`p-0.5 rounded-md hover:bg-white/20 transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                        aria-label="Toggle Submenu"
+                      >
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Collapsible Submenu Dropdown */}
+                    {isExpanded && (
+                      <div className="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-blue-200 ml-4 animate-in fade-in duration-150">
+                        {item.subItems.map((sub: any) => {
+                          const currentViewParam = new URLSearchParams(location.search).get('view');
+                          const isSubActive =
+                            location.pathname.startsWith(item.path) &&
+                            (currentViewParam === sub.view || (!currentViewParam && sub.view === 'NEW_REQUESTS'));
+
+                          return (
+                            <Link
+                              key={sub.path}
+                              to={sub.path}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition font-medium ${
+                                isSubActive
+                                  ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                                  : 'text-slate-600 hover:text-blue-950 hover:bg-blue-100/60'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                  isSubActive ? 'bg-amber-300 scale-125' : 'bg-slate-300'
+                                }`}
+                              />
+                              <span className="truncate">{sub.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <Link

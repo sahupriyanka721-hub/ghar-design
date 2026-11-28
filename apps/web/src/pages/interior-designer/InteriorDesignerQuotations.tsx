@@ -29,6 +29,12 @@ import {
   ChevronDown,
   ChevronRight,
   Info,
+  Search,
+  Filter,
+  History,
+  CheckCheck,
+  Ban,
+  ArrowUpRight,
 } from 'lucide-react';
 import { formatINR } from '../../lib/utils.js';
 import {
@@ -52,6 +58,19 @@ import {
 import { useToast } from '../../context/ToastContext.js';
 import { syncChannel } from '../../data/customerStore.js';
 
+export type QuotationViewMode =
+  | 'NEW_REQUESTS'
+  | 'ASSIGNED_REQUESTS'
+  | 'ACCEPTED_ASSIGNMENTS'
+  | 'GENERATE_QUOTATION'
+  | 'QUOTATION_LIST'
+  | 'PENDING_ADMIN_REVIEW'
+  | 'APPROVED_QUOTATIONS'
+  | 'REJECTED_QUOTATIONS'
+  | 'REVISION_REQUIRED'
+  | 'CUSTOMER_ACCEPTED'
+  | 'QUOTATION_HISTORY';
+
 export const InteriorDesignerQuotations: React.FC = () => {
   const { success, error, info } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,6 +80,8 @@ export const InteriorDesignerQuotations: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'ASSIGNED' | 'BUILDER' | 'UNDER_ADMIN_REVIEW' | 'CUSTOMER_APPROVED' | 'REVISIONS'>('ASSIGNED');
   const [selectedQuote, setSelectedQuote] = useState<InteriorQuotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Assignment action modals
   const [declineModal, setDeclineModal] = useState<{ open: boolean; assignment: InteriorDesignerAssignment | null; reason: string }>({
@@ -360,15 +381,13 @@ export const InteriorDesignerQuotations: React.FC = () => {
     if (status === 'UNDER_ADMIN_REVIEW') {
       submitInteriorQuotationToAdmin(saved.id);
       success(`Quotation ${saved.quotationNumber} (v${saved.version}) submitted to BuildGhar Admin for review!`);
-      setActiveTab('UNDER_ADMIN_REVIEW');
+      setSearchParams({ view: 'PENDING_ADMIN_REVIEW' });
     } else {
       success(`Quotation ${saved.quotationNumber} saved as draft!`);
-      setActiveTab('UNDER_ADMIN_REVIEW');
+      setSearchParams({ view: 'QUOTATION_LIST' });
     }
 
     loadData();
-    // Clear search parameters
-    setSearchParams({});
     setEditingQuotationId(null);
   };
 
@@ -376,7 +395,7 @@ export const InteriorDesignerQuotations: React.FC = () => {
     try {
       const revised = createInteriorQuotationRevision(q.id);
       success(`Revision ${revised.version} created for ${revised.quotationNumber}. You can now modify and resubmit.`);
-      setSearchParams({ revise: revised.id });
+      setSearchParams({ view: 'GENERATE_QUOTATION', revise: revised.id });
     } catch (e: any) {
       error(e.message || 'Failed to start revision');
     }
@@ -426,9 +445,290 @@ export const InteriorDesignerQuotations: React.FC = () => {
   };
 
   // Filtered views
-  const submittedQuotes = quotations.filter((q) => q.status === 'UNDER_ADMIN_REVIEW' || q.status === 'SUBMITTED' || q.status === 'APPROVED_BY_ADMIN' || q.status === 'DRAFT');
-  const acceptedQuotes = quotations.filter((q) => q.status === 'ACCEPTED');
+  const newAssignments = assignments.filter((a) => a.status === 'NEW');
+  const acceptedAssignments = assignments.filter((a) => a.status === 'ACCEPTED_BY_DESIGNER' || a.status === 'QUOTATION_SUBMITTED');
+  const pendingAdminReviewQuotes = quotations.filter((q) => q.status === 'UNDER_ADMIN_REVIEW' || q.status === 'SUBMITTED');
+  const approvedQuotes = quotations.filter((q) => q.status === 'APPROVED_BY_ADMIN' || q.status === 'SENT_TO_CUSTOMER');
+  const rejectedQuotes = quotations.filter((q) => q.status === 'REJECTED');
   const revisionQuotes = quotations.filter((q) => q.status === 'REVISION_REQUESTED');
+  const acceptedQuotes = quotations.filter((q) => q.status === 'ACCEPTED');
+
+  const currentView: QuotationViewMode =
+    (searchParams.get('view') as QuotationViewMode) ||
+    (searchParams.get('createFor') || searchParams.get('revise') ? 'GENERATE_QUOTATION' : 'NEW_REQUESTS');
+
+  const VIEW_TABS: { id: QuotationViewMode; label: string; count: number }[] = [
+    { id: 'NEW_REQUESTS', label: '1. New Requests', count: newAssignments.length },
+    { id: 'ASSIGNED_REQUESTS', label: '2. Assigned Requests', count: assignments.length },
+    { id: 'ACCEPTED_ASSIGNMENTS', label: '3. Accepted Assignments', count: acceptedAssignments.length },
+    { id: 'GENERATE_QUOTATION', label: '4. Generate Quotation', count: lineItems.length },
+    { id: 'QUOTATION_LIST', label: '5. Quotation List', count: quotations.length },
+    { id: 'PENDING_ADMIN_REVIEW', label: '6. Pending Review', count: pendingAdminReviewQuotes.length },
+    { id: 'APPROVED_QUOTATIONS', label: '7. Approved Quotes', count: approvedQuotes.length },
+    { id: 'REJECTED_QUOTATIONS', label: '8. Rejected Quotes', count: rejectedQuotes.length },
+    { id: 'REVISION_REQUIRED', label: '9. Revision Required', count: revisionQuotes.length },
+    { id: 'CUSTOMER_ACCEPTED', label: '10. Customer Accepted', count: acceptedQuotes.length },
+    { id: 'QUOTATION_HISTORY', label: '11. Quotation History', count: quotations.reduce((acc, q) => acc + 1 + (q.versionHistory?.length || 0), 0) },
+  ];
+
+  const filteredAssignments = (list: InteriorDesignerAssignment[]) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(
+      (a) =>
+        a.assignmentCode.toLowerCase().includes(q) ||
+        (a.requestCode && a.requestCode.toLowerCase().includes(q)) ||
+        a.customerName.toLowerCase().includes(q) ||
+        a.city.toLowerCase().includes(q) ||
+        a.propertyType.toLowerCase().includes(q)
+    );
+  };
+
+  const filteredQuotations = (list: InteriorQuotation[]) => {
+    let result = list;
+    if (statusFilter !== 'ALL') {
+      result = result.filter((q) => q.status === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.quotationNumber.toLowerCase().includes(q) ||
+          item.customerName.toLowerCase().includes(q) ||
+          item.projectAddress.toLowerCase().includes(q) ||
+          item.propertyType.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  };
+
+  const renderAssignmentCard = (asgn: InteriorDesignerAssignment) => (
+    <div
+      key={asgn.id}
+      className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+    >
+      <div className="space-y-2 flex-1">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="font-mono font-black text-blue-800 text-xs">{asgn.assignmentCode}</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-bold">
+            {asgn.requestCode || asgn.requestId}
+          </span>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+              asgn.status === 'NEW'
+                ? 'bg-blue-100 text-blue-800 animate-pulse'
+                : asgn.status === 'ACCEPTED_BY_DESIGNER'
+                ? 'bg-emerald-100 text-emerald-800'
+                : asgn.status === 'QUOTATION_SUBMITTED'
+                ? 'bg-purple-100 text-purple-800'
+                : asgn.status === 'CLARIFICATION_REQUESTED'
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-rose-100 text-rose-800'
+            }`}
+          >
+            {asgn.status.replace(/_/g, ' ')}
+          </span>
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-navy-950 text-base">{asgn.propertyType}</h3>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <span>{asgn.projectLocation}, {asgn.city}</span>
+            </span>
+            <span>•</span>
+            <span className="font-bold text-slate-700">{asgn.carpetAreaSqFt} sq.ft</span>
+            <span>•</span>
+            <span className="text-slate-600">{asgn.roomCount}</span>
+            <span>•</span>
+            <span className="text-slate-600">Client: <strong>{asgn.customerName}</strong></span>
+          </div>
+        </div>
+
+        {/* Required Services Tags */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {asgn.requiredServices.map((srv, idx) => (
+            <span
+              key={idx}
+              className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium"
+            >
+              {srv}
+            </span>
+          ))}
+        </div>
+
+        {asgn.clarificationNote && (
+          <div className="p-2 rounded-xl bg-amber-50 text-amber-900 text-xs border border-amber-200">
+            <strong>Your Clarification Note:</strong> {asgn.clarificationNote}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:items-end justify-between gap-3 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
+        <div className="text-left sm:text-right">
+          <span className="text-[10px] uppercase font-bold text-slate-400 block">Homeowner Budget</span>
+          <span className="text-base font-black text-navy-950 font-mono">
+            {formatINR(asgn.targetBudget)}
+          </span>
+          <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
+            Deadline: {asgn.deadlineDate}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setViewAssignmentModal(asgn)}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Details</span>
+          </button>
+
+          {asgn.status === 'NEW' && (
+            <>
+              <button
+                onClick={() => handleAcceptAssignment(asgn)}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Accept</span>
+              </button>
+              <button
+                onClick={() => setDeclineModal({ open: true, assignment: asgn, reason: '' })}
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition flex items-center gap-1.5 border border-rose-200"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Decline</span>
+              </button>
+              <button
+                onClick={() => setClarifyModal({ open: true, assignment: asgn, note: '' })}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs transition flex items-center gap-1.5 border border-amber-200"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Clarify</span>
+              </button>
+            </>
+          )}
+
+          {(asgn.status === 'ACCEPTED_BY_DESIGNER' || asgn.status === 'QUOTATION_SUBMITTED') && (
+            <button
+              onClick={() => {
+                setSearchParams({ view: 'GENERATE_QUOTATION', createFor: asgn.id });
+              }}
+              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Build Quotation</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderQuotationCard = (q: InteriorQuotation) => (
+    <div
+      key={q.id}
+      className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+    >
+      <div className="space-y-2 flex-1">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="font-mono font-black text-blue-800 text-xs">{q.quotationNumber}</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-bold font-mono">
+            v{q.version || '1.0'}
+          </span>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+              q.status === 'ACCEPTED'
+                ? 'bg-emerald-100 text-emerald-800'
+                : q.status === 'APPROVED_BY_ADMIN' || q.status === 'SENT_TO_CUSTOMER'
+                ? 'bg-blue-100 text-blue-800'
+                : q.status === 'UNDER_ADMIN_REVIEW' || q.status === 'SUBMITTED'
+                ? 'bg-purple-100 text-purple-800'
+                : q.status === 'REVISION_REQUESTED'
+                ? 'bg-amber-100 text-amber-800'
+                : q.status === 'REJECTED'
+                ? 'bg-rose-100 text-rose-800'
+                : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            {q.status.replace(/_/g, ' ')}
+          </span>
+        </div>
+
+        <div>
+          <h3 className="font-extrabold text-navy-950 text-base">{q.propertyType}</h3>
+          <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+            <span>{q.projectAddress}</span>
+          </div>
+        </div>
+
+        <div className="text-xs text-slate-600">
+          Client: <span className="font-bold text-navy-950">{q.customerName}</span> ({q.customerPhone}) • {q.roomCount} • Timeline: {q.estimatedTimelineWeeks} Weeks
+        </div>
+
+        {q.adminFeedback && (
+          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs flex items-start gap-2.5 mt-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-amber-950 block">Admin Feedback / Remarks:</span>
+              <p className="text-amber-900 mt-0.5 leading-relaxed">{q.adminFeedback}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="text-left sm:text-right shrink-0 space-y-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
+        <div>
+          <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Quotation Value</span>
+          <span className="text-lg font-black text-navy-950 font-mono">{formatINR(q.grandTotal)}</span>
+          <span className="text-[10px] text-slate-500 block">Incl. 18% GST ({formatINR(q.taxAmount)})</span>
+        </div>
+
+        <div className="flex flex-wrap items-center sm:justify-end gap-2">
+          <button
+            onClick={() => setSelectedQuote(q)}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Inspect Breakdown</span>
+          </button>
+
+          {q.status === 'REVISION_REQUESTED' && (
+            <button
+              onClick={() => handleStartRevision(q)}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Revise to v{Math.floor(parseFloat(q.version || '1.0') || 1) + 1}.0</span>
+            </button>
+          )}
+
+          {q.status === 'REJECTED' && (
+            <button
+              onClick={() => handleStartRevision(q)}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Resubmit Revision</span>
+            </button>
+          )}
+
+          {q.status === 'ACCEPTED' && (
+            <Link
+              to="/interior-designer/projects"
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
+            >
+              <span>Track Site Project</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 font-sans pb-12">
@@ -437,196 +737,477 @@ export const InteriorDesignerQuotations: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-950 text-xs font-black uppercase font-mono mb-1.5 border border-blue-200">
             <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
-            <span>Section 7 • Complete Quotation Management Workflow</span>
+            <span>Module 3 • Interior Quotation Management</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black font-display text-navy-950">
             Interior Quotation Desk & BOQ Builder
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-            Inbound Admin assignments, room-wise scope builder (living, modular kitchen, wardrobes, false ceiling), professional deliverable fees, and versioned audit history.
+            Inbound homeowner leads, accepted assignments, room-by-room BOQ scope generation, admin approvals, customer sign-offs, and version history.
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingQuotationId(null);
-            setCurrentVersion('1.0');
-            setActiveTab('BUILDER');
-          }}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition flex items-center gap-2 shadow-md self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Quotation Builder</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Top View Selector Dropdown */}
+          <div className="relative">
+            <select
+              value={currentView}
+              onChange={(e) => setSearchParams({ view: e.target.value })}
+              className="appearance-none pl-3.5 pr-8 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs text-navy-950 focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
+            >
+              {VIEW_TABS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label} ({t.count})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setEditingQuotationId(null);
+              setCurrentVersion('1.0');
+              setSearchParams({ view: 'GENERATE_QUOTATION' });
+            }}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition flex items-center gap-2 shadow-md shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New Quotation</span>
+            <span className="sm:hidden">New</span>
+          </button>
+        </div>
       </div>
 
-      {/* ---------------- TABS (Matching Section 7) ---------------- */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-        {[
-          { tab: 'ASSIGNED', label: '1. Assigned Requests', count: assignments.length },
-          { tab: 'BUILDER', label: '2. Quotation Builder (BOQ)', count: lineItems.length },
-          { tab: 'UNDER_ADMIN_REVIEW', label: '3. Under Admin Review', count: submittedQuotes.length },
-          { tab: 'CUSTOMER_APPROVED', label: '4. Customer Accepted', count: acceptedQuotes.length },
-          { tab: 'REVISIONS', label: '5. Revisions & Versions', count: revisionQuotes.length },
-        ].map((t) => (
-          <button
-            key={t.tab}
-            onClick={() => setActiveTab(t.tab as any)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === t.tab
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <span>{t.label}</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
-                activeTab === t.tab ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+      {/* ---------------- 11-PILL ACTION STRIP ---------------- */}
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs overflow-x-auto scrollbar-thin">
+        {VIEW_TABS.map((t) => {
+          const isSelected = currentView === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => {
+                setSearchParams({ view: t.id });
+                setSearchQuery('');
+              }}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                isSelected
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-navy-950'
               }`}
             >
-              {t.count}
-            </span>
-          </button>
-        ))}
+              <span>{t.label}</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
+      {/* ---------------- SEARCH & FILTER BAR (Active on list views) ---------------- */}
+      {currentView !== 'GENERATE_QUOTATION' && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by code, customer name, property type, or city..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          {currentView === 'QUOTATION_LIST' && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="UNDER_ADMIN_REVIEW">Under Review</option>
+                <option value="APPROVED_BY_ADMIN">Approved by Admin</option>
+                <option value="SENT_TO_CUSTOMER">Sent to Customer</option>
+                <option value="ACCEPTED">Customer Accepted</option>
+                <option value="REVISION_REQUESTED">Revision Required</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ========================================================================= */}
-      {/* TAB 1: ASSIGNED REQUESTS (Section 7 Steps 1 & 2)                          */}
+      {/* 1. NEW QUOTATION REQUESTS VIEW                                            */}
       {/* ========================================================================= */}
-      {activeTab === 'ASSIGNED' && (
+      {currentView === 'NEW_REQUESTS' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-blue-950">
               <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
               <span>
-                <strong>Admin Assignment Rule:</strong> Homeowner requests are pre-screened and assigned by BuildGhar Admin. Review brief details and click <strong>Accept</strong> or <strong>Decline</strong> before generating quotation.
+                <strong>New Inbound Requests:</strong> Homeowner project inquiries assigned to your studio. Review specifications and <strong>Accept</strong>, <strong>Decline</strong>, or <strong>Ask Clarification</strong>.
               </span>
             </div>
             <span className="text-[11px] font-mono font-bold text-blue-900 bg-white px-3 py-1 rounded-full border border-blue-200 shrink-0">
-              Strict Centralized Routing
+              Action Required ({newAssignments.length})
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {assignments.map((asgn) => (
+            {filteredAssignments(newAssignments).length > 0 ? (
+              filteredAssignments(newAssignments).map((asgn) => renderAssignmentCard(asgn))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center space-y-3">
+                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                <h4 className="font-extrabold text-navy-950 text-sm">All New Requests Actioned</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  You have responded to all new inbound quotation requests. Check "Accepted Assignments" to build estimates or explore "Assigned Requests" for full history.
+                </p>
+                <button
+                  onClick={() => setSearchParams({ view: 'ASSIGNED_REQUESTS' })}
+                  className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-xs transition"
+                >
+                  View All Assigned Requests
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. ASSIGNED REQUESTS VIEW                                                  */}
+      {/* ========================================================================= */}
+      {currentView === 'ASSIGNED_REQUESTS' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-800">
+              <FileCheck2 className="w-5 h-5 text-slate-600 shrink-0" />
+              <span>
+                <strong>Assigned Requests Repository:</strong> Complete directory of all homeowner requests dispatched by BuildGhar Admin to your studio.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-slate-700 bg-white px-3 py-1 rounded-full border border-slate-200 shrink-0">
+              Total ({assignments.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredAssignments(assignments).length > 0 ? (
+              filteredAssignments(assignments).map((asgn) => renderAssignmentCard(asgn))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No assignments match your search query.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. ACCEPTED ASSIGNMENTS VIEW                                               */}
+      {/* ========================================================================= */}
+      {currentView === 'ACCEPTED_ASSIGNMENTS' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-emerald-950">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Accepted Assignments:</strong> Briefs accepted by your studio. Click <strong>Build Quotation</strong> to open the BOQ calculator with pre-populated client details.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-emerald-900 bg-white px-3 py-1 rounded-full border border-emerald-200 shrink-0">
+              Ready to Quote ({acceptedAssignments.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredAssignments(acceptedAssignments).length > 0 ? (
+              filteredAssignments(acceptedAssignments).map((asgn) => renderAssignmentCard(asgn))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center space-y-3">
+                <Info className="w-10 h-10 text-blue-500 mx-auto" />
+                <h4 className="font-extrabold text-navy-950 text-sm">No Accepted Assignments Pending</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Accept new requests from the "New Quotation Requests" desk to begin preparing interior estimates.
+                </p>
+                <button
+                  onClick={() => setSearchParams({ view: 'NEW_REQUESTS' })}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition"
+                >
+                  Review New Requests
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. QUOTATION LIST VIEW (Master Directory)                                  */}
+      {/* ========================================================================= */}
+      {currentView === 'QUOTATION_LIST' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-blue-950">
+              <Layers className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>
+                <strong>Quotation Directory:</strong> Master registry of all estimates created by your studio across all lifecycle phases.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-blue-900 bg-white px-3 py-1 rounded-full border border-blue-200 shrink-0">
+              Total Quotations ({quotations.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(quotations).length > 0 ? (
+              filteredQuotations(quotations).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No quotations match the selected filters.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. PENDING ADMIN REVIEW VIEW                                               */}
+      {/* ========================================================================= */}
+      {currentView === 'PENDING_ADMIN_REVIEW' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-purple-950">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
+              <span>
+                <strong>Admin Clearance Stage:</strong> Interior quotations submitted to BuildGhar Quality & Pricing Desk. Once verified, they are released to the customer.
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-purple-200 shrink-0">
+              Clearance In Progress ({pendingAdminReviewQuotes.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(pendingAdminReviewQuotes).length > 0 ? (
+              filteredQuotations(pendingAdminReviewQuotes).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No quotations currently under Admin review.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. APPROVED QUOTATIONS VIEW                                                */}
+      {/* ========================================================================= */}
+      {currentView === 'APPROVED_QUOTATIONS' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>
+                <strong>Admin Approved Quotations:</strong> Estimates vetted and cleared by Admin, presented to the homeowner for final agreement.
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-blue-200 shrink-0">
+              Approved & Forwarded ({approvedQuotes.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(approvedQuotes).length > 0 ? (
+              filteredQuotations(approvedQuotes).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No approved quotations found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 8. REJECTED QUOTATIONS VIEW                                                */}
+      {/* ========================================================================= */}
+      {currentView === 'REJECTED_QUOTATIONS' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-rose-950">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>
+                <strong>Rejected Quotations:</strong> Estimates declined by Admin or Customer. Review feedback remarks, adjust rates or scope, and click Resubmit Revision.
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-rose-200 shrink-0">
+              Rejected ({rejectedQuotes.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(rejectedQuotes).length > 0 ? (
+              filteredQuotations(rejectedQuotes).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No rejected quotations on record. Excellent quality accuracy!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 9. REVISION REQUIRED VIEW                                                  */}
+      {/* ========================================================================= */}
+      {currentView === 'REVISION_REQUIRED' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-950">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>
+                <strong>Revision Required:</strong> Modifications requested by Admin or Client. Click <strong>Revise</strong> to generate next version snapshot (v1.0 ➔ v2.0).
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-amber-200 shrink-0">
+              Revisions Due ({revisionQuotes.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(revisionQuotes).length > 0 ? (
+              filteredQuotations(revisionQuotes).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No quotations currently pending revision.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 10. CUSTOMER ACCEPTED QUOTATIONS VIEW                                      */}
+      {/* ========================================================================= */}
+      {currentView === 'CUSTOMER_ACCEPTED' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-emerald-950">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Customer Accepted Contracts:</strong> Homeowners confirmed and accepted estimates. These bind deliverables, milestone payments, and escrow disbursements.
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
+              Active Contracts ({acceptedQuotes.length})
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredQuotations(acceptedQuotes).length > 0 ? (
+              filteredQuotations(acceptedQuotes).map((q) => renderQuotationCard(q))
+            ) : (
+              <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                No customer accepted quotations found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 11. QUOTATION HISTORY & VERSION TIMELINE VIEW                              */}
+      {/* ========================================================================= */}
+      {currentView === 'QUOTATION_HISTORY' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-100 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-800">
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>
+                <strong>Quotation Audit History:</strong> Chronological lifecycle audit trail of versions, modifications, client actions, and approvals across all estimates.
+              </span>
+            </div>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-full border border-slate-200 shrink-0">
+              Audit Stream Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {quotations.map((q) => (
               <div
-                key={asgn.id}
-                className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                key={q.id}
+                className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition space-y-3"
               >
-                <div className="space-y-2 flex-1">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-mono font-black text-blue-800 text-xs">{asgn.assignmentCode}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-bold">
-                      {asgn.requestCode || asgn.requestId}
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                        asgn.status === 'NEW'
-                          ? 'bg-blue-100 text-blue-800 animate-pulse'
-                          : asgn.status === 'ACCEPTED_BY_DESIGNER'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : asgn.status === 'QUOTATION_SUBMITTED'
-                          ? 'bg-purple-100 text-purple-800'
-                          : asgn.status === 'CLARIFICATION_REQUESTED'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {asgn.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
                   <div>
-                    <h3 className="font-extrabold text-navy-950 text-base">{asgn.propertyType}</h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{asgn.projectLocation}, {asgn.city}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-blue-800 text-xs">{q.quotationNumber}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-bold font-mono">
+                        v{q.version || '1.0'}
                       </span>
-                      <span>•</span>
-                      <span className="font-bold text-slate-700">{asgn.carpetAreaSqFt} sq.ft</span>
-                      <span>•</span>
-                      <span className="text-slate-600">{asgn.roomCount}</span>
-                    </div>
-                  </div>
-
-                  {/* Required Services Tags */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {asgn.requiredServices.map((srv, idx) => (
                       <span
-                        key={idx}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium"
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          q.status === 'ACCEPTED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : q.status === 'REVISION_REQUESTED'
+                            ? 'bg-amber-100 text-amber-800'
+                            : q.status === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
                       >
-                        {srv}
+                        {q.status.replace(/_/g, ' ')}
                       </span>
-                    ))}
+                    </div>
+                    <div className="text-xs text-slate-600 mt-1">
+                      Client: <strong>{q.customerName}</strong> • {q.propertyType} • {q.projectAddress}
+                    </div>
                   </div>
 
-                  {/* Additional notes / clarification banner */}
-                  {asgn.clarificationNote && (
-                    <div className="p-2 rounded-xl bg-amber-50 text-amber-900 text-xs border border-amber-200">
-                      <strong>Your Clarification Note:</strong> {asgn.clarificationNote}
-                    </div>
-                  )}
+                  <div className="text-right">
+                    <span className="text-sm font-mono font-black text-navy-950 block">{formatINR(q.grandTotal)}</span>
+                    <span className="text-[10px] text-slate-400">Created: {new Date(q.createdAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:items-end justify-between gap-3 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-                  <div className="text-left sm:text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Homeowner Budget</span>
-                    <span className="text-base font-black text-navy-950 font-mono">
-                      {formatINR(asgn.targetBudget)}
-                    </span>
-                    <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
-                      Deadline: {asgn.deadlineDate}
-                    </span>
-                  </div>
+                {/* Timeline Events for this Quote */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Lifecycle Transitions & Version History</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="font-mono font-bold text-navy-950">v{q.version || '1.0'} (Active Version)</span>
+                        <span className="text-[10px] text-slate-500 block">Status: {q.status.replace(/_/g, ' ')}</span>
+                      </div>
+                      <span className="font-mono font-bold text-slate-800">{formatINR(q.grandTotal)}</span>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => setViewAssignmentModal(asgn)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Details</span>
-                    </button>
-
-                    {asgn.status === 'NEW' && (
-                      <>
-                        <button
-                          onClick={() => handleAcceptAssignment(asgn)}
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Accept</span>
-                        </button>
-                        <button
-                          onClick={() => setDeclineModal({ open: true, assignment: asgn, reason: '' })}
-                          className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition flex items-center gap-1.5 border border-rose-200"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          <span>Decline</span>
-                        </button>
-                        <button
-                          onClick={() => setClarifyModal({ open: true, assignment: asgn, note: '' })}
-                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs transition flex items-center gap-1.5 border border-amber-200"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>Clarify</span>
-                        </button>
-                      </>
-                    )}
-
-                    {asgn.status === 'ACCEPTED_BY_DESIGNER' && (
-                      <button
-                        onClick={() => {
-                          setSearchParams({ createFor: asgn.id });
-                        }}
-                        className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
+                    {q.versionHistory?.map((vh, i) => (
+                      <div
+                        key={i}
+                        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Build Quotation</span>
-                      </button>
-                    )}
+                        <div>
+                          <span className="font-mono font-bold text-slate-700">v{vh.versionNumber} (Snapshot)</span>
+                          <span className="text-[10px] text-slate-500 block">{vh.createdAt}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-slate-800">{formatINR(vh.grandTotal)}</span>
+                          <span className="text-[10px] text-slate-400 block">{vh.lineItemsCount} items</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -636,9 +1217,9 @@ export const InteriorDesignerQuotations: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: DETAILED ROOM-WISE QUOTATION BUILDER (Section 7 Step 3)             */}
+      {/* 4. DETAILED ROOM-WISE QUOTATION BUILDER (BOQ BUILDER)                      */}
       {/* ========================================================================= */}
-      {activeTab === 'BUILDER' && (
+      {currentView === 'GENERATE_QUOTATION' && (
         <div className="space-y-6">
           {/* Builder Top Bar */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
@@ -1133,271 +1714,7 @@ export const InteriorDesignerQuotations: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3: UNDER ADMIN REVIEW (Section 7 Step 4)                               */}
-      {/* ========================================================================= */}
-      {activeTab === 'UNDER_ADMIN_REVIEW' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-between text-xs text-purple-950">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
-              <span>
-                <strong>Admin Clearance Stage:</strong> All interior design quotations must be reviewed and approved by BuildGhar Admin before being released to the customer.
-              </span>
-            </div>
-            <span className="font-mono font-bold bg-white px-2.5 py-0.5 rounded-full border border-purple-200">
-              Governance Guard Active
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {submittedQuotes.map((q) => (
-              <div
-                key={q.id}
-                className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-              >
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-black text-blue-800 text-xs">{q.quotationNumber}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-bold font-mono">
-                      v{q.version || '1.0'}
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                        q.status === 'APPROVED_BY_ADMIN'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : q.status === 'UNDER_ADMIN_REVIEW' || q.status === 'SUBMITTED'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {q.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="font-extrabold text-navy-950 text-base">{q.propertyType}</h3>
-                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                      <span>{q.projectAddress}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-600">
-                    Client: <span className="font-bold text-navy-950">{q.customerName}</span> • {q.roomCount} • Timeline: {q.estimatedTimelineWeeks} Weeks
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right shrink-0 space-y-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Quotation Value</span>
-                    <span className="text-lg font-black text-navy-950 font-mono">{formatINR(q.grandTotal)}</span>
-                    <span className="text-[10px] text-slate-500 block">Incl. 18% GST ({formatINR(q.taxAmount)})</span>
-                  </div>
-
-                  <div className="flex items-center sm:justify-end gap-2">
-                    <button
-                      onClick={() => setSelectedQuote(q)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Inspect Breakdown</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 4: CUSTOMER ACCEPTED QUOTATIONS (Section 7 Step 5)                     */}
-      {/* ========================================================================= */}
-      {activeTab === 'CUSTOMER_APPROVED' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-950">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>
-                <strong>Legally Binding Contracts:</strong> Customer accepted quotations are permanently preserved and locked for compliance. These define milestone deliverables and escrow payouts.
-              </span>
-            </div>
-            <span className="font-mono font-bold bg-white px-2.5 py-0.5 rounded-full border border-emerald-200">
-              Locked & Immutable
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {acceptedQuotes.map((q) => (
-              <div
-                key={q.id}
-                className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-emerald-300 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-              >
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-black text-blue-800 text-xs">{q.quotationNumber}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-bold font-mono">
-                      v{q.version || '1.0'}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800">
-                      CUSTOMER ACCEPTED
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[10px] font-mono font-bold">
-                      Contract Active
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="font-extrabold text-navy-950 text-base">{q.propertyType}</h3>
-                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{q.projectAddress}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-600">
-                    Homeowner: <span className="font-bold text-navy-950">{q.customerName}</span> ({q.customerPhone}) • {q.roomCount}
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right shrink-0 space-y-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Accepted Contract Value</span>
-                    <span className="text-lg font-black text-emerald-700 font-mono">{formatINR(q.grandTotal)}</span>
-                    <span className="text-[10px] text-slate-500 block">4 Escrow Milestones Scheduled</span>
-                  </div>
-
-                  <div className="flex items-center sm:justify-end gap-2">
-                    <button
-                      onClick={() => setSelectedQuote(q)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Inspect Contract</span>
-                    </button>
-                    <Link
-                      to="/interior-designer/projects"
-                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <span>Track Site Project</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 5: REVISIONS & VERSION HISTORY (Section 7 Version Control)            */}
-      {/* ========================================================================= */}
-      {activeTab === 'REVISIONS' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs text-amber-950">
-            <div className="flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 text-amber-600 shrink-0" />
-              <span>
-                <strong>Quotation Version Control:</strong> Every modification creates a new major version (v1.0 ➔ v2.0). Review Admin feedback, apply scope corrections, and resubmit.
-              </span>
-            </div>
-            <span className="font-mono font-bold bg-white px-2.5 py-0.5 rounded-full border border-amber-200">
-              Audit Versioning
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {quotations
-              .filter((q) => q.status === 'REVISION_REQUESTED' || (q.versionHistory && q.versionHistory.length > 0))
-              .map((q) => (
-                <div
-                  key={q.id}
-                  className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs hover:border-amber-300 transition space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-blue-800 text-xs">{q.quotationNumber}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold font-mono">
-                          Current v{q.version || '1.0'}
-                        </span>
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            q.status === 'REVISION_REQUESTED'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {q.status.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-600 mt-1">
-                        Client: <span className="font-bold text-navy-950">{q.customerName}</span> • {q.propertyType}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setSelectedQuote(q)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
-                      >
-                        Inspect Versions
-                      </button>
-                      {q.status === 'REVISION_REQUESTED' && (
-                        <button
-                          onClick={() => handleStartRevision(q)}
-                          className="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Revise to v{Math.floor(parseFloat(q.version || '1.0') || 1) + 1}.0</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Admin Feedback Box */}
-                  {q.adminFeedback && (
-                    <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs flex items-start gap-2.5">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-amber-950 block">Admin Feedback Remarks:</span>
-                        <p className="text-amber-900 mt-0.5 leading-relaxed">{q.adminFeedback}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Version History List */}
-                  {q.versionHistory && q.versionHistory.length > 0 && (
-                    <div className="pt-2 border-t border-slate-100 space-y-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Archived Version Snapshots
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {q.versionHistory.map((vh, i) => (
-                          <div
-                            key={i}
-                            className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs flex items-center justify-between"
-                          >
-                            <div>
-                              <span className="font-mono font-bold text-navy-950">v{vh.versionNumber}</span>
-                              <span className="text-[10px] text-slate-500 block">{vh.createdAt}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="font-mono font-bold text-slate-800">{formatINR(vh.grandTotal)}</span>
-                              <span className="text-[10px] text-slate-400 block">{vh.lineItemsCount} items</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL: INSPECT QUOTATION DETAILS & PDF PREVIEW BREAKDOWN                  */}
