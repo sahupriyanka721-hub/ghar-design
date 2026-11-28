@@ -153,6 +153,22 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Completed Visits', path: '/interior-designer/site-management?view=COMPLETED_VISITS', view: 'COMPLETED_VISITS' },
       ],
     },
+    {
+      label: '8. Project Execution & Coordination',
+      path: '/interior-designer/execution',
+      icon: Briefcase,
+      subItems: [
+        { label: 'Execution Planning', path: '/interior-designer/execution?view=EXECUTION_PLANNING', view: 'EXECUTION_PLANNING' },
+        { label: 'Work Instructions', path: '/interior-designer/execution?view=WORK_INSTRUCTIONS', view: 'WORK_INSTRUCTIONS' },
+        { label: 'Vendor Coordination', path: '/interior-designer/execution?view=VENDOR_COORDINATION', view: 'VENDOR_COORDINATION' },
+        { label: 'Material Coordination', path: '/interior-designer/execution?view=MATERIAL_COORDINATION', view: 'MATERIAL_COORDINATION' },
+        { label: 'Contractor Coordination', path: '/interior-designer/execution?view=CONTRACTOR_COORDINATION', view: 'CONTRACTOR_COORDINATION' },
+        { label: 'Installation Schedule', path: '/interior-designer/execution?view=INSTALLATION_SCHEDULE', view: 'INSTALLATION_SCHEDULE' },
+        { label: 'Work Inspection', path: '/interior-designer/execution?view=WORK_INSPECTION', view: 'WORK_INSPECTION' },
+        { label: 'Site Progress Reports', path: '/interior-designer/execution?view=PROGRESS_REPORTS', view: 'PROGRESS_REPORTS' },
+        { label: 'Issues & Delays', path: '/interior-designer/execution?view=ISSUES_DELAYS', view: 'ISSUES_DELAYS' },
+      ],
+    },
     { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
     { label: 'I. Client Management', path: '/interior-designer/clients', icon: Users },
     { label: 'J. Communication Desk', path: '/interior-designer/messages', icon: MessageSquare },
@@ -343,7 +359,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                 (sub.view === 'NEW_REQUESTS' ||
                                   sub.view === 'MY_PROJECTS' ||
                                   sub.view === 'DESIGN_BRIEFS' ||
-                                  sub.view === 'CREATE_BOQ')));
+                                  sub.view === 'CREATE_BOQ' ||
+                                  sub.view === 'EXECUTION_PLANNING')));
 
                           return (
                             <Link
