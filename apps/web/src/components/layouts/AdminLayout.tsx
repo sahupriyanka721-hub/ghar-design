@@ -350,7 +350,29 @@ export const AdminLayout: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   // All submenus closed by default; only open when explicitly clicked by user
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  // Quick Section Category Filter for 0-scroll navigation: 'ALL' | 0 | 1 | 2 | 3 | 4
+  const [activeSectionFilter, setActiveSectionFilter] = useState<'ALL' | number>('ALL');
+  // Accordion state for the 5 navSections
+  const [openSections, setOpenSections] = useState<Record<number, boolean>>({
+    0: true,
+    1: true,
+    2: true,
+    3: true,
+    4: true,
+  });
   const { success } = useToast();
+
+  const toggleSection = (idx: number) => {
+    setOpenSections((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const expandAllSections = () => {
+    setOpenSections({ 0: true, 1: true, 2: true, 3: true, 4: true });
+  };
+
+  const collapseAllSections = () => {
+    setOpenSections({ 0: false, 1: false, 2: false, 3: false, 4: false });
+  };
 
   useEffect(() => {
     const onRoleSwitched = (e: any) => {
@@ -793,49 +815,22 @@ export const AdminLayout: React.FC = () => {
             { label: 'Project Status Settings', path: '/admin/services-config?view=PROJECT_STATUS_SETTINGS', view: 'PROJECT_STATUS_SETTINGS' },
           ],
         },
-        {
-          label: 'Admin User & Role Management',
-          path: '/admin/staff',
-          icon: Lock,
-          subItems: [
-            { label: 'Admin Users', path: '/admin/staff?view=ADMIN_USERS', view: 'ADMIN_USERS' },
-            { label: 'Create Admin', path: '/admin/staff?view=CREATE_ADMIN', view: 'CREATE_ADMIN' },
-            { label: 'Roles & Permissions', path: '/admin/staff?view=ROLES_PERMISSIONS', view: 'ROLES_PERMISSIONS' },
-            { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
-          ],
-        },
-        {
-          label: 'Platform Settings',
-          path: '/admin/settings',
-          icon: Sliders,
-          subItems: [
-            { label: 'General Settings', path: '/admin/settings?view=GENERAL_SETTINGS', view: 'GENERAL_SETTINGS' },
-            { label: 'Payment Gateway Settings', path: '/admin/settings?view=PAYMENT_GATEWAY', view: 'PAYMENT_GATEWAY' },
-            { label: 'Payout Settings', path: '/admin/settings?view=PAYOUT_SETTINGS', view: 'PAYOUT_SETTINGS' },
-            { label: 'OTP Settings', path: '/admin/settings?view=OTP_SETTINGS', view: 'OTP_SETTINGS' },
-            { label: 'Email/SMS Settings', path: '/admin/settings?view=EMAIL_SMS_SETTINGS', view: 'EMAIL_SMS_SETTINGS' },
-            { label: 'Tax Settings', path: '/admin/settings?view=TAX_SETTINGS', view: 'TAX_SETTINGS' },
-            { label: 'Document Settings', path: '/admin/settings?view=DOCUMENT_SETTINGS', view: 'DOCUMENT_SETTINGS' },
-            { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
-          ],
-        },
-        {
-          label: 'Security Audit Trail',
-          path: '/admin/audit-logs',
-          icon: ShieldCheck,
-          subItems: [
-            { label: 'Admin Activity', path: '/admin/audit-logs?view=ADMIN_ACTIVITY', view: 'ADMIN_ACTIVITY' },
-            { label: 'Customer Activity', path: '/admin/audit-logs?view=CUSTOMER_ACTIVITY', view: 'CUSTOMER_ACTIVITY' },
-            { label: 'Architect Activity', path: '/admin/audit-logs?view=ARCHITECT_ACTIVITY', view: 'ARCHITECT_ACTIVITY' },
-            { label: 'Payment Activity', path: '/admin/audit-logs?view=PAYMENT_ACTIVITY', view: 'PAYMENT_ACTIVITY' },
-            { label: 'Project Activity', path: '/admin/audit-logs?view=PROJECT_ACTIVITY', view: 'PROJECT_ACTIVITY' },
-            { label: 'Status Change History', path: '/admin/audit-logs?view=STATUS_HISTORY', view: 'STATUS_HISTORY' },
-            { label: 'Login History', path: '/admin/audit-logs?view=LOGIN_HISTORY', view: 'LOGIN_HISTORY' },
-          ],
-        },
       ],
     },
   ];
+
+  // Ensure the section containing the active path is automatically expanded
+  useEffect(() => {
+    const currentPath = location.pathname;
+    navSections.forEach((sec, idx) => {
+      const hasActive = (sec.items || []).some((it: any) =>
+        it.exact ? currentPath === it.path : currentPath.startsWith(it.path)
+      );
+      if (hasActive) {
+        setOpenSections((prev) => ({ ...prev, [idx]: true }));
+      }
+    });
+  }, [location.pathname]);
 
   const currentRoleMeta = ADMIN_ROLE_DEFINITIONS[activeRole] || ADMIN_ROLE_DEFINITIONS.SUPER_ADMIN;
   return (
@@ -1005,148 +1000,230 @@ export const AdminLayout: React.FC = () => {
           />
         )}
         {/* Dedicated Admin Light Blue Sidebar */}
-          <aside
-          className={`fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-64 bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
+        <aside
+          className={`fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-68 bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
         >
-          {/* Admin Navigation Menu */}
-          <div className="p-3 space-y-4 overflow-y-auto max-h-[calc(100vh-10rem)] text-xs scrollbar-thin scrollbar-thumb-blue-200">
-            {navSections.map((sec, secIdx) => (
-              <div key={secIdx} className="space-y-1">
-                <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-900/80 flex items-center justify-between">
-                  <span>{sec.title}</span>
-                  {secIdx === 0 && <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>}
-                </div>
-                {(sec.items || []).map((item: any) => {
-                  const isActive = item.exact
-                    ? location.pathname === item.path
-                    : location.pathname.startsWith(item.path);
-                  const Icon = item.icon;
-                  const hasSubItems = item.subItems && item.subItems.length > 0;
-                  const isExpanded = Boolean(expandedMenus[item.path]);
+          {/* Quick Category Filter Pills & Accordion Controls (0-Scroll Header) */}
+          <div className="p-2 border-b border-blue-200/80 bg-white/70 backdrop-blur-xs space-y-1.5 shrink-0">
+            <div className="flex items-center justify-between px-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-blue-600" />
+                <span>Categories</span>
+              </span>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={expandAllSections}
+                  className="hover:text-blue-700 font-bold transition cursor-pointer"
+                  title="Expand all menu sections"
+                >
+                  All
+                </button>
+                <span className="text-slate-300">/</span>
+                <button
+                  type="button"
+                  onClick={collapseAllSections}
+                  className="hover:text-blue-700 font-bold transition cursor-pointer"
+                  title="Collapse all menu sections"
+                >
+                  Collapse
+                </button>
+              </div>
+            </div>
 
-                  if (hasSubItems) {
-                    return (
-                      <div key={item.path} className="space-y-0.5">
-                        <div
-                          className={`flex items-center justify-between px-3 py-2 rounded-xl font-medium transition cursor-pointer select-none ${
-                            isActive
-                              ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30'
-                              : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
-                          }`}
-                          onClick={() => {
-                            setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
-                            if (!location.pathname.startsWith(item.path)) {
-                              navigate(item.path);
-                            }
-                          }}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
-                            <span className="truncate text-xs">{item.label}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
-                            }}
-                            className={`p-0.5 rounded-md hover:bg-white/20 transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                            aria-label="Toggle Submenu"
-                          >
-                            <ChevronDown
-                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`}
-                            />
-                          </button>
-                        </div>
+            {/* Category Filter Pills (Instant 1-Click Jump with 0 Scrolling) */}
+            <div className="grid grid-cols-6 gap-1 text-[10px] font-bold">
+              {[
+                { id: 'ALL', label: 'All' },
+                { id: 0, label: '1.Core' },
+                { id: 1, label: '2.Users' },
+                { id: 2, label: '3.Quote' },
+                { id: 3, label: '4.Proj' },
+                { id: 4, label: '5.Ops' },
+              ].map((pill) => {
+                const isSelected = activeSectionFilter === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveSectionFilter(pill.id as any);
+                      if (pill.id !== 'ALL') {
+                        setOpenSections((prev) => ({ ...prev, [pill.id as number]: true }));
+                      }
+                    }}
+                    className={`py-1 rounded-md text-center transition cursor-pointer font-bold truncate ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-2xs font-black'
+                        : 'bg-slate-100/90 text-slate-600 hover:bg-blue-50 hover:text-blue-900 border border-slate-200/60'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-                        {/* Collapsible Submenu Dropdown */}
-                        {isExpanded && (
-                          <div className="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-blue-300/80 ml-4.5 animate-in fade-in duration-150">
-                            {item.subItems.map((sub: any) => {
-                              const currentViewParam = new URLSearchParams(location.search).get('view');
-                              const isSubActive =
-                                location.pathname.startsWith(item.path) &&
-                                (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
+          {/* Admin Navigation Menu (Full Height Flex, Compact Density, Accordion) */}
+          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto text-xs scrollbar-thin scrollbar-thumb-blue-200">
+            {navSections.map((sec, secIdx) => {
+              if (activeSectionFilter !== 'ALL' && activeSectionFilter !== secIdx) {
+                return null;
+              }
+              const isSectionOpen = openSections[secIdx] ?? true;
 
-                              return (
-                                <Link
-                                  key={sub.path}
-                                  to={sub.path}
-                                  onClick={() => setSidebarOpen(false)}
-                                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition font-medium ${
-                                    isSubActive
-                                      ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                                      : 'text-slate-600 hover:text-blue-950 hover:bg-blue-100/60'
-                                  }`}
+              return (
+                <div key={secIdx} className="space-y-0.5 rounded-xl border border-blue-100/70 bg-white/50 p-1 shadow-2xs">
+                  {/* Collapsible Section Header Accordion Button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(secIdx)}
+                    className="w-full px-2 py-1 text-[10.5px] font-black uppercase tracking-wider text-blue-950 hover:text-blue-700 hover:bg-blue-50/80 rounded-lg flex items-center justify-between transition cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSectionOpen ? 'bg-blue-600' : 'bg-slate-400'} shrink-0`} />
+                      <span className="truncate">{sec.title}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
+                      <span className="text-[9px] font-mono font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
+                        {sec.items.length}
+                      </span>
+                      <ChevronDown
+                        className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${
+                          isSectionOpen ? 'rotate-180 text-blue-600' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Section Items */}
+                  {isSectionOpen && (
+                    <div className="space-y-0.5 pt-0.5 animate-in fade-in duration-150">
+                      {(sec.items || []).map((item: any) => {
+                        const isActive = item.exact
+                          ? location.pathname === item.path
+                          : location.pathname.startsWith(item.path);
+                        const Icon = item.icon;
+                        const hasSubItems = item.subItems && item.subItems.length > 0;
+                        const isExpanded = Boolean(expandedMenus[item.path]);
+
+                        if (hasSubItems) {
+                          return (
+                            <div key={item.path} className="space-y-0.5">
+                              <div
+                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg font-medium transition cursor-pointer select-none ${
+                                  isActive
+                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
+                                    : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
+                                }`}
+                                onClick={() => {
+                                  setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                                  if (!location.pathname.startsWith(item.path)) {
+                                    navigate(item.path);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                                  <span className="truncate text-[11.5px] leading-tight">{item.label}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                                  }}
+                                  className={`p-0.5 rounded-md hover:bg-white/20 transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                                  aria-label="Toggle Submenu"
                                 >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                      isSubActive ? 'bg-amber-300 scale-125' : 'bg-slate-300'
+                                  <ChevronDown
+                                    className={`w-3 h-3 transition-transform duration-200 ${
+                                      isExpanded ? 'rotate-180' : ''
                                     }`}
                                   />
-                                  <span className="truncate">{sub.label}</span>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
+                                </button>
+                              </div>
 
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl font-medium transition ${
-                        isActive
-                          ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-sm shadow-blue-500/20 border border-blue-400/30'
-                          : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
-                      <span className="truncate text-xs">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+                              {/* Collapsible Submenu Dropdown */}
+                              {isExpanded && (
+                                <div className="pl-3 pr-1 py-0.5 space-y-0.5 border-l-2 border-blue-300/80 ml-3.5 animate-in fade-in duration-150">
+                                  {item.subItems.map((sub: any) => {
+                                    const currentViewParam = new URLSearchParams(location.search).get('view');
+                                    const isSubActive =
+                                      location.pathname.startsWith(item.path) &&
+                                      (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
+
+                                    return (
+                                      <Link
+                                        key={sub.path}
+                                        to={sub.path}
+                                        onClick={() => setSidebarOpen(false)}
+                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10.5px] transition font-medium ${
+                                          isSubActive
+                                            ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                                            : 'text-slate-600 hover:text-blue-950 hover:bg-blue-100/60'
+                                        }`}
+                                      >
+                                        <span
+                                          className={`w-1 h-1 rounded-full shrink-0 ${
+                                            isSubActive ? 'bg-amber-300 scale-125' : 'bg-slate-300'
+                                          }`}
+                                        />
+                                        <span className="truncate">{sub.label}</span>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setSidebarOpen(false)}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium transition ${
+                              isActive
+                                ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
+                                : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
+                            }`}
+                          >
+                            <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                            <span className="truncate text-[11.5px] leading-tight">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {/* Bottom System Health Box */}
-          <div className="p-4 border-t border-blue-200/80 bg-blue-100/30 text-[10px] text-slate-600 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-navy-950 font-bold">
-                <Database className="w-3.5 h-3.5 text-blue-600" />
-                <span>MongoDB Atlas</span>
-              </div>
-              <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-bold border border-emerald-200">Connected</span>
+
+          {/* Slim Space-Saving Bottom Status Bar */}
+          <div className="px-3 py-2 border-t border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-slate-700">Atlas Online</span>
+              <span className="text-slate-300">•</span>
+              <span className="font-mono text-slate-400">v1.0</span>
             </div>
-            <div className="flex items-center justify-between text-slate-500 font-medium">
-              <span>Security Engine</span>
-              <span className="text-blue-900 font-semibold">RBAC Enforced</span>
-            </div>
-            <div className="pt-1 border-t border-blue-200/60 flex items-center justify-between text-slate-500 font-mono">
-              <span>GharDesign Core</span>
-              <span className="text-blue-950 font-bold">v1.0.0</span>
-            </div>
-          </div>
-          {/* Dedicated Sidebar Logout Button */}
-          <div className="p-3 border-t border-blue-200/80 bg-white/70 shrink-0">
             <button
               type="button"
               onClick={handleAdminLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl font-bold text-xs transition cursor-pointer shadow-2xs"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-bold transition cursor-pointer text-[10px]"
+              title="Log Out of Admin"
             >
-              <LogOut className="w-4 h-4 text-rose-600" />
-              <span>Log Out of Admin</span>
+              <LogOut className="w-3 h-3" />
+              <span>Logout</span>
             </button>
           </div>
-          </aside>
+        </aside>
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-[#edf4fc] via-[#f7faff] to-[#edf4fc]/70">
           {/* Full Screen Top Coverage Anchor */}
