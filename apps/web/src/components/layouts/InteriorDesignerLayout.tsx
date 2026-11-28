@@ -215,7 +215,19 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Deductions & Commission', path: '/interior-designer/billing?view=DEDUCTIONS_COMMISSION', view: 'DEDUCTIONS_COMMISSION' },
       ],
     },
-    { label: 'M. Reports & Analytics', path: '/interior-designer/reports', icon: BarChart3 },
+    {
+      label: '12. Reports & Analytics',
+      path: '/interior-designer/reports',
+      icon: BarChart3,
+      subItems: [
+        { label: 'Project Reports', path: '/interior-designer/reports?view=PROJECT_REPORTS', view: 'PROJECT_REPORTS' },
+        { label: 'Quotation Reports', path: '/interior-designer/reports?view=QUOTATION_REPORTS', view: 'QUOTATION_REPORTS' },
+        { label: 'Design Progress Reports', path: '/interior-designer/reports?view=DESIGN_PROGRESS_REPORTS', view: 'DESIGN_PROGRESS_REPORTS' },
+        { label: 'Milestone Reports', path: '/interior-designer/reports?view=MILESTONE_REPORTS', view: 'MILESTONE_REPORTS' },
+        { label: 'Earnings Reports', path: '/interior-designer/reports?view=EARNINGS_REPORTS', view: 'EARNINGS_REPORTS' },
+        { label: 'Performance Reports', path: '/interior-designer/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
+      ],
+    },
     { label: 'N. Support & Disputes', path: '/interior-designer/support', icon: LifeBuoy },
     { label: 'O. Notifications', path: '/interior-designer/notifications', icon: Bell },
     { label: 'P. Settings', path: '/interior-designer/settings', icon: Sliders },
@@ -404,7 +416,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                                   sub.view === 'EXECUTION_PLANNING' ||
                                   sub.view === 'PROJECT_MILESTONES' ||
                                   sub.view === 'ADMIN_MESSAGES' ||
-                                  sub.view === 'PROFESSIONAL_FEES')));
+                                  sub.view === 'PROFESSIONAL_FEES' ||
+                                  sub.view === 'PROJECT_REPORTS')));
 
                           return (
                             <Link
