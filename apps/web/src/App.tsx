@@ -392,6 +392,7 @@ export const App: React.FC = () => {
           <Route path="boq" element={<InteriorDesignerBOQ />} />
           <Route path="estimation" element={<InteriorDesignerBOQ />} />
           <Route path="site-management" element={<InteriorDesignerSiteManagement />} />
+          <Route path="site-visits" element={<InteriorDesignerSiteManagement />} />
           <Route path="milestones" element={<InteriorDesignerMilestones />} />
           <Route path="deliverables" element={<InteriorDesignerMilestones />} />
           <Route path="clients" element={<InteriorDesignerClients />} />

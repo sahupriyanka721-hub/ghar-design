@@ -3579,6 +3579,52 @@ export const TEST_SITE_VISITS: InteriorSiteVisit[] = [
     findingsNotes: 'Verify LED channel dimensions.',
     photos: ['https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600'],
   },
+  {
+    id: 'sv-103',
+    projectId: 'prj-int-3',
+    projectName: 'Sushant Lok Modern Art Deco Villa',
+    scheduledDate: '2026-11-29',
+    timeSlot: '10:00 AM - 12:00 PM',
+    purpose: 'Initial physical site measurement and structural column verification',
+    siteLocation: 'Plot 42, Block C, Sushant Lok 1, Gurugram',
+    status: 'SCHEDULED',
+    findingsNotes: 'Awaiting site visit confirmation with homeowner Vikramaditya Oberoi.',
+    photos: ['https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=600'],
+  },
+  {
+    id: 'sv-104',
+    projectId: 'prj-int-4',
+    projectName: 'DLF Phase 5 Super Luxury Duplex Villa',
+    scheduledDate: '2025-11-15',
+    visitDate: '2025-11-15',
+    timeSlot: '03:00 PM - 05:00 PM',
+    purpose: 'Final Snag Rectification & Client Handover Inspection',
+    siteLocation: 'Villa 12, Park Drive, DLF Phase 5, Gurugram',
+    status: 'COMPLETED',
+    findingsNotes: 'Zero pending snags. All joinery and marble surfaces verified in pristine condition.',
+    measurementsSummary: 'All room clearances verified 100% against approved CAD drawing.',
+    photos: [
+      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=600',
+      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600',
+    ],
+  },
+  {
+    id: 'sv-105',
+    projectId: 'prj-int-1',
+    projectName: 'DLF The Crest Penthouse Oasis',
+    scheduledDate: '2026-11-10',
+    visitDate: '2026-11-10',
+    timeSlot: '11:00 AM - 01:30 PM',
+    purpose: 'Initial 3D Laser Demarcation & Column Non-Destructive Check',
+    siteLocation: 'Tower 4, Flat 1802, DLF Phase 5, Gurugram',
+    status: 'COMPLETED',
+    findingsNotes: 'Laser measurements logged for living room, kitchen, and master suite.',
+    measurementsSummary: 'Living Room: 26 ft x 18 ft (Height 10.5 ft); Kitchen: 16 ft x 12 ft; Master Suite: 20 ft x 16 ft. Ceiling drop allowance 150mm verified.',
+    photos: [
+      'https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=600',
+      'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=600',
+    ],
+  },
 ];
 
 export const SEED_INTERIOR_SITE_VISITS: InteriorSiteVisit[] = TEST_SITE_VISITS;
@@ -3589,11 +3635,16 @@ export const getInteriorSiteVisits = (projectId?: string): InteriorSiteVisit[] =
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return projectId ? parsed.filter((v: InteriorSiteVisit) => v.projectId === projectId) : parsed;
+        // Merge missing defaults so new seed visits always appear
+        const existingIds = new Set(parsed.map((v: any) => v.id));
+        const missingDefaults = TEST_SITE_VISITS.filter((v) => !existingIds.has(v.id));
+        const combined = missingDefaults.length > 0 ? [...parsed, ...missingDefaults] : parsed;
+        return projectId ? combined.filter((v: InteriorSiteVisit) => v.projectId === projectId) : combined;
       }
     }
   } catch (e) {}
-  return projectId ? SEED_INTERIOR_SITE_VISITS.filter((v) => v.projectId === projectId) : SEED_INTERIOR_SITE_VISITS;
+  const defaults = TEST_SITE_VISITS;
+  return projectId ? defaults.filter((v) => v.projectId === projectId) : defaults;
 };
 
 export const saveInteriorSiteVisit = (visit: Partial<InteriorSiteVisit>): InteriorSiteVisit => {
