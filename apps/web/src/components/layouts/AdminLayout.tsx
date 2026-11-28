@@ -59,6 +59,7 @@ import {
   HelpCircle,
   FolderGit2,
   Globe,
+  Star,
 } from 'lucide-react';
 /**
  * AdminAuthGate
@@ -348,35 +349,8 @@ export const AdminLayout: React.FC = () => {
   const [activeRole, setActiveRoleState] = useState<MasterAdminRole>(getActiveAdminRole());
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  // All submenus closed by default; only open when explicitly clicked by user
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
-  // Quick Section Category Filter for 0-scroll navigation: 'ALL' | 0 | 1 | 2 | 3 | 4 | 5
-  const [activeSectionFilter, setActiveSectionFilter] = useState<'ALL' | number>('ALL');
-  // Accordion state for the 6 navSections: all sections open by default so all menus cover full sidebar height
-  const [openSections, setOpenSections] = useState<Record<number, boolean>>({
-    0: true,
-    1: true,
-    2: true,
-    3: true,
-    4: true,
-    5: true,
-  });
   const { success } = useToast();
-
-  const toggleSection = (idx: number) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
-
-  const expandAllSections = () => {
-    setOpenSections({ 0: true, 1: true, 2: true, 3: true, 4: true, 5: true });
-  };
-
-  const collapseAllSections = () => {
-    setOpenSections({ 0: false, 1: false, 2: false, 3: false, 4: false, 5: false });
-  };
 
   useEffect(() => {
     const onRoleSwitched = (e: any) => {
@@ -496,498 +470,350 @@ export const AdminLayout: React.FC = () => {
     setSearchQuery('');
   };
 
-  const navSections = [
+  const navItems = [
+    { label: 'Dashboard / Overview', path: '/admin', icon: LayoutDashboard, exact: true },
+    { label: 'Customer Management', path: '/admin/customers', icon: Users },
     {
-      title: '1. Core Governance & RBAC',
-      items: [
-        { label: 'Dashboard / Overview', path: '/admin', icon: LayoutDashboard, exact: true },
-        {
-          label: 'Admin User & Role Management',
-          path: '/admin/staff',
-          icon: Lock,
-          subItems: [
-            { label: 'Admin Users', path: '/admin/staff?view=ADMIN_USERS', view: 'ADMIN_USERS' },
-            { label: 'Create Admin', path: '/admin/staff?view=CREATE_ADMIN', view: 'CREATE_ADMIN' },
-            { label: 'Roles & Permissions', path: '/admin/staff?view=ROLES_PERMISSIONS', view: 'ROLES_PERMISSIONS' },
-            { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
-          ],
-        },
-        {
-          label: 'Security Audit Trail',
-          path: '/admin/audit-logs',
-          icon: ShieldCheck,
-          subItems: [
-            { label: 'Admin Activity', path: '/admin/audit-logs?view=ADMIN_ACTIVITY', view: 'ADMIN_ACTIVITY' },
-            { label: 'Customer Activity', path: '/admin/audit-logs?view=CUSTOMER_ACTIVITY', view: 'CUSTOMER_ACTIVITY' },
-            { label: 'Architect Activity', path: '/admin/audit-logs?view=ARCHITECT_ACTIVITY', view: 'ARCHITECT_ACTIVITY' },
-            { label: 'Payment Activity', path: '/admin/audit-logs?view=PAYMENT_ACTIVITY', view: 'PAYMENT_ACTIVITY' },
-            { label: 'Project Activity', path: '/admin/audit-logs?view=PROJECT_ACTIVITY', view: 'PROJECT_ACTIVITY' },
-            { label: 'Status Change History', path: '/admin/audit-logs?view=STATUS_HISTORY', view: 'STATUS_HISTORY' },
-            { label: 'Login History', path: '/admin/audit-logs?view=LOGIN_HISTORY', view: 'LOGIN_HISTORY' },
-          ],
-        },
-        {
-          label: 'Platform Settings',
-          path: '/admin/settings',
-          icon: Sliders,
-          subItems: [
-            { label: 'General Settings', path: '/admin/settings?view=GENERAL_SETTINGS', view: 'GENERAL_SETTINGS' },
-            { label: 'Payment Gateway Settings', path: '/admin/settings?view=PAYMENT_GATEWAY', view: 'PAYMENT_GATEWAY' },
-            { label: 'Payout Settings', path: '/admin/settings?view=PAYOUT_SETTINGS', view: 'PAYOUT_SETTINGS' },
-            { label: 'OTP Settings', path: '/admin/settings?view=OTP_SETTINGS', view: 'OTP_SETTINGS' },
-            { label: 'Email/SMS Settings', path: '/admin/settings?view=EMAIL_SMS_SETTINGS', view: 'EMAIL_SMS_SETTINGS' },
-            { label: 'Tax Settings', path: '/admin/settings?view=TAX_SETTINGS', view: 'TAX_SETTINGS' },
-            { label: 'Document Settings', path: '/admin/settings?view=DOCUMENT_SETTINGS', view: 'DOCUMENT_SETTINGS' },
-            { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
-          ],
-        },
+      label: 'Architect Management & COA',
+      path: '/admin/architects',
+      icon: Compass,
+      subItems: [
+        { label: 'All Architects', path: '/admin/architects?view=ALL', view: 'ALL' },
+        { label: 'New Applications', path: '/admin/architects?view=NEW_APPLICATIONS', view: 'NEW_APPLICATIONS' },
+        { label: 'Pending Verification', path: '/admin/architects?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
+        { label: 'KYC Verification', path: '/admin/architects?view=KYC_VERIFICATION', view: 'KYC_VERIFICATION' },
+        { label: 'Business Verification', path: '/admin/architects?view=BUSINESS_VERIFICATION', view: 'BUSINESS_VERIFICATION' },
+        { label: 'Qualification Verification', path: '/admin/architects?view=QUALIFICATION_VERIFICATION', view: 'QUALIFICATION_VERIFICATION' },
+        { label: 'Portfolio Review', path: '/admin/architects?view=PORTFOLIO_REVIEW', view: 'PORTFOLIO_REVIEW' },
+        { label: 'Approved Architects', path: '/admin/architects?view=APPROVED', view: 'APPROVED' },
+        { label: 'Rejected Applications', path: '/admin/architects?view=REJECTED', view: 'REJECTED' },
+        { label: 'Suspended Architects', path: '/admin/architects?view=SUSPENDED', view: 'SUSPENDED' },
+        { label: 'Architect Performance', path: '/admin/architects?view=PERFORMANCE', view: 'PERFORMANCE' },
+        { label: 'Architect Payment Details', path: '/admin/architects?view=PAYMENT_DETAILS', view: 'PAYMENT_DETAILS' },
+      ],
+    },
+    { label: 'Contractor Directory & KYC', path: '/admin/contractors', icon: HardHat },
+    { label: 'Interior Designers Network', path: '/admin/interior-designers', icon: Palette },
+    { label: 'Material Vendors & Depots', path: '/admin/vendors', icon: Store },
+    {
+      label: 'Quotation Request Management',
+      path: '/admin/requests',
+      icon: FileText,
+      subItems: [
+        { label: 'New Quotation Requests', path: '/admin/requests?view=NEW_REQUESTS', view: 'NEW_REQUESTS' },
+        { label: 'Pending Assignment', path: '/admin/requests?view=PENDING_ASSIGNMENT', view: 'PENDING_ASSIGNMENT' },
+        { label: 'Assigned Requests', path: '/admin/requests?view=ASSIGNED', view: 'ASSIGNED' },
+        { label: 'Request Clarification', path: '/admin/requests?view=CLARIFICATION', view: 'CLARIFICATION' },
+        { label: 'Request History', path: '/admin/requests?view=HISTORY', view: 'HISTORY' },
+        { label: 'Cancelled Requests', path: '/admin/requests?view=CANCELLED', view: 'CANCELLED' },
       ],
     },
     {
-      title: '2. Stakeholder Ecosystem & KYC',
-      items: [
-        { label: 'Customer Management', path: '/admin/customers', icon: Users },
-        {
-          label: 'Architect Management & COA',
-          path: '/admin/architects',
-          icon: Compass,
-          subItems: [
-            { label: 'All Architects', path: '/admin/architects?view=ALL', view: 'ALL' },
-            { label: 'New Applications', path: '/admin/architects?view=NEW_APPLICATIONS', view: 'NEW_APPLICATIONS' },
-            { label: 'Pending Verification', path: '/admin/architects?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
-            { label: 'KYC Verification', path: '/admin/architects?view=KYC_VERIFICATION', view: 'KYC_VERIFICATION' },
-            { label: 'Business Verification', path: '/admin/architects?view=BUSINESS_VERIFICATION', view: 'BUSINESS_VERIFICATION' },
-            { label: 'Qualification Verification', path: '/admin/architects?view=QUALIFICATION_VERIFICATION', view: 'QUALIFICATION_VERIFICATION' },
-            { label: 'Portfolio Review', path: '/admin/architects?view=PORTFOLIO_REVIEW', view: 'PORTFOLIO_REVIEW' },
-            { label: 'Approved Architects', path: '/admin/architects?view=APPROVED', view: 'APPROVED' },
-            { label: 'Rejected Applications', path: '/admin/architects?view=REJECTED', view: 'REJECTED' },
-            { label: 'Suspended Architects', path: '/admin/architects?view=SUSPENDED', view: 'SUSPENDED' },
-            { label: 'Architect Performance', path: '/admin/architects?view=PERFORMANCE', view: 'PERFORMANCE' },
-            { label: 'Architect Payment Details', path: '/admin/architects?view=PAYMENT_DETAILS', view: 'PAYMENT_DETAILS' },
-          ],
-        },
-        { label: 'Contractor Directory & KYC', path: '/admin/contractors', icon: HardHat },
-        { label: 'Interior Designers Network', path: '/admin/interior-designers', icon: Palette },
-        { label: 'Material Vendors & Depots', path: '/admin/vendors', icon: Store },
+      label: 'Architect Assignment Management',
+      path: '/admin/assignments',
+      icon: Briefcase,
+      subItems: [
+        { label: 'Assign Architect', path: '/admin/assignments?view=ASSIGN_ARCHITECT', view: 'ASSIGN_ARCHITECT' },
+        { label: 'Reassign Architect', path: '/admin/assignments?view=REASSIGN_ARCHITECT', view: 'REASSIGN_ARCHITECT' },
+        { label: 'Multiple Architect Assignment', path: '/admin/assignments?view=MULTI_ASSIGNMENT', view: 'MULTI_ASSIGNMENT' },
+        { label: 'Assignment History', path: '/admin/assignments?view=HISTORY', view: 'HISTORY' },
+        { label: 'Architect Availability', path: '/admin/assignments?view=AVAILABILITY', view: 'AVAILABILITY' },
+        { label: 'Assignment Performance', path: '/admin/assignments?view=PERFORMANCE', view: 'PERFORMANCE' },
       ],
     },
     {
-      title: '3. Quotation & Assignment Desk',
-      items: [
-        {
-          label: 'Quotation Request Management',
-          path: '/admin/requests',
-          icon: FileText,
-          subItems: [
-            { label: 'New Quotation Requests', path: '/admin/requests?view=NEW_REQUESTS', view: 'NEW_REQUESTS' },
-            { label: 'Pending Assignment', path: '/admin/requests?view=PENDING_ASSIGNMENT', view: 'PENDING_ASSIGNMENT' },
-            { label: 'Assigned Requests', path: '/admin/requests?view=ASSIGNED', view: 'ASSIGNED' },
-            { label: 'Request Clarification', path: '/admin/requests?view=CLARIFICATION', view: 'CLARIFICATION' },
-            { label: 'Request History', path: '/admin/requests?view=HISTORY', view: 'HISTORY' },
-            { label: 'Cancelled Requests', path: '/admin/requests?view=CANCELLED', view: 'CANCELLED' },
-          ],
-        },
-        {
-          label: 'Architect Assignment Management',
-          path: '/admin/assignments',
-          icon: Briefcase,
-          subItems: [
-            { label: 'Assign Architect', path: '/admin/assignments?view=ASSIGN_ARCHITECT', view: 'ASSIGN_ARCHITECT' },
-            { label: 'Reassign Architect', path: '/admin/assignments?view=REASSIGN_ARCHITECT', view: 'REASSIGN_ARCHITECT' },
-            { label: 'Multiple Architect Assignment', path: '/admin/assignments?view=MULTI_ASSIGNMENT', view: 'MULTI_ASSIGNMENT' },
-            { label: 'Assignment History', path: '/admin/assignments?view=HISTORY', view: 'HISTORY' },
-            { label: 'Architect Availability', path: '/admin/assignments?view=AVAILABILITY', view: 'AVAILABILITY' },
-            { label: 'Assignment Performance', path: '/admin/assignments?view=PERFORMANCE', view: 'PERFORMANCE' },
-          ],
-        },
-        {
-          label: 'Quotation Management',
-          path: '/admin/quotations',
-          icon: FileCheck2,
-          subItems: [
-            { label: 'Pending Architect Quotations', path: '/admin/quotations?view=PENDING_ARCHITECT', view: 'PENDING_ARCHITECT' },
-            { label: 'Quotation Under Review', path: '/admin/quotations?view=UNDER_REVIEW', view: 'UNDER_REVIEW' },
-            { label: 'Approved Quotations', path: '/admin/quotations?view=APPROVED', view: 'APPROVED' },
-            { label: 'Rejected Quotations', path: '/admin/quotations?view=REJECTED', view: 'REJECTED' },
-            { label: 'Revision Required', path: '/admin/quotations?view=REVISION_REQUIRED', view: 'REVISION_REQUIRED' },
-            { label: 'Sent to Customer', path: '/admin/quotations?view=SENT_TO_CUSTOMER', view: 'SENT_TO_CUSTOMER' },
-            { label: 'Customer Accepted Quotations', path: '/admin/quotations?view=CUSTOMER_ACCEPTED', view: 'CUSTOMER_ACCEPTED' },
-            { label: 'Customer Rejected Quotations', path: '/admin/quotations?view=CUSTOMER_REJECTED', view: 'CUSTOMER_REJECTED' },
-            { label: 'Expired Quotations', path: '/admin/quotations?view=EXPIRED', view: 'EXPIRED' },
-            { label: 'Quotation History', path: '/admin/quotations?view=HISTORY', view: 'HISTORY' },
-          ],
-        },
-        { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
-        { label: 'Service & Category Pricing', path: '/admin/services-config?view=PRICING_CONFIGURATION', icon: Layers },
+      label: 'Quotation Management',
+      path: '/admin/quotations',
+      icon: FileCheck2,
+      subItems: [
+        { label: 'Pending Architect Quotations', path: '/admin/quotations?view=PENDING_ARCHITECT', view: 'PENDING_ARCHITECT' },
+        { label: 'Quotation Under Review', path: '/admin/quotations?view=UNDER_REVIEW', view: 'UNDER_REVIEW' },
+        { label: 'Approved Quotations', path: '/admin/quotations?view=APPROVED', view: 'APPROVED' },
+        { label: 'Rejected Quotations', path: '/admin/quotations?view=REJECTED', view: 'REJECTED' },
+        { label: 'Revision Required', path: '/admin/quotations?view=REVISION_REQUIRED', view: 'REVISION_REQUIRED' },
+        { label: 'Sent to Customer', path: '/admin/quotations?view=SENT_TO_CUSTOMER', view: 'SENT_TO_CUSTOMER' },
+        { label: 'Customer Accepted Quotations', path: '/admin/quotations?view=CUSTOMER_ACCEPTED', view: 'CUSTOMER_ACCEPTED' },
+        { label: 'Customer Rejected Quotations', path: '/admin/quotations?view=CUSTOMER_REJECTED', view: 'CUSTOMER_REJECTED' },
+        { label: 'Expired Quotations', path: '/admin/quotations?view=EXPIRED', view: 'EXPIRED' },
+        { label: 'Quotation History', path: '/admin/quotations?view=HISTORY', view: 'HISTORY' },
+      ],
+    },
+    { label: 'Cost Estimator Rates Matrix', path: '/admin/calculator', icon: Calculator },
+    { label: 'Service & Category Pricing', path: '/admin/services-config?view=PRICING_CONFIGURATION', icon: Layers },
+    {
+      label: 'Project Management',
+      path: '/admin/projects',
+      icon: FolderGit2,
+      subItems: [
+        { label: 'All Projects', path: '/admin/projects?view=ALL', view: 'ALL' },
+        { label: 'New Projects', path: '/admin/projects?view=NEW', view: 'NEW' },
+        { label: 'Project Kickoff', path: '/admin/projects?view=KICKOFF', view: 'KICKOFF' },
+        { label: 'Active Projects', path: '/admin/projects?view=ACTIVE', view: 'ACTIVE' },
+        { label: 'On-Hold Projects', path: '/admin/projects?view=ON_HOLD', view: 'ON_HOLD' },
+        { label: 'Delayed Projects', path: '/admin/projects?view=DELAYED', view: 'DELAYED' },
+        { label: 'Completed Projects', path: '/admin/projects?view=COMPLETED', view: 'COMPLETED' },
+        { label: 'Cancelled Projects', path: '/admin/projects?view=CANCELLED', view: 'CANCELLED' },
+        { label: 'Project Documents', path: '/admin/projects?view=DOCUMENTS', view: 'DOCUMENTS' },
+        { label: 'Project Activity Timeline', path: '/admin/projects?view=TIMELINE', view: 'TIMELINE' },
       ],
     },
     {
-      title: '4. Project Management & Delivery',
-      items: [
-        {
-          label: 'Project Management',
-          path: '/admin/projects',
-          icon: FolderGit2,
-          subItems: [
-            { label: 'All Projects', path: '/admin/projects?view=ALL', view: 'ALL' },
-            { label: 'New Projects', path: '/admin/projects?view=NEW', view: 'NEW' },
-            { label: 'Project Kickoff', path: '/admin/projects?view=KICKOFF', view: 'KICKOFF' },
-            { label: 'Active Projects', path: '/admin/projects?view=ACTIVE', view: 'ACTIVE' },
-            { label: 'On-Hold Projects', path: '/admin/projects?view=ON_HOLD', view: 'ON_HOLD' },
-            { label: 'Delayed Projects', path: '/admin/projects?view=DELAYED', view: 'DELAYED' },
-            { label: 'Completed Projects', path: '/admin/projects?view=COMPLETED', view: 'COMPLETED' },
-            { label: 'Cancelled Projects', path: '/admin/projects?view=CANCELLED', view: 'CANCELLED' },
-            { label: 'Project Documents', path: '/admin/projects?view=DOCUMENTS', view: 'DOCUMENTS' },
-            { label: 'Project Activity Timeline', path: '/admin/projects?view=TIMELINE', view: 'TIMELINE' },
-          ],
-        },
-        {
-          label: 'Design & Document Management',
-          path: '/admin/documents',
-          icon: FileCheck2,
-          subItems: [
-            { label: 'Architect Design Submissions', path: '/admin/documents?view=SUBMISSIONS', view: 'SUBMISSIONS' },
-            { label: 'Floor Plans', path: '/admin/documents?view=FLOOR_PLANS', view: 'FLOOR_PLANS' },
-            { label: 'House Maps', path: '/admin/documents?view=HOUSE_MAPS', view: 'HOUSE_MAPS' },
-            { label: '2D Drawings', path: '/admin/documents?view=2D_DRAWINGS', view: '2D_DRAWINGS' },
-            { label: '3D Designs', path: '/admin/documents?view=3D_DESIGNS', view: '3D_DESIGNS' },
-            { label: 'Elevation Designs', path: '/admin/documents?view=ELEVATIONS', view: 'ELEVATIONS' },
-            { label: 'Working Drawings', path: '/admin/documents?view=WORKING_DRAWINGS', view: 'WORKING_DRAWINGS' },
-            { label: 'BOQ Documents', path: '/admin/documents?view=BOQ', view: 'BOQ' },
-            { label: 'Design Approval Requests', path: '/admin/documents?view=APPROVAL_REQUESTS', view: 'APPROVAL_REQUESTS' },
-            { label: 'Revision Requests', path: '/admin/documents?view=REVISIONS', view: 'REVISIONS' },
-            { label: 'Approved Documents', path: '/admin/documents?view=APPROVED', view: 'APPROVED' },
-            { label: 'Rejected Documents', path: '/admin/documents?view=REJECTED', view: 'REJECTED' },
-            { label: 'Document Version History', path: '/admin/documents?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
-          ],
-        },
-        {
-          label: 'Milestone & Work Progress Management',
-          path: '/admin/timeline',
-          icon: HardHat,
-          subItems: [
-            { label: 'Project Milestones', path: '/admin/timeline?view=PROJECT_MILESTONES', view: 'PROJECT_MILESTONES' },
-            { label: 'Pending Milestone Submissions', path: '/admin/timeline?view=PENDING_SUBMISSIONS', view: 'PENDING_SUBMISSIONS' },
-            { label: 'Work Progress Verification', path: '/admin/timeline?view=WORK_PROGRESS_VERIFICATION', view: 'WORK_PROGRESS_VERIFICATION' },
-            { label: 'Customer Approval Pending', path: '/admin/timeline?view=CUSTOMER_APPROVAL_PENDING', view: 'CUSTOMER_APPROVAL_PENDING' },
-            { label: 'Admin Inspection', path: '/admin/timeline?view=ADMIN_INSPECTION', view: 'ADMIN_INSPECTION' },
-            { label: 'Approved Milestones', path: '/admin/timeline?view=APPROVED_MILESTONES', view: 'APPROVED_MILESTONES' },
-            { label: 'Rejected Milestones', path: '/admin/timeline?view=REJECTED_MILESTONES', view: 'REJECTED_MILESTONES' },
-            { label: 'Delayed Milestones', path: '/admin/timeline?view=DELAYED_MILESTONES', view: 'DELAYED_MILESTONES' },
-            { label: 'Milestone Payment Eligibility', path: '/admin/timeline?view=PAYMENT_ELIGIBILITY', view: 'PAYMENT_ELIGIBILITY' },
-          ],
-        },
-        {
-          label: 'Project Execution & Coordination',
-          path: '/admin/execution',
-          icon: HardHat,
-          subItems: [
-            { label: 'Execution Planning', path: '/admin/execution?view=EXECUTION_PLANNING', view: 'EXECUTION_PLANNING' },
-            { label: 'Work Instructions', path: '/admin/execution?view=WORK_INSTRUCTIONS', view: 'WORK_INSTRUCTIONS' },
-            { label: 'Vendor Coordination', path: '/admin/execution?view=VENDOR_COORDINATION', view: 'VENDOR_COORDINATION' },
-            { label: 'Material Coordination', path: '/admin/execution?view=MATERIAL_COORDINATION', view: 'MATERIAL_COORDINATION' },
-            { label: 'Contractor Coordination', path: '/admin/execution?view=CONTRACTOR_COORDINATION', view: 'CONTRACTOR_COORDINATION' },
-            { label: 'Installation Schedule', path: '/admin/execution?view=INSTALLATION_SCHEDULE', view: 'INSTALLATION_SCHEDULE' },
-            { label: 'Work Inspection & QA', path: '/admin/execution?view=WORK_INSPECTION', view: 'WORK_INSPECTION' },
-            { label: 'Site Progress Reports', path: '/admin/execution?view=PROGRESS_REPORTS', view: 'PROGRESS_REPORTS' },
-            { label: 'Issues & Delays Desk', path: '/admin/execution?view=ISSUES_DELAYS', view: 'ISSUES_DELAYS' },
-          ],
-        },
-        { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
-        { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
+      label: 'Design & Document Management',
+      path: '/admin/documents',
+      icon: FileCheck2,
+      subItems: [
+        { label: 'Architect Design Submissions', path: '/admin/documents?view=SUBMISSIONS', view: 'SUBMISSIONS' },
+        { label: 'Floor Plans', path: '/admin/documents?view=FLOOR_PLANS', view: 'FLOOR_PLANS' },
+        { label: 'House Maps', path: '/admin/documents?view=HOUSE_MAPS', view: 'HOUSE_MAPS' },
+        { label: '2D Drawings', path: '/admin/documents?view=2D_DRAWINGS', view: '2D_DRAWINGS' },
+        { label: '3D Designs', path: '/admin/documents?view=3D_DESIGNS', view: '3D_DESIGNS' },
+        { label: 'Elevation Designs', path: '/admin/documents?view=ELEVATIONS', view: 'ELEVATIONS' },
+        { label: 'Working Drawings', path: '/admin/documents?view=WORKING_DRAWINGS', view: 'WORKING_DRAWINGS' },
+        { label: 'BOQ Documents', path: '/admin/documents?view=BOQ', view: 'BOQ' },
+        { label: 'Design Approval Requests', path: '/admin/documents?view=APPROVAL_REQUESTS', view: 'APPROVAL_REQUESTS' },
+        { label: 'Revision Requests', path: '/admin/documents?view=REVISIONS', view: 'REVISIONS' },
+        { label: 'Approved Documents', path: '/admin/documents?view=APPROVED', view: 'APPROVED' },
+        { label: 'Rejected Documents', path: '/admin/documents?view=REJECTED', view: 'REJECTED' },
+        { label: 'Document Version History', path: '/admin/documents?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
       ],
     },
     {
-      title: '5. Finance, Payouts & Billing',
-      items: [
-        {
-          label: 'Payment Management',
-          path: '/admin/payments',
-          icon: CreditCard,
-          subItems: [
-            { label: 'All Customer Payments', path: '/admin/payments?view=ALL', view: 'ALL' },
-            { label: 'Pending Payment Verification', path: '/admin/payments?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
-            { label: 'Successful Payments', path: '/admin/payments?view=SUCCESSFUL', view: 'SUCCESSFUL' },
-            { label: 'Failed Payments', path: '/admin/payments?view=FAILED', view: 'FAILED' },
-            { label: 'Refund Requests', path: '/admin/payments?view=REFUNDS', view: 'REFUNDS' },
-            { label: 'Customer Payment History', path: '/admin/payments?view=CUSTOMER_HISTORY', view: 'CUSTOMER_HISTORY' },
-            { label: 'Payment Reconciliation', path: '/admin/payments?view=RECONCILIATION', view: 'RECONCILIATION' },
-            { label: 'Payment Gateway Transactions', path: '/admin/payments?view=GATEWAY_TRANSACTIONS', view: 'GATEWAY_TRANSACTIONS' },
-          ],
-        },
-        {
-          label: 'Architect Payout Management',
-          path: '/admin/payouts',
-          icon: Briefcase,
-          subItems: [
-            { label: 'Pending Architect Payouts', path: '/admin/payouts?view=PENDING_PAYOUTS', view: 'PENDING_PAYOUTS' },
-            { label: 'Eligible for Payout', path: '/admin/payouts?view=ELIGIBLE', view: 'ELIGIBLE' },
-            { label: 'Payout Approval', path: '/admin/payouts?view=APPROVAL_QUEUE', view: 'APPROVAL_QUEUE' },
-            { label: 'Process Architect Payment', path: '/admin/payouts?view=PROCESS_PAYMENT', view: 'PROCESS_PAYMENT' },
-            { label: 'Successful Payouts', path: '/admin/payouts?view=SUCCESSFUL_PAYOUTS', view: 'SUCCESSFUL_PAYOUTS' },
-            { label: 'Failed Payouts', path: '/admin/payouts?view=FAILED_PAYOUTS', view: 'FAILED_PAYOUTS' },
-            { label: 'Payout History', path: '/admin/payouts?view=PAYOUT_HISTORY', view: 'PAYOUT_HISTORY' },
-            { label: 'Architect Earnings', path: '/admin/payouts?view=ARCHITECT_EARNINGS', view: 'ARCHITECT_EARNINGS' },
-            { label: 'Commission & Platform Fees', path: '/admin/payouts?view=COMMISSION_FEES', view: 'COMMISSION_FEES' },
-            { label: 'Payout Reconciliation', path: '/admin/payouts?view=PAYOUT_RECONCILIATION', view: 'PAYOUT_RECONCILIATION' },
-          ],
-        },
-        {
-          label: 'Invoice & Billing Management',
-          path: '/admin/invoices',
-          icon: FileText,
-          subItems: [
-            { label: 'Customer Invoices', path: '/admin/invoices?view=CUSTOMER_INVOICES', view: 'CUSTOMER_INVOICES' },
-            { label: 'Architect Invoices', path: '/admin/invoices?view=ARCHITECT_INVOICES', view: 'ARCHITECT_INVOICES' },
-            { label: 'Payment Receipts', path: '/admin/invoices?view=PAYMENT_RECEIPTS', view: 'PAYMENT_RECEIPTS' },
-            { label: 'Credit Notes', path: '/admin/invoices?view=CREDIT_NOTES', view: 'CREDIT_NOTES' },
-            { label: 'Refund Records', path: '/admin/invoices?view=REFUND_RECORDS', view: 'REFUND_RECORDS' },
-            { label: 'Tax Reports', path: '/admin/invoices?view=TAX_REPORTS', view: 'TAX_REPORTS' },
-            { label: 'Final Settlement', path: '/admin/invoices?view=FINAL_SETTLEMENT', view: 'FINAL_SETTLEMENT' },
-          ],
-        },
-        { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
+      label: 'Milestone & Work Progress Management',
+      path: '/admin/timeline',
+      icon: HardHat,
+      subItems: [
+        { label: 'Project Milestones', path: '/admin/timeline?view=PROJECT_MILESTONES', view: 'PROJECT_MILESTONES' },
+        { label: 'Pending Milestone Submissions', path: '/admin/timeline?view=PENDING_SUBMISSIONS', view: 'PENDING_SUBMISSIONS' },
+        { label: 'Work Progress Verification', path: '/admin/timeline?view=WORK_PROGRESS_VERIFICATION', view: 'WORK_PROGRESS_VERIFICATION' },
+        { label: 'Customer Approval Pending', path: '/admin/timeline?view=CUSTOMER_APPROVAL_PENDING', view: 'CUSTOMER_APPROVAL_PENDING' },
+        { label: 'Admin Inspection', path: '/admin/timeline?view=ADMIN_INSPECTION', view: 'ADMIN_INSPECTION' },
+        { label: 'Approved Milestones', path: '/admin/timeline?view=APPROVED_MILESTONES', view: 'APPROVED_MILESTONES' },
+        { label: 'Rejected Milestones', path: '/admin/timeline?view=REJECTED_MILESTONES', view: 'REJECTED_MILESTONES' },
+        { label: 'Delayed Milestones', path: '/admin/timeline?view=DELAYED_MILESTONES', view: 'DELAYED_MILESTONES' },
+        { label: 'Milestone Payment Eligibility', path: '/admin/timeline?view=PAYMENT_ELIGIBILITY', view: 'PAYMENT_ELIGIBILITY' },
       ],
     },
     {
-      title: '6. Operations, Support & Content',
-      items: [
-        {
-          label: 'Communication Management',
-          path: '/admin/communications',
-          icon: Megaphone,
-          subItems: [
-            { label: 'Customer Messages', path: '/admin/communications?view=CUSTOMER_MESSAGES', view: 'CUSTOMER_MESSAGES' },
-            { label: 'Architect Messages', path: '/admin/communications?view=ARCHITECT_MESSAGES', view: 'ARCHITECT_MESSAGES' },
-            { label: 'Admin Review Inbox', path: '/admin/communications?view=ADMIN_INBOX', view: 'ADMIN_INBOX' },
-            { label: 'Customer-to-Architect Routed Messages', path: '/admin/communications?view=CUSTOMER_TO_ARCHITECT', view: 'CUSTOMER_TO_ARCHITECT' },
-            { label: 'Architect-to-Customer Routed Messages', path: '/admin/communications?view=ARCHITECT_TO_CUSTOMER', view: 'ARCHITECT_TO_CUSTOMER' },
-            { label: 'Clarification Requests', path: '/admin/communications?view=CLARIFICATION_REQUESTS', view: 'CLARIFICATION_REQUESTS' },
-            { label: 'Internal Admin Notes', path: '/admin/communications?view=INTERNAL_ADMIN_NOTES', view: 'INTERNAL_ADMIN_NOTES' },
-            { label: 'Communication History', path: '/admin/communications?view=COMMUNICATION_HISTORY', view: 'COMMUNICATION_HISTORY' },
-          ],
-        },
-        {
-          label: 'Complaint & Dispute Management',
-          path: '/admin/support',
-          icon: LifeBuoy,
-          subItems: [
-            { label: 'Customer Complaints', path: '/admin/support?view=CUSTOMER_COMPLAINTS', view: 'CUSTOMER_COMPLAINTS' },
-            { label: 'Architect Complaints', path: '/admin/support?view=ARCHITECT_COMPLAINTS', view: 'ARCHITECT_COMPLAINTS' },
-            { label: 'Payment Disputes', path: '/admin/support?view=PAYMENT_DISPUTES', view: 'PAYMENT_DISPUTES' },
-            { label: 'Project Disputes', path: '/admin/support?view=PROJECT_DISPUTES', view: 'PROJECT_DISPUTES' },
-            { label: 'Milestone Disputes', path: '/admin/support?view=MILESTONE_DISPUTES', view: 'MILESTONE_DISPUTES' },
-            { label: 'Resolution Management', path: '/admin/support?view=RESOLUTION_MANAGEMENT', view: 'RESOLUTION_MANAGEMENT' },
-            { label: 'Escalation Management', path: '/admin/support?view=ESCALATION_MANAGEMENT', view: 'ESCALATION_MANAGEMENT' },
-          ],
-        },
-        {
-          label: 'Reports & Analytics',
-          path: '/admin/reports',
-          icon: BarChart3,
-          subItems: [
-            { label: 'Customer Reports', path: '/admin/reports?view=CUSTOMER_REPORTS', view: 'CUSTOMER_REPORTS' },
-            { label: 'Architect Reports', path: '/admin/reports?view=ARCHITECT_REPORTS', view: 'ARCHITECT_REPORTS' },
-            { label: 'Quotation Reports', path: '/admin/reports?view=QUOTATION_REPORTS', view: 'QUOTATION_REPORTS' },
-            { label: 'Project Reports', path: '/admin/reports?view=PROJECT_REPORTS', view: 'PROJECT_REPORTS' },
-            { label: 'Milestone Reports', path: '/admin/reports?view=MILESTONE_REPORTS', view: 'MILESTONE_REPORTS' },
-            { label: 'Payment Reports', path: '/admin/reports?view=PAYMENT_REPORTS', view: 'PAYMENT_REPORTS' },
-            { label: 'Payout Reports', path: '/admin/reports?view=PAYOUT_REPORTS', view: 'PAYOUT_REPORTS' },
-            { label: 'Revenue Reports', path: '/admin/reports?view=REVENUE_REPORTS', view: 'REVENUE_REPORTS' },
-            { label: 'Commission Reports', path: '/admin/reports?view=COMMISSION_REPORTS', view: 'COMMISSION_REPORTS' },
-            { label: 'Performance Reports', path: '/admin/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
-          ],
-        },
-        {
-          label: 'Notification Management',
-          path: '/admin/notifications',
-          icon: Bell,
-          subItems: [
-            { label: 'Customer Notifications', path: '/admin/notifications?view=CUSTOMER_NOTIFICATIONS', view: 'CUSTOMER_NOTIFICATIONS' },
-            { label: 'Architect Notifications', path: '/admin/notifications?view=ARCHITECT_NOTIFICATIONS', view: 'ARCHITECT_NOTIFICATIONS' },
-            { label: 'Admin Notifications', path: '/admin/notifications?view=ADMIN_NOTIFICATIONS', view: 'ADMIN_NOTIFICATIONS' },
-            { label: 'Email Templates', path: '/admin/notifications?view=EMAIL_TEMPLATES', view: 'EMAIL_TEMPLATES' },
-            { label: 'SMS Templates', path: '/admin/notifications?view=SMS_TEMPLATES', view: 'SMS_TEMPLATES' },
-            { label: 'Notification History', path: '/admin/notifications?view=NOTIFICATION_HISTORY', view: 'NOTIFICATION_HISTORY' },
-          ],
-        },
-        {
-          label: 'Reviews & Ratings Desk',
-          path: '/admin/reviews',
-          icon: Crown,
-          subItems: [
-            { label: 'Customer Reviews', path: '/admin/reviews?view=CUSTOMER_REVIEWS', view: 'CUSTOMER_REVIEWS' },
-            { label: 'Project Feedback Surveys', path: '/admin/reviews?view=PROJECT_FEEDBACK', view: 'PROJECT_FEEDBACK' },
-            { label: 'Professional Ratings History', path: '/admin/reviews?view=RATINGS_HISTORY', view: 'RATINGS_HISTORY' },
-          ],
-        },
-        { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
-        { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
-        {
-          label: 'CMS & Platform Content Management',
-          path: '/admin/cms',
-          icon: Globe,
-          subItems: [
-            { label: 'Homepage Content', path: '/admin/cms?view=HOMEPAGE_CONTENT', view: 'HOMEPAGE_CONTENT' },
-            { label: 'About Us', path: '/admin/cms?view=ABOUT_US', view: 'ABOUT_US' },
-            { label: 'Contact Us', path: '/admin/cms?view=CONTACT_US', view: 'CONTACT_US' },
-            { label: 'FAQ', path: '/admin/cms?view=FAQ', view: 'FAQ' },
-            { label: 'Terms & Conditions', path: '/admin/cms?view=TERMS_CONDITIONS', view: 'TERMS_CONDITIONS' },
-            { label: 'Privacy Policy', path: '/admin/cms?view=PRIVACY_POLICY', view: 'PRIVACY_POLICY' },
-            { label: 'Cancellation Policy', path: '/admin/cms?view=CANCELLATION_POLICY', view: 'CANCELLATION_POLICY' },
-            { label: 'Refund Policy', path: '/admin/cms?view=REFUND_POLICY', view: 'REFUND_POLICY' },
-          ],
-        },
-        {
-          label: 'Service & Configuration Management',
-          path: '/admin/services-config',
-          icon: Layers,
-          subItems: [
-            { label: 'Service Categories', path: '/admin/services-config?view=SERVICE_CATEGORIES', view: 'SERVICE_CATEGORIES' },
-            { label: 'Subcategories', path: '/admin/services-config?view=SUBCATEGORIES', view: 'SUBCATEGORIES' },
-            { label: 'Service Types', path: '/admin/services-config?view=SERVICE_TYPES', view: 'SERVICE_TYPES' },
-            { label: 'Project Types', path: '/admin/services-config?view=PROJECT_TYPES', view: 'PROJECT_TYPES' },
-            { label: 'Pricing Configuration', path: '/admin/services-config?view=PRICING_CONFIGURATION', view: 'PRICING_CONFIGURATION' },
-            { label: 'Quotation Request Fee', path: '/admin/services-config?view=QUOTATION_FEE', view: 'QUOTATION_FEE' },
-            { label: 'Platform Commission Settings', path: '/admin/services-config?view=COMMISSION_SETTINGS', view: 'COMMISSION_SETTINGS' },
-            { label: 'Milestone Templates', path: '/admin/services-config?view=MILESTONE_TEMPLATES', view: 'MILESTONE_TEMPLATES' },
-            { label: 'Project Status Settings', path: '/admin/services-config?view=PROJECT_STATUS_SETTINGS', view: 'PROJECT_STATUS_SETTINGS' },
-          ],
-        },
+      label: 'Project Execution & Coordination',
+      path: '/admin/execution',
+      icon: HardHat,
+      subItems: [
+        { label: 'Execution Planning', path: '/admin/execution?view=EXECUTION_PLANNING', view: 'EXECUTION_PLANNING' },
+        { label: 'Work Instructions', path: '/admin/execution?view=WORK_INSTRUCTIONS', view: 'WORK_INSTRUCTIONS' },
+        { label: 'Vendor Coordination', path: '/admin/execution?view=VENDOR_COORDINATION', view: 'VENDOR_COORDINATION' },
+        { label: 'Material Coordination', path: '/admin/execution?view=MATERIAL_COORDINATION', view: 'MATERIAL_COORDINATION' },
+        { label: 'Contractor Coordination', path: '/admin/execution?view=CONTRACTOR_COORDINATION', view: 'CONTRACTOR_COORDINATION' },
+        { label: 'Installation Schedule', path: '/admin/execution?view=INSTALLATION_SCHEDULE', view: 'INSTALLATION_SCHEDULE' },
+        { label: 'Work Inspection & QA', path: '/admin/execution?view=WORK_INSPECTION', view: 'WORK_INSPECTION' },
+        { label: 'Site Progress Reports', path: '/admin/execution?view=PROGRESS_REPORTS', view: 'PROGRESS_REPORTS' },
+        { label: 'Issues & Delays Desk', path: '/admin/execution?view=ISSUES_DELAYS', view: 'ISSUES_DELAYS' },
+      ],
+    },
+    { label: 'Confirmed Service Bookings', path: '/admin/bookings', icon: CalendarCheck },
+    { label: 'Legal Agreements & Contracts', path: '/admin/agreements', icon: ShieldAlert },
+    {
+      label: 'Payment Management',
+      path: '/admin/payments',
+      icon: CreditCard,
+      subItems: [
+        { label: 'All Customer Payments', path: '/admin/payments?view=ALL', view: 'ALL' },
+        { label: 'Pending Payment Verification', path: '/admin/payments?view=PENDING_VERIFICATION', view: 'PENDING_VERIFICATION' },
+        { label: 'Successful Payments', path: '/admin/payments?view=SUCCESSFUL', view: 'SUCCESSFUL' },
+        { label: 'Failed Payments', path: '/admin/payments?view=FAILED', view: 'FAILED' },
+        { label: 'Refund Requests', path: '/admin/payments?view=REFUNDS', view: 'REFUNDS' },
+        { label: 'Customer Payment History', path: '/admin/payments?view=CUSTOMER_HISTORY', view: 'CUSTOMER_HISTORY' },
+        { label: 'Payment Reconciliation', path: '/admin/payments?view=RECONCILIATION', view: 'RECONCILIATION' },
+        { label: 'Payment Gateway Transactions', path: '/admin/payments?view=GATEWAY_TRANSACTIONS', view: 'GATEWAY_TRANSACTIONS' },
+      ],
+    },
+    {
+      label: 'Architect Payout Management',
+      path: '/admin/payouts',
+      icon: Briefcase,
+      subItems: [
+        { label: 'Pending Architect Payouts', path: '/admin/payouts?view=PENDING_PAYOUTS', view: 'PENDING_PAYOUTS' },
+        { label: 'Eligible for Payout', path: '/admin/payouts?view=ELIGIBLE', view: 'ELIGIBLE' },
+        { label: 'Payout Approval', path: '/admin/payouts?view=APPROVAL_QUEUE', view: 'APPROVAL_QUEUE' },
+        { label: 'Process Architect Payment', path: '/admin/payouts?view=PROCESS_PAYMENT', view: 'PROCESS_PAYMENT' },
+        { label: 'Successful Payouts', path: '/admin/payouts?view=SUCCESSFUL_PAYOUTS', view: 'SUCCESSFUL_PAYOUTS' },
+        { label: 'Failed Payouts', path: '/admin/payouts?view=FAILED_PAYOUTS', view: 'FAILED_PAYOUTS' },
+        { label: 'Payout History', path: '/admin/payouts?view=PAYOUT_HISTORY', view: 'PAYOUT_HISTORY' },
+        { label: 'Architect Earnings', path: '/admin/payouts?view=ARCHITECT_EARNINGS', view: 'ARCHITECT_EARNINGS' },
+        { label: 'Commission & Platform Fees', path: '/admin/payouts?view=COMMISSION_FEES', view: 'COMMISSION_FEES' },
+        { label: 'Payout Reconciliation', path: '/admin/payouts?view=PAYOUT_RECONCILIATION', view: 'PAYOUT_RECONCILIATION' },
+      ],
+    },
+    {
+      label: 'Invoice & Billing Management',
+      path: '/admin/invoices',
+      icon: FileText,
+      subItems: [
+        { label: 'Customer Invoices', path: '/admin/invoices?view=CUSTOMER_INVOICES', view: 'CUSTOMER_INVOICES' },
+        { label: 'Architect Invoices', path: '/admin/invoices?view=ARCHITECT_INVOICES', view: 'ARCHITECT_INVOICES' },
+        { label: 'Payment Receipts', path: '/admin/invoices?view=PAYMENT_RECEIPTS', view: 'PAYMENT_RECEIPTS' },
+        { label: 'Credit Notes', path: '/admin/invoices?view=CREDIT_NOTES', view: 'CREDIT_NOTES' },
+        { label: 'Refund Records', path: '/admin/invoices?view=REFUND_RECORDS', view: 'REFUND_RECORDS' },
+        { label: 'Tax Reports', path: '/admin/invoices?view=TAX_REPORTS', view: 'TAX_REPORTS' },
+        { label: 'Final Settlement', path: '/admin/invoices?view=FINAL_SETTLEMENT', view: 'FINAL_SETTLEMENT' },
+      ],
+    },
+    { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
+    {
+      label: 'Communication Management',
+      path: '/admin/communications',
+      icon: Megaphone,
+      subItems: [
+        { label: 'Customer Messages', path: '/admin/communications?view=CUSTOMER_MESSAGES', view: 'CUSTOMER_MESSAGES' },
+        { label: 'Architect Messages', path: '/admin/communications?view=ARCHITECT_MESSAGES', view: 'ARCHITECT_MESSAGES' },
+        { label: 'Admin Review Inbox', path: '/admin/communications?view=ADMIN_INBOX', view: 'ADMIN_INBOX' },
+        { label: 'Customer-to-Architect Routed Messages', path: '/admin/communications?view=CUSTOMER_TO_ARCHITECT', view: 'CUSTOMER_TO_ARCHITECT' },
+        { label: 'Architect-to-Customer Routed Messages', path: '/admin/communications?view=ARCHITECT_TO_CUSTOMER', view: 'ARCHITECT_TO_CUSTOMER' },
+        { label: 'Clarification Requests', path: '/admin/communications?view=CLARIFICATION_REQUESTS', view: 'CLARIFICATION_REQUESTS' },
+        { label: 'Internal Admin Notes', path: '/admin/communications?view=INTERNAL_ADMIN_NOTES', view: 'INTERNAL_ADMIN_NOTES' },
+        { label: 'Communication History', path: '/admin/communications?view=COMMUNICATION_HISTORY', view: 'COMMUNICATION_HISTORY' },
+      ],
+    },
+    {
+      label: 'Complaint & Dispute Management',
+      path: '/admin/support',
+      icon: LifeBuoy,
+      subItems: [
+        { label: 'Customer Complaints', path: '/admin/support?view=CUSTOMER_COMPLAINTS', view: 'CUSTOMER_COMPLAINTS' },
+        { label: 'Architect Complaints', path: '/admin/support?view=ARCHITECT_COMPLAINTS', view: 'ARCHITECT_COMPLAINTS' },
+        { label: 'Payment Disputes', path: '/admin/support?view=PAYMENT_DISPUTES', view: 'PAYMENT_DISPUTES' },
+        { label: 'Project Disputes', path: '/admin/support?view=PROJECT_DISPUTES', view: 'PROJECT_DISPUTES' },
+        { label: 'Milestone Disputes', path: '/admin/support?view=MILESTONE_DISPUTES', view: 'MILESTONE_DISPUTES' },
+        { label: 'Resolution Management', path: '/admin/support?view=RESOLUTION_MANAGEMENT', view: 'RESOLUTION_MANAGEMENT' },
+        { label: 'Escalation Management', path: '/admin/support?view=ESCALATION_MANAGEMENT', view: 'ESCALATION_MANAGEMENT' },
+      ],
+    },
+    {
+      label: 'Reports & Analytics',
+      path: '/admin/reports',
+      icon: BarChart3,
+      subItems: [
+        { label: 'Customer Reports', path: '/admin/reports?view=CUSTOMER_REPORTS', view: 'CUSTOMER_REPORTS' },
+        { label: 'Architect Reports', path: '/admin/reports?view=ARCHITECT_REPORTS', view: 'ARCHITECT_REPORTS' },
+        { label: 'Quotation Reports', path: '/admin/reports?view=QUOTATION_REPORTS', view: 'QUOTATION_REPORTS' },
+        { label: 'Project Reports', path: '/admin/reports?view=PROJECT_REPORTS', view: 'PROJECT_REPORTS' },
+        { label: 'Milestone Reports', path: '/admin/reports?view=MILESTONE_REPORTS', view: 'MILESTONE_REPORTS' },
+        { label: 'Payment Reports', path: '/admin/reports?view=PAYMENT_REPORTS', view: 'PAYMENT_REPORTS' },
+        { label: 'Payout Reports', path: '/admin/reports?view=PAYOUT_REPORTS', view: 'PAYOUT_REPORTS' },
+        { label: 'Revenue Reports', path: '/admin/reports?view=REVENUE_REPORTS', view: 'REVENUE_REPORTS' },
+        { label: 'Commission Reports', path: '/admin/reports?view=COMMISSION_REPORTS', view: 'COMMISSION_REPORTS' },
+        { label: 'Performance Reports', path: '/admin/reports?view=PERFORMANCE_REPORTS', view: 'PERFORMANCE_REPORTS' },
+      ],
+    },
+    {
+      label: 'Reviews & Ratings Desk',
+      path: '/admin/reviews',
+      icon: Star,
+      subItems: [
+        { label: 'Customer Reviews', path: '/admin/reviews?view=CUSTOMER_REVIEWS', view: 'CUSTOMER_REVIEWS' },
+        { label: 'Project Feedback Surveys', path: '/admin/reviews?view=PROJECT_FEEDBACK', view: 'PROJECT_FEEDBACK' },
+        { label: 'Professional Ratings History', path: '/admin/reviews?view=RATINGS_HISTORY', view: 'RATINGS_HISTORY' },
+      ],
+    },
+    {
+      label: 'Notification Management',
+      path: '/admin/notifications',
+      icon: Bell,
+      subItems: [
+        { label: 'Customer Notifications', path: '/admin/notifications?view=CUSTOMER_NOTIFICATIONS', view: 'CUSTOMER_NOTIFICATIONS' },
+        { label: 'Architect Notifications', path: '/admin/notifications?view=ARCHITECT_NOTIFICATIONS', view: 'ARCHITECT_NOTIFICATIONS' },
+        { label: 'Admin Notifications', path: '/admin/notifications?view=ADMIN_NOTIFICATIONS', view: 'ADMIN_NOTIFICATIONS' },
+        { label: 'Email Templates', path: '/admin/notifications?view=EMAIL_TEMPLATES', view: 'EMAIL_TEMPLATES' },
+        { label: 'SMS Templates', path: '/admin/notifications?view=SMS_TEMPLATES', view: 'SMS_TEMPLATES' },
+        { label: 'Notification History', path: '/admin/notifications?view=NOTIFICATION_HISTORY', view: 'NOTIFICATION_HISTORY' },
+      ],
+    },
+    { label: 'Coupons & Promotional Engine', path: '/admin/coupons', icon: Tag },
+    { label: 'Territory & Coverage Locations', path: '/admin/locations', icon: MapPin },
+    {
+      label: 'CMS & Platform Content Management',
+      path: '/admin/cms',
+      icon: Globe,
+      subItems: [
+        { label: 'Homepage Content', path: '/admin/cms?view=HOMEPAGE_CONTENT', view: 'HOMEPAGE_CONTENT' },
+        { label: 'About Us', path: '/admin/cms?view=ABOUT_US', view: 'ABOUT_US' },
+        { label: 'Contact Us', path: '/admin/cms?view=CONTACT_US', view: 'CONTACT_US' },
+        { label: 'FAQ', path: '/admin/cms?view=FAQ', view: 'FAQ' },
+        { label: 'Terms & Conditions', path: '/admin/cms?view=TERMS_CONDITIONS', view: 'TERMS_CONDITIONS' },
+        { label: 'Privacy Policy', path: '/admin/cms?view=PRIVACY_POLICY', view: 'PRIVACY_POLICY' },
+        { label: 'Cancellation Policy', path: '/admin/cms?view=CANCELLATION_POLICY', view: 'CANCELLATION_POLICY' },
+        { label: 'Refund Policy', path: '/admin/cms?view=REFUND_POLICY', view: 'REFUND_POLICY' },
+      ],
+    },
+    {
+      label: 'Service & Configuration Management',
+      path: '/admin/services-config',
+      icon: Layers,
+      subItems: [
+        { label: 'Service Categories', path: '/admin/services-config?view=SERVICE_CATEGORIES', view: 'SERVICE_CATEGORIES' },
+        { label: 'Subcategories', path: '/admin/services-config?view=SUBCATEGORIES', view: 'SUBCATEGORIES' },
+        { label: 'Service Types', path: '/admin/services-config?view=SERVICE_TYPES', view: 'SERVICE_TYPES' },
+        { label: 'Project Types', path: '/admin/services-config?view=PROJECT_TYPES', view: 'PROJECT_TYPES' },
+        { label: 'Pricing Configuration', path: '/admin/services-config?view=PRICING_CONFIGURATION', view: 'PRICING_CONFIGURATION' },
+        { label: 'Quotation Request Fee', path: '/admin/services-config?view=QUOTATION_FEE', view: 'QUOTATION_FEE' },
+        { label: 'Platform Commission Settings', path: '/admin/services-config?view=COMMISSION_SETTINGS', view: 'COMMISSION_SETTINGS' },
+        { label: 'Milestone Templates', path: '/admin/services-config?view=MILESTONE_TEMPLATES', view: 'MILESTONE_TEMPLATES' },
+        { label: 'Project Status Settings', path: '/admin/services-config?view=PROJECT_STATUS_SETTINGS', view: 'PROJECT_STATUS_SETTINGS' },
+      ],
+    },
+    {
+      label: 'Admin User & Role Management',
+      path: '/admin/staff',
+      icon: Lock,
+      subItems: [
+        { label: 'Admin Users', path: '/admin/staff?view=ADMIN_USERS', view: 'ADMIN_USERS' },
+        { label: 'Create Admin', path: '/admin/staff?view=CREATE_ADMIN', view: 'CREATE_ADMIN' },
+        { label: 'Roles & Permissions', path: '/admin/staff?view=ROLES_PERMISSIONS', view: 'ROLES_PERMISSIONS' },
+        { label: 'Activity Logs', path: '/admin/staff?view=ACTIVITY_LOGS', view: 'ACTIVITY_LOGS' },
+      ],
+    },
+    {
+      label: 'Security Audit Trail',
+      path: '/admin/audit-logs',
+      icon: ShieldCheck,
+      subItems: [
+        { label: 'Admin Activity', path: '/admin/audit-logs?view=ADMIN_ACTIVITY', view: 'ADMIN_ACTIVITY' },
+        { label: 'Customer Activity', path: '/admin/audit-logs?view=CUSTOMER_ACTIVITY', view: 'CUSTOMER_ACTIVITY' },
+        { label: 'Architect Activity', path: '/admin/audit-logs?view=ARCHITECT_ACTIVITY', view: 'ARCHITECT_ACTIVITY' },
+        { label: 'Payment Activity', path: '/admin/audit-logs?view=PAYMENT_ACTIVITY', view: 'PAYMENT_ACTIVITY' },
+        { label: 'Project Activity', path: '/admin/audit-logs?view=PROJECT_ACTIVITY', view: 'PROJECT_ACTIVITY' },
+        { label: 'Status Change History', path: '/admin/audit-logs?view=STATUS_HISTORY', view: 'STATUS_HISTORY' },
+        { label: 'Login History', path: '/admin/audit-logs?view=LOGIN_HISTORY', view: 'LOGIN_HISTORY' },
+      ],
+    },
+    {
+      label: 'Platform Settings',
+      path: '/admin/settings',
+      icon: Sliders,
+      subItems: [
+        { label: 'General Settings', path: '/admin/settings?view=GENERAL_SETTINGS', view: 'GENERAL_SETTINGS' },
+        { label: 'Payment Gateway Settings', path: '/admin/settings?view=PAYMENT_GATEWAY', view: 'PAYMENT_GATEWAY' },
+        { label: 'Payout Settings', path: '/admin/settings?view=PAYOUT_SETTINGS', view: 'PAYOUT_SETTINGS' },
+        { label: 'OTP Settings', path: '/admin/settings?view=OTP_SETTINGS', view: 'OTP_SETTINGS' },
+        { label: 'Email/SMS Settings', path: '/admin/settings?view=EMAIL_SMS_SETTINGS', view: 'EMAIL_SMS_SETTINGS' },
+        { label: 'Tax Settings', path: '/admin/settings?view=TAX_SETTINGS', view: 'TAX_SETTINGS' },
+        { label: 'Document Settings', path: '/admin/settings?view=DOCUMENT_SETTINGS', view: 'DOCUMENT_SETTINGS' },
+        { label: 'Security Settings', path: '/admin/settings?view=SECURITY_SETTINGS', view: 'SECURITY_SETTINGS' },
       ],
     },
   ];
 
-  // Auto-expand the section containing the current active route and keep single-accordion for zero vertical scrolling
+  // Auto-expand menu when active route changes
   useEffect(() => {
-    const activeIdx = navSections.findIndex((sec) =>
-      sec.items.some((item) =>
-        item.exact
-          ? location.pathname === item.path
-          : location.pathname.startsWith(item.path)
-      )
+    const activeItem = navItems.find((item) =>
+      !item.exact && location.pathname.startsWith(item.path) && item.subItems && item.subItems.length > 0
     );
-    if (activeIdx !== -1) {
-      setOpenSections((prev) => ({
+    if (activeItem) {
+      setExpandedMenus((prev) => ({
         ...prev,
-        [activeIdx]: true,
+        [activeItem.path]: true,
       }));
     }
-    setExpandedMenus({});
   }, [location.pathname]);
-
-  // Close floating popovers when clicking outside the sidebar
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.admin-sidebar-container')) {
-        setExpandedMenus({});
-      }
-    };
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
-  }, []);
-
-  const renderMenuItem = (item: any, isBottomHalf = false) => {
-    const isActive = item.exact
-      ? location.pathname === item.path
-      : location.pathname.startsWith(item.path);
-    const Icon = item.icon;
-    const hasSubItems = item.subItems && item.subItems.length > 0;
-    const isExpanded = Boolean(expandedMenus[item.path]);
-
-    return (
-      <div key={item.path} className="relative">
-        <div
-          className={`flex items-center justify-between px-2 py-1 rounded-md transition cursor-pointer select-none text-[11px] ${
-            isActive
-              ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
-              : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-medium'
-          }`}
-          onClick={() => {
-            navigate(item.path);
-            if (hasSubItems) {
-              setExpandedMenus((prev) => ({
-                [item.path]: !prev[item.path],
-              }));
-            } else {
-              setExpandedMenus({});
-              setSidebarOpen(false);
-            }
-          }}
-        >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
-            <span className="truncate leading-tight text-[11px]">{item.label}</span>
-          </div>
-
-          {hasSubItems && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpandedMenus((prev) => ({
-                  [item.path]: !prev[item.path],
-                }));
-              }}
-              className={`p-0.5 rounded transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-700'}`}
-              title="Toggle Submenu Options"
-            >
-              <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90 text-amber-300' : ''}`} />
-            </button>
-          )}
-        </div>
-
-        {/* Floating Submenu Popover (Zero Vertical Scroll) */}
-        {hasSubItems && isExpanded && (
-          <div
-            className={`absolute left-full ${
-              isBottomHalf ? 'bottom-0' : 'top-0'
-            } ml-2 w-64 z-50 bg-white rounded-xl shadow-2xl border border-blue-200/90 p-2 animate-in fade-in zoom-in-95 duration-150`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-2 py-1 border-b border-blue-100 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-blue-900">
-              <span className="truncate">{item.label}</span>
-              <button
-                type="button"
-                onClick={() => setExpandedMenus((prev) => ({ ...prev, [item.path]: false }))}
-                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-            <div className="py-1 max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
-              {item.subItems.map((sub: any) => {
-                const currentViewParam = new URLSearchParams(location.search).get('view');
-                const isSubActive =
-                  location.pathname.startsWith(item.path) &&
-                  (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
-
-                return (
-                  <Link
-                    key={sub.path}
-                    to={sub.path}
-                    onClick={() => {
-                      setExpandedMenus({});
-                      setSidebarOpen(false);
-                    }}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition font-medium ${
-                      isSubActive
-                        ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                        : 'text-slate-600 hover:text-blue-950 hover:bg-blue-50'
-                    }`}
-                  >
-                    <span className={`w-1 h-1 rounded-full shrink-0 ${isSubActive ? 'bg-amber-300' : 'bg-slate-300'}`} />
-                    <span className="truncate">{sub.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const currentRoleMeta = ADMIN_ROLE_DEFINITIONS[activeRole] || ADMIN_ROLE_DEFINITIONS.SUPER_ADMIN;
   return (
@@ -1147,8 +973,8 @@ export const AdminLayout: React.FC = () => {
           </div>
         </div>
         </header>
-      {/* ---------------- ADMIN BODY (LIGHT BLUE SIDEBAR + MAIN CONTENT) ---------------- */}
-      <div className="flex-1 flex overflow-hidden relative z-30">
+      {/* ---------------- MAIN LAYOUT CONTAINER ---------------- */}
+      <div className="flex-1 flex overflow-hidden">
         {/* Backdrop for mobile drawer */}
         {sidebarOpen && (
           <div
@@ -1156,168 +982,156 @@ export const AdminLayout: React.FC = () => {
             className="fixed inset-0 bg-navy-950/40 z-30 lg:hidden backdrop-blur-xs"
           />
         )}
-        {/* Dedicated Admin Single-Column Zero-Scroll Sidebar */}
+
+        {/* Dedicated Admin Sidebar matching InteriorDesignerLayout */}
         <aside
-          className={`admin-sidebar-container fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-64 sm:w-68 bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          className={`fixed lg:static inset-y-0 left-0 z-30 w-64 sm:w-68 bg-white border-r border-blue-100 shadow-sm flex flex-col justify-between transition-transform duration-200 lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          {/* Top Header & Quick Category Jump Pills */}
-          <div className="border-b border-blue-200/80 bg-white/80 backdrop-blur-xs shrink-0">
-            <div className="px-3 py-1.5 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                <span className="text-[11px] font-black uppercase tracking-wider text-navy-950">
-                  Navigation
-                </span>
-                <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
-                  33 Menus
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={expandAllSections}
-                  title="Expand All Sections"
-                  className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
-                >
-                  Expand
-                </button>
-                <span className="text-slate-300 text-[10px]">|</span>
-                <button
-                  type="button"
-                  onClick={collapseAllSections}
-                  title="Collapse All Sections"
-                  className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded transition cursor-pointer"
-                >
-                  Collapse
-                </button>
-              </div>
+          <div className="p-4 space-y-1 overflow-y-auto flex-1 scrollbar-thin">
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+              Workspace • Admin Console
             </div>
+            {navItems.map((item: any) => {
+              const isActive = item.exact
+                ? location.pathname === item.path
+                : location.pathname.startsWith(item.path);
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isExpanded = Boolean(expandedMenus[item.path]);
 
-            {/* Quick Category Jump Pills */}
-            <div className="px-2 pb-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none">
-              {[
-                { label: 'Core', idx: 0 },
-                { label: 'Users', idx: 1 },
-                { label: 'Quotes', idx: 2 },
-                { label: 'Projects', idx: 3 },
-                { label: 'Finance', idx: 4 },
-                { label: 'Ops', idx: 5 },
-              ].map((pill) => {
-                const isPillActive = Boolean(openSections[pill.idx]);
+              if (hasSubItems) {
                 return (
-                  <button
-                    key={pill.idx}
-                    type="button"
-                    onClick={() => {
-                      setOpenSections((prev) => ({ ...prev, [pill.idx]: true }));
-                      const el = document.getElementById(`nav-sec-${pill.idx}`);
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition whitespace-nowrap cursor-pointer ${
-                      isPillActive
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-blue-50/80 text-blue-800 hover:bg-blue-100'
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                  <div key={item.path} className="space-y-0.5">
+                    <div
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-700 hover:bg-blue-50 hover:text-navy-950 font-semibold'
+                      }`}
+                      onClick={() => {
+                        setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                        if (!location.pathname.startsWith(item.path)) {
+                          navigate(item.path);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
+                        }}
+                        className={`p-0.5 rounded-md hover:bg-white/20 transition ${
+                          isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                        aria-label="Toggle Submenu"
+                      >
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
 
-          {/* Single-Column Full-Height Menu List (Covering all the way to bottom) */}
-          <div className="flex-1 p-2 space-y-2 overflow-y-auto select-none scrollbar-thin">
-            {navSections.map((sec, sIdx) => {
-              const isOpen = Boolean(openSections[sIdx]);
-              const hasActiveItem = sec.items.some((item) =>
-                item.exact
-                  ? location.pathname === item.path
-                  : location.pathname.startsWith(item.path)
-              );
+                    {/* Collapsible Submenu Dropdown */}
+                    {isExpanded && (
+                      <div className="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-blue-200 ml-4 animate-in fade-in duration-150">
+                        {item.subItems.map((sub: any) => {
+                          const currentViewParam = new URLSearchParams(location.search).get('view');
+                          const isSubActive =
+                            location.pathname.startsWith(item.path) &&
+                            (currentViewParam === sub.view ||
+                              (!currentViewParam &&
+                                (sub.view === 'ALL' ||
+                                  sub.view === 'SUBMISSIONS' ||
+                                  sub.view === 'PROJECT_MILESTONES' ||
+                                  sub.view === 'EXECUTION_PLANNING' ||
+                                  sub.view === 'PENDING_PAYOUTS' ||
+                                  sub.view === 'CUSTOMER_INVOICES' ||
+                                  sub.view === 'CUSTOMER_MESSAGES' ||
+                                  sub.view === 'CUSTOMER_COMPLAINTS' ||
+                                  sub.view === 'CUSTOMER_REPORTS' ||
+                                  sub.view === 'CUSTOMER_REVIEWS' ||
+                                  sub.view === 'CUSTOMER_NOTIFICATIONS' ||
+                                  sub.view === 'HOMEPAGE_CONTENT' ||
+                                  sub.view === 'SERVICE_CATEGORIES' ||
+                                  sub.view === 'ADMIN_USERS' ||
+                                  sub.view === 'GENERAL_SETTINGS' ||
+                                  sub.view === 'ADMIN_ACTIVITY' ||
+                                  sub.view === 'NEW_REQUESTS' ||
+                                  sub.view === 'ASSIGN_ARCHITECT' ||
+                                  sub.view === 'PENDING_ARCHITECT')));
+
+                          return (
+                            <Link
+                              key={sub.path}
+                              to={sub.path}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition font-medium ${
+                                isSubActive
+                                  ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                  : 'text-slate-600 hover:text-navy-950 hover:bg-blue-50'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isSubActive ? 'bg-amber-300' : 'bg-slate-300'
+                                }`}
+                              />
+                              <span className="truncate">{sub.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               return (
-                <div
-                  key={sIdx}
-                  id={`nav-sec-${sIdx}`}
-                  className="rounded-xl border border-blue-100/90 bg-white/95 p-1.5 shadow-2xs space-y-1 transition-all"
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-blue-50 hover:text-navy-950 font-semibold'
+                  }`}
                 >
-                  {/* Accordion Header */}
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(sIdx)}
-                    className="w-full px-2 py-1 flex items-center justify-between text-left cursor-pointer group hover:bg-blue-50/70 rounded-lg transition"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          hasActiveItem ? 'bg-blue-600' : 'bg-slate-300 group-hover:bg-blue-400'
-                        }`}
-                      />
-                      <span
-                        className={`text-[11px] font-black tracking-tight truncate ${
-                          hasActiveItem
-                            ? 'text-blue-950 font-black'
-                            : 'text-slate-700 group-hover:text-blue-900 font-bold'
-                        }`}
-                      >
-                        {sec.title}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 py-0.2 rounded">
-                        {sec.items.length}
-                      </span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
-                          isOpen ? 'rotate-180 text-blue-600' : ''
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {/* Section Items */}
-                  {isOpen && (
-                    <div className="px-0.5 pb-0.5 pt-0.5 space-y-0.5 border-t border-blue-50/80 animate-in fade-in duration-100">
-                      {sec.items.map((item: any, itemIdx: number) => {
-                        const isBottomHalf = sIdx >= 4 || itemIdx >= 3;
-                        return renderMenuItem(item, isBottomHalf);
-                      })}
-                    </div>
-                  )}
-                </div>
+                  <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
               );
             })}
           </div>
 
           {/* Slim Space-Saving Bottom Status Bar */}
-          <div className="px-3 py-1.5 border-t border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between text-[10px] text-slate-500 shrink-0">
-            <div className="flex items-center gap-1.5">
+          <div className="p-3 border-t border-blue-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="font-bold text-slate-700">Atlas Online</span>
               <span className="text-slate-300">•</span>
-              <span className="text-blue-900 font-semibold">RBAC Active</span>
-              <span className="text-slate-300">•</span>
-              <span className="font-mono text-slate-400">v1.0</span>
+              <span className="font-semibold text-blue-900">RBAC Active</span>
             </div>
             <button
-              type="button"
               onClick={handleAdminLogout}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-bold transition cursor-pointer text-[10px]"
-              title="Log Out of Admin"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
             >
-              <LogOut className="w-3 h-3" />
-              <span>Logout</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </aside>
+
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-[#edf4fc] via-[#f7faff] to-[#edf4fc]/70">
-          {/* Full Screen Top Coverage Anchor */}
           <SectionErrorBoundary sectionName="Admin Console" fallbackUrl="/admin">
             <Outlet />
           </SectionErrorBoundary>
