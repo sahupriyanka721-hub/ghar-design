@@ -125,7 +125,20 @@ export const InteriorDesignerLayout: React.FC = () => {
         { label: 'Design Version History', path: '/interior-designer/designs?view=VERSION_HISTORY', view: 'VERSION_HISTORY' },
       ],
     },
-    { label: 'F. Estimation & BOQ', path: '/interior-designer/boq', icon: Layers },
+    {
+      label: '6. BOQ & Cost Estimation',
+      path: '/interior-designer/boq',
+      icon: Layers,
+      subItems: [
+        { label: 'Create BOQ', path: '/interior-designer/boq?view=CREATE_BOQ', view: 'CREATE_BOQ' },
+        { label: 'Material List', path: '/interior-designer/boq?view=MATERIAL_LIST', view: 'MATERIAL_LIST' },
+        { label: 'Quantity Estimation', path: '/interior-designer/boq?view=QUANTITY_ESTIMATION', view: 'QUANTITY_ESTIMATION' },
+        { label: 'Cost Estimation', path: '/interior-designer/boq?view=COST_ESTIMATION', view: 'COST_ESTIMATION' },
+        { label: 'Furniture Estimation', path: '/interior-designer/boq?view=FURNITURE_ESTIMATION', view: 'FURNITURE_ESTIMATION' },
+        { label: 'Material Specifications', path: '/interior-designer/boq?view=MATERIAL_SPECIFICATIONS', view: 'MATERIAL_SPECIFICATIONS' },
+        { label: 'BOQ Submission History', path: '/interior-designer/boq?view=SUBMISSION_HISTORY', view: 'SUBMISSION_HISTORY' },
+      ],
+    },
     { label: 'G. Site & Snag List', path: '/interior-designer/site-management', icon: Camera },
     { label: 'H. Milestones & Deliverables', path: '/interior-designer/milestones', icon: CheckSquare },
     { label: 'I. Client Management', path: '/interior-designer/clients', icon: Users },
@@ -316,7 +329,8 @@ export const InteriorDesignerLayout: React.FC = () => {
                               (!currentViewParam &&
                                 (sub.view === 'NEW_REQUESTS' ||
                                   sub.view === 'MY_PROJECTS' ||
-                                  sub.view === 'DESIGN_BRIEFS')));
+                                  sub.view === 'DESIGN_BRIEFS' ||
+                                  sub.view === 'CREATE_BOQ')));
 
                           return (
                             <Link

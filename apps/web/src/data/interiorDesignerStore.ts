@@ -3170,6 +3170,86 @@ export const TEST_BOQ: InteriorBOQItem[] = [
     supplierName: 'Classic Marble Co',
     status: 'APPROVED_BY_ADMIN',
   },
+  {
+    id: 'boq-5',
+    projectId: 'prj-int-1',
+    roomName: 'Living & Dining Room',
+    category: 'FURNITURE',
+    itemName: 'Custom 8-Seater Statuario Dining Table with Champagne PVD Base',
+    specification: 'Monolithic Statuario Italian Marble Top • Stainless Steel 304 Champagne Brass PVD Base • 8 ft x 4 ft',
+    brand: 'BuildGhar Atelier Woodcraft',
+    unit: 'Nos',
+    quantity: 1,
+    unitRate: 145000,
+    wastagePercent: 0,
+    labourCost: 8000,
+    installationCost: 5000,
+    taxPercent: 18,
+    totalAmount: 158000,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'BuildGhar Atelier Workshop',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-6',
+    projectId: 'prj-int-1',
+    roomName: 'Master Bedroom Suite',
+    category: 'FURNITURE',
+    itemName: 'King Size Hydraulic Storage Bed with Fluted Velvet Headboard',
+    specification: 'Century 710 Marine Ply Frame • German Gas Struts • Acoustic Suede Velvet Headboard',
+    brand: 'Century / Hettich',
+    unit: 'Nos',
+    quantity: 1,
+    unitRate: 85000,
+    wastagePercent: 0,
+    labourCost: 6000,
+    installationCost: 4000,
+    taxPercent: 18,
+    totalAmount: 95000,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Century Ply Workshop',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-7',
+    projectId: 'prj-int-1',
+    roomName: 'Living & Dining Room',
+    category: 'ELECTRICAL',
+    itemName: 'DALI Dimmable Magnetic Track Lighting & Downlights',
+    specification: '24V Magnetic Extruded Aluminum Track • 3000K Warm White • Osram Driver Integration',
+    brand: 'Havells / Osram',
+    unit: 'Nos',
+    quantity: 24,
+    unitRate: 2800,
+    wastagePercent: 4,
+    labourCost: 9600,
+    installationCost: 4800,
+    taxPercent: 18,
+    totalAmount: 81600,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Schneider / Havells Depot',
+    status: 'APPROVED_BY_ADMIN',
+  },
+  {
+    id: 'boq-8',
+    projectId: 'prj-int-1',
+    roomName: 'Full Penthouse',
+    category: 'PAINTING',
+    itemName: 'Asian Paints Royale Aspira Luxury Emulsion with PU Primer Coat',
+    specification: 'High-Sheen Teflon Surface Protection • 2 Coats Putty + 1 Coat Primer + 2 Coats Aspira',
+    brand: 'Asian Paints Royale',
+    unit: 'Square Feet',
+    quantity: 1800,
+    unitRate: 48,
+    wastagePercent: 5,
+    labourCost: 25000,
+    installationCost: 10000,
+    taxPercent: 18,
+    totalAmount: 121400,
+    costStage: 'APPROVED_BOQ',
+    supplierName: 'Asian Paints Depot',
+    status: 'APPROVED_BY_ADMIN',
+  },
 ];
 
 export const SEED_INTERIOR_BOQ_ITEMS: InteriorBOQItem[] = TEST_BOQ;
@@ -3180,7 +3260,11 @@ export const getInteriorBOQItems = (projectId?: string): InteriorBOQItem[] => {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return projectId ? parsed.filter((b: InteriorBOQItem) => b.projectId === projectId) : parsed;
+        // Merge missing defaults so new seed items always show up
+        const existingIds = new Set(parsed.map((b: any) => b.id));
+        const missingDefaults = TEST_BOQ.filter((b) => !existingIds.has(b.id));
+        const combined = missingDefaults.length > 0 ? [...parsed, ...missingDefaults] : parsed;
+        return projectId ? combined.filter((b: InteriorBOQItem) => b.projectId === projectId) : combined;
       }
     }
   } catch (e) {}
