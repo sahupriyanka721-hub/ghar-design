@@ -674,7 +674,7 @@ export const AdminLayout: React.FC = () => {
       ],
     },
     {
-      title: '5. Finance, Payouts & Resolutions',
+      title: '5. Finance, Payouts & Billing',
       items: [
         {
           label: 'Payment Management',
@@ -723,6 +723,11 @@ export const AdminLayout: React.FC = () => {
           ],
         },
         { label: 'Civil Material Store Orders', path: '/admin/materials', icon: ShoppingBag },
+      ],
+    },
+    {
+      title: '6. Operations, Support & Content',
+      items: [
         {
           label: 'Communication Management',
           path: '/admin/communications',
@@ -819,18 +824,127 @@ export const AdminLayout: React.FC = () => {
     },
   ];
 
-  // Ensure the section containing the active path is automatically expanded
+  // Column groupings for 2-column zero-scroll layout
+  const col1Sections = [navSections[0], navSections[1], navSections[2]];
+  const col2Sections = [navSections[3], navSections[4], navSections[5]];
+
+  // Close floating popovers on route change
   useEffect(() => {
-    const currentPath = location.pathname;
-    navSections.forEach((sec, idx) => {
-      const hasActive = (sec.items || []).some((it: any) =>
-        it.exact ? currentPath === it.path : currentPath.startsWith(it.path)
-      );
-      if (hasActive) {
-        setOpenSections((prev) => ({ ...prev, [idx]: true }));
+    setExpandedMenus({});
+  }, [location.pathname, location.search]);
+
+  // Close floating popovers when clicking outside the sidebar
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.admin-sidebar-container')) {
+        setExpandedMenus({});
       }
-    });
-  }, [location.pathname]);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const renderMenuItem = (item: any, isBottomHalf = false) => {
+    const isActive = item.exact
+      ? location.pathname === item.path
+      : location.pathname.startsWith(item.path);
+    const Icon = item.icon;
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isExpanded = Boolean(expandedMenus[item.path]);
+
+    return (
+      <div key={item.path} className="relative">
+        <div
+          className={`flex items-center justify-between px-2 py-1 rounded-md transition cursor-pointer select-none text-[11px] ${
+            isActive
+              ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
+              : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-medium'
+          }`}
+          onClick={() => {
+            navigate(item.path);
+            if (hasSubItems) {
+              setExpandedMenus((prev) => ({
+                [item.path]: !prev[item.path],
+              }));
+            } else {
+              setExpandedMenus({});
+              setSidebarOpen(false);
+            }
+          }}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
+            <span className="truncate leading-tight text-[11px]">{item.label}</span>
+          </div>
+
+          {hasSubItems && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedMenus((prev) => ({
+                  [item.path]: !prev[item.path],
+                }));
+              }}
+              className={`p-0.5 rounded transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-700'}`}
+              title="Toggle Submenu Options"
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90 text-amber-300' : ''}`} />
+            </button>
+          )}
+        </div>
+
+        {/* Floating Submenu Popover (Zero Vertical Scroll) */}
+        {hasSubItems && isExpanded && (
+          <div
+            className={`absolute left-full ${
+              isBottomHalf ? 'bottom-0' : 'top-0'
+            } ml-2 w-64 z-50 bg-white rounded-xl shadow-2xl border border-blue-200/90 p-2 animate-in fade-in zoom-in-95 duration-150`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-2 py-1 border-b border-blue-100 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-blue-900">
+              <span className="truncate">{item.label}</span>
+              <button
+                type="button"
+                onClick={() => setExpandedMenus((prev) => ({ ...prev, [item.path]: false }))}
+                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="py-1 max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
+              {item.subItems.map((sub: any) => {
+                const currentViewParam = new URLSearchParams(location.search).get('view');
+                const isSubActive =
+                  location.pathname.startsWith(item.path) &&
+                  (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
+
+                return (
+                  <Link
+                    key={sub.path}
+                    to={sub.path}
+                    onClick={() => {
+                      setExpandedMenus({});
+                      setSidebarOpen(false);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition font-medium ${
+                      isSubActive
+                        ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                        : 'text-slate-600 hover:text-blue-950 hover:bg-blue-50'
+                    }`}
+                  >
+                    <span className={`w-1 h-1 rounded-full shrink-0 ${isSubActive ? 'bg-amber-300' : 'bg-slate-300'}`} />
+                    <span className="truncate">{sub.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const currentRoleMeta = ADMIN_ROLE_DEFINITIONS[activeRole] || ADMIN_ROLE_DEFINITIONS.SUPER_ADMIN;
   return (
@@ -999,217 +1113,77 @@ export const AdminLayout: React.FC = () => {
             className="fixed inset-0 bg-navy-950/40 z-30 lg:hidden backdrop-blur-xs"
           />
         )}
-        {/* Dedicated Admin Light Blue Sidebar */}
+        {/* Dedicated Admin Light Blue Sidebar (2-Column Zero-Scroll Layout) */}
         <aside
-          className={`fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-68 bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
+          className={`admin-sidebar-container fixed lg:sticky top-16 left-0 z-30 h-[calc(100vh-4rem)] w-80 sm:w-96 lg:w-[480px] xl:w-[500px] bg-gradient-to-b from-white via-[#f4f8fe] to-[#edf4fc] border-r border-blue-200/80 text-slate-700 flex flex-col justify-between transition-transform duration-200 ease-in-out shrink-0 shadow-xs ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
         >
-          {/* Quick Category Filter Pills & Accordion Controls (0-Scroll Header) */}
-          <div className="p-2 border-b border-blue-200/80 bg-white/70 backdrop-blur-xs space-y-1.5 shrink-0">
-            <div className="flex items-center justify-between px-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-blue-600" />
-                <span>Categories</span>
+          {/* Top Info Header */}
+          <div className="px-3 py-1.5 border-b border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-navy-950">
+                Admin Console Navigation
               </span>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <button
-                  type="button"
-                  onClick={expandAllSections}
-                  className="hover:text-blue-700 font-bold transition cursor-pointer"
-                  title="Expand all menu sections"
-                >
-                  All
-                </button>
-                <span className="text-slate-300">/</span>
-                <button
-                  type="button"
-                  onClick={collapseAllSections}
-                  className="hover:text-blue-700 font-bold transition cursor-pointer"
-                  title="Collapse all menu sections"
-                >
-                  Collapse
-                </button>
-              </div>
+              <span className="text-[10px] font-mono font-black bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
+                31 Menus
+              </span>
+            </div>
+            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 hidden sm:inline-block">
+              Zero-Scroll View
+            </span>
+          </div>
+
+          {/* 2-Column Balanced Menu Grid (All 31 Menus 100% Visible Without Vertical Scroll) */}
+          <div className="flex-1 p-2 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto lg:overflow-hidden select-none">
+            {/* Column 1: Core Governance, Stakeholders & Quotation Desk (14 Items) */}
+            <div className="space-y-1.5 flex flex-col justify-between">
+              {col1Sections.map((sec, sIdx) => (
+                <div key={sIdx} className="rounded-xl border border-blue-100/80 bg-white/80 p-1.5 shadow-2xs space-y-0.5">
+                  <div className="px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-900/90 flex items-center justify-between">
+                    <span className="truncate">{sec.title}</span>
+                    <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 rounded">
+                      {sec.items.length}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {sec.items.map((item: any) => renderMenuItem(item, false))}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Category Filter Pills (Instant 1-Click Jump with 0 Scrolling) */}
-            <div className="grid grid-cols-6 gap-1 text-[10px] font-bold">
-              {[
-                { id: 'ALL', label: 'All' },
-                { id: 0, label: '1.Core' },
-                { id: 1, label: '2.Users' },
-                { id: 2, label: '3.Quote' },
-                { id: 3, label: '4.Proj' },
-                { id: 4, label: '5.Ops' },
-              ].map((pill) => {
-                const isSelected = activeSectionFilter === pill.id;
+            {/* Column 2: Projects, Finance & Operations (17 Items) */}
+            <div className="space-y-1.5 flex flex-col justify-between">
+              {col2Sections.map((sec, sIdx) => {
+                const isBottomSec = sIdx === col2Sections.length - 1;
                 return (
-                  <button
-                    key={pill.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveSectionFilter(pill.id as any);
-                      if (pill.id !== 'ALL') {
-                        setOpenSections((prev) => ({ ...prev, [pill.id as number]: true }));
-                      }
-                    }}
-                    className={`py-1 rounded-md text-center transition cursor-pointer font-bold truncate ${
-                      isSelected
-                        ? 'bg-blue-600 text-white shadow-2xs font-black'
-                        : 'bg-slate-100/90 text-slate-600 hover:bg-blue-50 hover:text-blue-900 border border-slate-200/60'
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
+                  <div key={sIdx} className="rounded-xl border border-blue-100/80 bg-white/80 p-1.5 shadow-2xs space-y-0.5">
+                    <div className="px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-900/90 flex items-center justify-between">
+                      <span className="truncate">{sec.title}</span>
+                      <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 rounded">
+                        {sec.items.length}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {sec.items.map((item: any, itemIdx: number) =>
+                        renderMenuItem(item, isBottomSec && itemIdx >= 3)
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Admin Navigation Menu (Full Height Flex, Compact Density, Accordion) */}
-          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto text-xs scrollbar-thin scrollbar-thumb-blue-200">
-            {navSections.map((sec, secIdx) => {
-              if (activeSectionFilter !== 'ALL' && activeSectionFilter !== secIdx) {
-                return null;
-              }
-              const isSectionOpen = openSections[secIdx] ?? true;
-
-              return (
-                <div key={secIdx} className="space-y-0.5 rounded-xl border border-blue-100/70 bg-white/50 p-1 shadow-2xs">
-                  {/* Collapsible Section Header Accordion Button */}
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(secIdx)}
-                    className="w-full px-2 py-1 text-[10.5px] font-black uppercase tracking-wider text-blue-950 hover:text-blue-700 hover:bg-blue-50/80 rounded-lg flex items-center justify-between transition cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSectionOpen ? 'bg-blue-600' : 'bg-slate-400'} shrink-0`} />
-                      <span className="truncate">{sec.title}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
-                      <span className="text-[9px] font-mono font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">
-                        {sec.items.length}
-                      </span>
-                      <ChevronDown
-                        className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${
-                          isSectionOpen ? 'rotate-180 text-blue-600' : ''
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {/* Section Items */}
-                  {isSectionOpen && (
-                    <div className="space-y-0.5 pt-0.5 animate-in fade-in duration-150">
-                      {(sec.items || []).map((item: any) => {
-                        const isActive = item.exact
-                          ? location.pathname === item.path
-                          : location.pathname.startsWith(item.path);
-                        const Icon = item.icon;
-                        const hasSubItems = item.subItems && item.subItems.length > 0;
-                        const isExpanded = Boolean(expandedMenus[item.path]);
-
-                        if (hasSubItems) {
-                          return (
-                            <div key={item.path} className="space-y-0.5">
-                              <div
-                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg font-medium transition cursor-pointer select-none ${
-                                  isActive
-                                    ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
-                                    : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
-                                }`}
-                                onClick={() => {
-                                  setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
-                                  if (!location.pathname.startsWith(item.path)) {
-                                    navigate(item.path);
-                                  }
-                                }}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
-                                  <span className="truncate text-[11.5px] leading-tight">{item.label}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedMenus((prev) => ({ ...prev, [item.path]: !prev[item.path] }));
-                                  }}
-                                  className={`p-0.5 rounded-md hover:bg-white/20 transition ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                                  aria-label="Toggle Submenu"
-                                >
-                                  <ChevronDown
-                                    className={`w-3 h-3 transition-transform duration-200 ${
-                                      isExpanded ? 'rotate-180' : ''
-                                    }`}
-                                  />
-                                </button>
-                              </div>
-
-                              {/* Collapsible Submenu Dropdown */}
-                              {isExpanded && (
-                                <div className="pl-3 pr-1 py-0.5 space-y-0.5 border-l-2 border-blue-300/80 ml-3.5 animate-in fade-in duration-150">
-                                  {item.subItems.map((sub: any) => {
-                                    const currentViewParam = new URLSearchParams(location.search).get('view');
-                                    const isSubActive =
-                                      location.pathname.startsWith(item.path) &&
-                                      (currentViewParam === sub.view || (!currentViewParam && (sub.view === 'ALL' || sub.view === 'SUBMISSIONS' || sub.view === 'PROJECT_MILESTONES' || sub.view === 'PENDING_PAYOUTS' || sub.view === 'CUSTOMER_INVOICES' || sub.view === 'CUSTOMER_MESSAGES' || sub.view === 'CUSTOMER_COMPLAINTS' || sub.view === 'CUSTOMER_REPORTS' || sub.view === 'CUSTOMER_NOTIFICATIONS' || sub.view === 'HOMEPAGE_CONTENT' || sub.view === 'SERVICE_CATEGORIES' || sub.view === 'ADMIN_USERS' || sub.view === 'GENERAL_SETTINGS' || sub.view === 'ADMIN_ACTIVITY')));
-
-                                    return (
-                                      <Link
-                                        key={sub.path}
-                                        to={sub.path}
-                                        onClick={() => setSidebarOpen(false)}
-                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10.5px] transition font-medium ${
-                                          isSubActive
-                                            ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                                            : 'text-slate-600 hover:text-blue-950 hover:bg-blue-100/60'
-                                        }`}
-                                      >
-                                        <span
-                                          className={`w-1 h-1 rounded-full shrink-0 ${
-                                            isSubActive ? 'bg-amber-300 scale-125' : 'bg-slate-300'
-                                          }`}
-                                        />
-                                        <span className="truncate">{sub.label}</span>
-                                      </Link>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            onClick={() => setSidebarOpen(false)}
-                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium transition ${
-                              isActive
-                                ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-navy-900 text-white font-bold shadow-xs border border-blue-400/30'
-                                : 'text-slate-700 hover:bg-blue-100/70 hover:text-navy-950 font-semibold'
-                            }`}
-                          >
-                            <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-300' : 'text-blue-600'}`} />
-                            <span className="truncate text-[11.5px] leading-tight">{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
           {/* Slim Space-Saving Bottom Status Bar */}
-          <div className="px-3 py-2 border-t border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+          <div className="px-3 py-1.5 border-t border-blue-200/80 bg-white/80 backdrop-blur-xs flex items-center justify-between text-[10px] text-slate-500 shrink-0">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="font-bold text-slate-700">Atlas Online</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-blue-900 font-semibold">RBAC Active</span>
               <span className="text-slate-300">•</span>
               <span className="font-mono text-slate-400">v1.0</span>
             </div>
